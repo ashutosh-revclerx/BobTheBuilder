@@ -4,10 +4,34 @@ interface StatusBadgeProps {
   config: ComponentConfig;
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  success: '#00b894',
+  done: '#00b894',
+  completed: '#00b894',
+  active: '#00b894',
+  danger: '#ff6b6b',
+  blocked: '#ff6b6b',
+  error: '#ff6b6b',
+  critical: '#ff6b6b',
+  warning: '#fdcb6e',
+  'in progress': '#6c5ce7',
+  'to do': '#8888a8',
+  pending: '#8888a8',
+  default: '#00cec9',
+};
+
+function resolveColor(label: string, fallback: string): string {
+  const lower = label.toLowerCase();
+  for (const [key, color] of Object.entries(STATUS_COLORS)) {
+    if (lower.includes(key)) return color;
+  }
+  return fallback;
+}
+
 export default function StatusBadge({ config }: StatusBadgeProps) {
   const { style, data, label } = config;
   const value = typeof data.mockValue === 'string' ? data.mockValue : String(data.mockValue ?? '—');
-  const badgeColor = style.textColor || '#00b894';
+  const badgeColor = resolveColor(label, style.textColor || '#00cec9');
 
   return (
     <div
@@ -20,8 +44,6 @@ export default function StatusBadge({ config }: StatusBadgeProps) {
         borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
         borderStyle: 'solid',
         padding: style.padding ? `${style.padding}px` : undefined,
-        flexDirection: 'column',
-        gap: '8px',
       }}
     >
       <span
@@ -32,25 +54,14 @@ export default function StatusBadge({ config }: StatusBadgeProps) {
         }}
       >
         <span
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: '50%',
-            backgroundColor: badgeColor,
-            display: 'inline-block',
-          }}
+          className="status-dot"
+          style={{ backgroundColor: badgeColor }}
         />
         {value}
       </span>
       <div
-        style={{
-          fontSize: '11px',
-          fontWeight: 600,
-          textTransform: 'uppercase' as const,
-          letterSpacing: '0.05em',
-          color: `${style.textColor || '#a0a0b8'}88`,
-          marginTop: '4px',
-        }}
+        className="status-badge-label"
+        style={{ color: `${style.textColor || '#8888a8'}88` }}
       >
         {label}
       </div>

@@ -10,10 +10,25 @@ import {
 } from 'recharts';
 import type { ComponentConfig } from '../../types/template';
 
-const LINE_COLORS = ['#6c5ce7', '#00cec9', '#fdcb6e', '#ff6b6b', '#00b894'];
+const LINE_COLORS = ['#6c5ce7', '#00cec9', '#a855f7', '#fdcb6e', '#00b894'];
 
 interface LineChartProps {
   config: ComponentConfig;
+}
+
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="chart-custom-tooltip">
+      <div className="label">{label}</div>
+      {payload.map((entry, i) => (
+        <div key={i} className="item">
+          <span className="dot" style={{ background: entry.color }} />
+          {entry.name}: {entry.value.toLocaleString()}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function LineChart({ config }: LineChartProps) {
@@ -43,28 +58,24 @@ export default function LineChart({ config }: LineChartProps) {
       <div className="chart-component-title" style={{ color: style.textColor }}>{label}</div>
       <ResponsiveContainer width="100%" height={240}>
         <RechartsLineChart data={chartData as Record<string, unknown>[]} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
           <XAxis
             dataKey={xKey}
-            tick={{ fill: '#a0a0b8', fontSize: 11 }}
-            axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+            tick={{ fill: '#8888a8', fontSize: 10, fontFamily: 'DM Sans' }}
+            axisLine={{ stroke: 'rgba(255,255,255,0.05)' }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: '#a0a0b8', fontSize: 11 }}
-            axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+            tick={{ fill: '#8888a8', fontSize: 10, fontFamily: 'DM Sans' }}
+            axisLine={false}
             tickLine={false}
           />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#252532',
-              border: '1px solid #2a2a3a',
-              borderRadius: '8px',
-              fontSize: '12px',
-              color: '#f0f0f5',
-            }}
+          <Tooltip content={<CustomTooltip />} />
+          <Legend
+            wrapperStyle={{ fontSize: '10px', fontFamily: 'DM Sans', color: '#8888a8' }}
+            iconType="circle"
+            iconSize={6}
           />
-          <Legend wrapperStyle={{ fontSize: '11px', color: '#a0a0b8' }} />
           {series.map((s, i) => (
             <Line
               key={s.fieldKey}
@@ -73,8 +84,8 @@ export default function LineChart({ config }: LineChartProps) {
               name={s.name}
               stroke={LINE_COLORS[i % LINE_COLORS.length]}
               strokeWidth={2}
-              dot={{ fill: LINE_COLORS[i % LINE_COLORS.length], r: 4 }}
-              activeDot={{ r: 6 }}
+              dot={{ fill: LINE_COLORS[i % LINE_COLORS.length], r: 3, strokeWidth: 0 }}
+              activeDot={{ r: 5, stroke: LINE_COLORS[i % LINE_COLORS.length], strokeWidth: 2, fill: '#0f0f14' }}
             />
           ))}
         </RechartsLineChart>

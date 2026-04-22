@@ -10,10 +10,25 @@ import {
 } from 'recharts';
 import type { ComponentConfig } from '../../types/template';
 
-const CHART_COLORS = ['#6c5ce7', '#00cec9', '#fdcb6e', '#ff6b6b', '#00b894'];
+const CHART_COLORS = ['#6c5ce7', '#a855f7', '#00cec9', '#fdcb6e', '#00b894'];
 
 interface BarChartProps {
   config: ComponentConfig;
+}
+
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="chart-custom-tooltip">
+      <div className="label">{label}</div>
+      {payload.map((entry, i) => (
+        <div key={i} className="item">
+          <span className="dot" style={{ background: entry.color }} />
+          {entry.name}: {entry.value.toLocaleString()}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function BarChart({ config }: BarChartProps) {
@@ -21,7 +36,6 @@ export default function BarChart({ config }: BarChartProps) {
   const chartData = Array.isArray(data.mockValue) ? data.mockValue : [];
   const series = data.series || [{ name: 'Value', fieldKey: 'value' }];
 
-  // Determine the x-axis key (first string field that isn't a series fieldKey)
   const seriesKeys = new Set(series.map((s) => s.fieldKey));
   const firstRow = chartData[0] as Record<string, unknown> | undefined;
   const xKey = firstRow
@@ -44,28 +58,24 @@ export default function BarChart({ config }: BarChartProps) {
       <div className="chart-component-title" style={{ color: style.textColor }}>{label}</div>
       <ResponsiveContainer width="100%" height={240}>
         <RechartsBarChart data={chartData as Record<string, unknown>[]} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
           <XAxis
             dataKey={xKey}
-            tick={{ fill: '#a0a0b8', fontSize: 11 }}
-            axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+            tick={{ fill: '#8888a8', fontSize: 10, fontFamily: 'DM Sans' }}
+            axisLine={{ stroke: 'rgba(255,255,255,0.05)' }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: '#a0a0b8', fontSize: 11 }}
-            axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+            tick={{ fill: '#8888a8', fontSize: 10, fontFamily: 'DM Sans' }}
+            axisLine={false}
             tickLine={false}
           />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#252532',
-              border: '1px solid #2a2a3a',
-              borderRadius: '8px',
-              fontSize: '12px',
-              color: '#f0f0f5',
-            }}
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(108, 92, 231, 0.08)' }} />
+          <Legend
+            wrapperStyle={{ fontSize: '10px', fontFamily: 'DM Sans', color: '#8888a8' }}
+            iconType="circle"
+            iconSize={6}
           />
-          <Legend wrapperStyle={{ fontSize: '11px', color: '#a0a0b8' }} />
           {series.map((s, i) => (
             <Bar
               key={s.fieldKey}
@@ -73,6 +83,7 @@ export default function BarChart({ config }: BarChartProps) {
               name={s.name}
               fill={CHART_COLORS[i % CHART_COLORS.length]}
               radius={[4, 4, 0, 0]}
+              maxBarSize={48}
             />
           ))}
         </RechartsBarChart>

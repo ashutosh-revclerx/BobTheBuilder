@@ -402,6 +402,15 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 - [x] Clicking `×` shows an inline confirmation directly below the button: "Remove this component? Yes / No" — no modal
 - [x] Confirming removes the component from Zustand `components` array and deselects if it was selected
 
+#### 0.8 — Phase 0.5: Visual Polish & Pretext Integration (Completed)
+
+- [x] Integrate standard modern UI tokens, themes, typography (DM Sans), gradients, and animations into CSS (`index.css`).
+- [x] Integrate `@chenglou/pretext` for advanced intelligent dynamic text measurement (`useTextMeasure.ts`).
+- [x] Implement accurately sized sliding/hovering labels for builder canvas components without layout reflows.
+- [x] Implement robust dynamic binary-searched column-text truncation to fix visual overflow inside Table components intelligently.
+- [x] Build kinetic input elements that auto-resize securely relative to input string scale for dashboard names.
+- [x] Fully upgrade aesthetics for `RightPanel`, `Canvas`, `Table`, `LineChart`, `BarChart`, `StatCard`, and `StatusBadge` interfaces.
+
 ---
 
 ### Phase 1 — Core Engine
@@ -520,4 +529,4 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 ---
 
-*Current status: Phase 0 — COMPLETE. All sub-tasks 0.1–0.7 done. Ready for Phase 1.*
+*Current status: Phase 0 & 0.5 — COMPLETE. All sub-tasks 0.1–0.8 done (including visual aesthetic rewrite and pretext integration). Ready for Phase 1.*

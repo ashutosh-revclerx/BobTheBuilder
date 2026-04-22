@@ -7,6 +7,7 @@ import LineChartComponent from '../dashboard-components/LineChart';
 import StatusBadge from '../dashboard-components/StatusBadge';
 import ComponentPicker from './ComponentPicker';
 import { useState } from 'react';
+import { useLabelWidth } from '../../hooks/useTextMeasure';
 
 const ComponentMap: Record<ComponentType, React.ComponentType<{ config: ComponentConfig }>> = {
   StatCard,
@@ -15,6 +16,20 @@ const ComponentMap: Record<ComponentType, React.ComponentType<{ config: Componen
   LineChart: LineChartComponent,
   StatusBadge,
 };
+
+// Floating label rendered with pretext-measured pill width
+function FloatingLabel({ text }: { text: string }) {
+  const pillWidth = useLabelWidth(text);
+
+  return (
+    <div
+      className="canvas-component-label"
+      style={{ width: pillWidth > 0 ? `${pillWidth}px` : undefined }}
+    >
+      {text}
+    </div>
+  );
+}
 
 export default function Canvas() {
   const components = useEditorStore((s) => s.components);
@@ -29,7 +44,6 @@ export default function Canvas() {
   const charts = components.filter((c) => c.type === 'BarChart' || c.type === 'LineChart');
   const tables = components.filter((c) => c.type === 'Table');
 
-  // Maintain ordering from template JSON: render in order but group visually
   const groupOrder: { type: string; items: ComponentConfig[] }[] = [];
   const seen = new Set<string>();
 
@@ -95,6 +109,9 @@ export default function Canvas() {
           if (confirmRemoveId !== comp.id) setConfirmRemoveId(null);
         }}
       >
+        {/* Feature A: pretext-measured floating label */}
+        <FloatingLabel text={comp.label} />
+
         <button
           className="remove-btn"
           onClick={(e) => handleRemoveClick(e, comp.id)}
@@ -138,16 +155,10 @@ export default function Canvas() {
         })}
 
         {components.length === 0 && (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '80px 20px',
-              color: 'var(--text-muted)',
-            }}
-          >
-            <div style={{ fontSize: '40px', marginBottom: '12px', opacity: 0.4 }}>📊</div>
-            <p style={{ fontSize: '15px', fontWeight: 500, marginBottom: '6px' }}>No components yet</p>
-            <p style={{ fontSize: '13px' }}>Click the + button below to add your first component</p>
+          <div className="canvas-empty">
+            <div className="canvas-empty-icon">📊</div>
+            <p style={{ fontSize: '14px', fontWeight: 500, marginBottom: '6px' }}>No components yet</p>
+            <p style={{ fontSize: '12px' }}>Click the button below to add your first component</p>
           </div>
         )}
 

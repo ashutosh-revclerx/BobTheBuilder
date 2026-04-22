@@ -17,9 +17,10 @@ export default function RightPanel() {
   return (
     <div className="right-panel">
       <div className="right-panel-header">
-        <span className="right-panel-title">
-          {component.type} — {component.label}
-        </span>
+        <div className="right-panel-title">
+          {component.label}
+          <span className="right-panel-type-badge">{component.type}</span>
+        </div>
         <button className="right-panel-close" onClick={() => selectComponent(null)}>
           ✕
         </button>

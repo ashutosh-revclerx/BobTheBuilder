@@ -4,6 +4,7 @@ import { useEditorStore } from '../store/editorStore';
 import { getTemplateById, getBlankTemplate } from '../templates';
 import Canvas from '../components/editor/Canvas';
 import RightPanel from '../components/editor/RightPanel';
+import { useKineticWidth } from '../hooks/useTextMeasure';
 
 export default function BuilderPage() {
   const { templateId } = useParams<{ templateId: string }>();
@@ -23,6 +24,9 @@ export default function BuilderPage() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
 
+  // Feature C: pretext kinetic width for name input
+  const nameWidth = useKineticWidth(dashboardName);
+
   useEffect(() => {
     loadFromLocalStorage();
   }, [loadFromLocalStorage]);
@@ -30,14 +34,12 @@ export default function BuilderPage() {
   useEffect(() => {
     if (!templateId) return;
 
-    // Check if there's a saved version
     const saved = savedTemplates[templateId];
     if (saved) {
       loadSavedTemplate(saved);
       return;
     }
 
-    // Load from default templates
     if (templateId === 'blank') {
       const blank = getBlankTemplate();
       loadTemplate(blank.id, blank.name, blank.components);
@@ -49,7 +51,6 @@ export default function BuilderPage() {
         navigate('/templates');
       }
     }
-    // Only run when templateId changes or when savedTemplates are first loaded
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId]);
 
@@ -62,7 +63,6 @@ export default function BuilderPage() {
   const handleReset = () => {
     if (!originalTemplateId) return;
     resetToDefault();
-    // Reload the original template
     if (originalTemplateId.startsWith('blank')) {
       const blank = getBlankTemplate();
       loadTemplate(blank.id, blank.name, blank.components);
@@ -81,11 +81,16 @@ export default function BuilderPage() {
     <div className="builder-layout">
       {/* Top Bar */}
       <div className="builder-topbar">
+        <div className="topbar-logo">
+          <div className="topbar-logo-icon">B</div>
+          <span className="topbar-logo-text">BoardTool</span>
+        </div>
+        <div className="topbar-divider" />
         <button
           className="topbar-back"
           onClick={() => navigate('/templates')}
         >
-          ← Gallery
+          ← Templates
         </button>
         <div className="topbar-divider" />
         <div className="topbar-name">
@@ -95,6 +100,7 @@ export default function BuilderPage() {
             value={dashboardName}
             onChange={(e) => setDashboardName(e.target.value)}
             placeholder="Dashboard name"
+            style={{ width: `${nameWidth}px` }}
           />
         </div>
         <div className="topbar-actions">
@@ -103,25 +109,25 @@ export default function BuilderPage() {
               className="btn-topbar danger-text"
               onClick={() => setShowResetConfirm(true)}
             >
-              Reset to default
+              Reset
             </button>
           )}
           {showResetConfirm && (
             <div className="reset-confirm-inline">
-              <span>Reset all changes?</span>
+              <span>Reset all?</span>
               <button className="confirm-yes" onClick={handleReset}>Yes</button>
               <button className="confirm-no" onClick={() => setShowResetConfirm(false)}>No</button>
             </div>
           )}
-          <button className="btn-topbar">
-            👁️ Preview
-          </button>
+          <div className="preview-pill">
+            <button className="active">Edit</button>
+            <button>Preview</button>
+          </div>
           <button
-            className={`btn-topbar primary`}
+            className={`btn-topbar primary ${saveFlash ? 'saved' : ''}`}
             onClick={handleSave}
-            style={saveFlash ? { background: 'var(--accent-success)' } : undefined}
           >
-            {saveFlash ? '✓ Saved' : '💾 Save'}
+            {saveFlash ? '✓ Saved' : 'Save'}
           </button>
         </div>
       </div>
@@ -130,13 +136,13 @@ export default function BuilderPage() {
       <div className="builder-body">
         {/* Left Sidebar */}
         <div className="builder-sidebar">
-          <div className="sidebar-icon active" title="Components">
+          <div className="sidebar-icon active" data-tooltip="Components">
             <span>⊞</span>
           </div>
-          <div className="sidebar-icon" title="Layers">
+          <div className="sidebar-icon" data-tooltip="Layers">
             <span>☰</span>
           </div>
-          <div className="sidebar-icon" title="Settings">
+          <div className="sidebar-icon" data-tooltip="Settings">
             <span>⚙</span>
           </div>
         </div>

@@ -1,13 +1,59 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ComponentConfig } from '../../types/template';
+import { truncateTexts } from '../../hooks/useTextMeasure';
 
 interface TableProps {
   config: ComponentConfig;
+}
+
+function TruncatedCell({ text, colWidth }: { text: string; colWidth: number }) {
+  const [hover, setHover] = useState(false);
+  const str = String(text ?? '');
+
+  // Use pretext to compute pixel-perfect truncation
+  const cellPad = 32; // 16px padding each side
+  const availW = colWidth - cellPad;
+  const result = availW > 0
+    ? truncateTexts([str], availW)[0]
+    : { display: str, full: str, isTruncated: false };
+
+  return (
+    <td
+      onMouseEnter={() => result.isTruncated && setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ position: 'relative' }}
+    >
+      {result.display}
+      {hover && result.isTruncated && (
+        <div className="cell-tooltip">{result.full}</div>
+      )}
+    </td>
+  );
 }
 
 export default function Table({ config }: TableProps) {
   const { style, data, label } = config;
   const columns = data.columns || [];
   const rows = (Array.isArray(data.mockValue) ? data.mockValue : []) as Record<string, unknown>[];
+
+  const tableRef = useRef<HTMLTableElement>(null);
+  const [colWidths, setColWidths] = useState<number[]>([]);
+
+  const measureCols = useCallback(() => {
+    if (!tableRef.current || columns.length === 0) return;
+    const ths = tableRef.current.querySelectorAll('thead th');
+    if (ths.length > 0) {
+      const widths = Array.from(ths).map((th) => (th as HTMLElement).offsetWidth);
+      setColWidths(widths);
+    }
+  }, [columns.length]);
+
+  useEffect(() => {
+    measureCols();
+    const obs = new ResizeObserver(measureCols);
+    if (tableRef.current) obs.observe(tableRef.current);
+    return () => obs.disconnect();
+  }, [measureCols]);
 
   return (
     <div
@@ -27,7 +73,7 @@ export default function Table({ config }: TableProps) {
           {label}
         </div>
       </div>
-      <table>
+      <table ref={tableRef}>
         <thead>
           <tr>
             {columns.map((col) => (
@@ -38,11 +84,16 @@ export default function Table({ config }: TableProps) {
         <tbody>
           {rows.map((row, rowIndex) => (
             <tr key={rowIndex}>
-              {columns.map((col) => (
-                <td key={col.fieldKey} style={{ color: style.textColor ? `${style.textColor}cc` : undefined }}>
-                  {String(row[col.fieldKey] ?? '')}
-                </td>
-              ))}
+              {columns.map((col, colIdx) => {
+                const cw = colWidths[colIdx] || 0;
+                return (
+                  <TruncatedCell
+                    key={col.fieldKey}
+                    text={String(row[col.fieldKey] ?? '')}
+                    colWidth={cw}
+                  />
+                );
+              })}
             </tr>
           ))}
         </tbody>
