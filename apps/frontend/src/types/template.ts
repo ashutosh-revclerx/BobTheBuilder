@@ -12,11 +12,12 @@ export interface ComponentStyle {
 export interface ComponentData {
   fieldName?: string;
   mockValue?: unknown;
-  dbBinding?: string;
+  dbBinding?: any; // Changed from string to any because it gets replaced with resolved data at runtime
   refreshOn?: 'manual' | 'onLoad' | 'onRowSelect';
   label?: string;
   series?: Array<{ name: string; fieldKey: string }>;
   columns?: Array<{ name: string; fieldKey: string }>;
+  _resolvedBindings?: Record<string, boolean>;
 }
 
 export type ComponentType = 'StatCard' | 'Table' | 'BarChart' | 'LineChart' | 'StatusBadge' | 'Button' | 'LogsViewer';
