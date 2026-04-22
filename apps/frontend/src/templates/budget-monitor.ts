@@ -1,0 +1,137 @@
+import type { TemplateConfig } from '../types/template';
+
+const budgetMonitor: TemplateConfig = {
+  id: 'budget-monitor',
+  name: 'Budget Monitor',
+  description: 'Cost metric cards, spending trend line chart, and category breakdown table',
+  components: [
+    {
+      id: 'stat-b1',
+      type: 'StatCard',
+      label: 'Total Spent',
+      style: {
+        backgroundColor: '#ffffff',
+        textColor: '#0f1117',
+        fontFamily: 'Inter',
+        fontSize: 14,
+        borderRadius: 10,
+        borderColor: '#e3e6ec',
+        borderWidth: 1,
+        padding: 20,
+      },
+      data: {
+        fieldName: 'total_spent',
+        mockValue: '₹12,84,500',
+        dbBinding: 'budgets.total_spent',
+        refreshOn: 'onLoad',
+      },
+    },
+    {
+      id: 'stat-b2',
+      type: 'StatCard',
+      label: 'Remaining Budget',
+      style: {
+        backgroundColor: '#ffffff',
+        textColor: '#0f1117',
+        fontFamily: 'Inter',
+        fontSize: 14,
+        borderRadius: 10,
+        borderColor: '#e3e6ec',
+        borderWidth: 1,
+        padding: 20,
+      },
+      data: {
+        fieldName: 'remaining',
+        mockValue: '₹5,15,500',
+        dbBinding: 'budgets.remaining',
+        refreshOn: 'onLoad',
+      },
+    },
+    {
+      id: 'stat-b3',
+      type: 'StatCard',
+      label: 'Burn Rate',
+      style: {
+        backgroundColor: '#ffffff',
+        textColor: '#0f1117',
+        fontFamily: 'Inter',
+        fontSize: 14,
+        borderRadius: 10,
+        borderColor: '#e3e6ec',
+        borderWidth: 1,
+        padding: 20,
+      },
+      data: {
+        fieldName: 'burn_rate',
+        mockValue: '₹2,14,000/mo',
+        dbBinding: 'budgets.burn_rate',
+        refreshOn: 'onLoad',
+      },
+    },
+    {
+      id: 'chart-b1',
+      type: 'LineChart',
+      label: 'Spending Trend',
+      style: {
+        backgroundColor: '#ffffff',
+        textColor: '#0f1117',
+        fontFamily: 'Inter',
+        fontSize: 14,
+        borderRadius: 10,
+        borderColor: '#e3e6ec',
+        borderWidth: 1,
+        padding: 20,
+      },
+      data: {
+        series: [
+          { name: 'Actual', fieldKey: 'actual' },
+          { name: 'Budget', fieldKey: 'budget' },
+        ],
+        mockValue: [
+          { month: 'Jan', actual: 180000, budget: 200000 },
+          { month: 'Feb', actual: 210000, budget: 200000 },
+          { month: 'Mar', actual: 195000, budget: 200000 },
+          { month: 'Apr', actual: 230000, budget: 220000 },
+          { month: 'May', actual: 215000, budget: 220000 },
+          { month: 'Jun', actual: 254500, budget: 220000 },
+        ],
+        dbBinding: 'budgets.spending_trend',
+        refreshOn: 'onLoad',
+      },
+    },
+    {
+      id: 'table-b1',
+      type: 'Table',
+      label: 'Category Breakdown',
+      style: {
+        backgroundColor: '#ffffff',
+        textColor: '#0f1117',
+        fontFamily: 'Inter',
+        fontSize: 13,
+        borderRadius: 10,
+        borderColor: '#e3e6ec',
+        borderWidth: 1,
+        padding: 0,
+      },
+      data: {
+        columns: [
+          { name: 'Category', fieldKey: 'category' },
+          { name: 'Allocated', fieldKey: 'allocated' },
+          { name: 'Spent', fieldKey: 'spent' },
+          { name: 'Remaining', fieldKey: 'remaining' },
+        ],
+        mockValue: [
+          { category: 'Engineering', allocated: '₹6,00,000', spent: '₹4,80,000', remaining: '₹1,20,000' },
+          { category: 'Design', allocated: '₹2,00,000', spent: '₹1,65,000', remaining: '₹35,000' },
+          { category: 'Marketing', allocated: '₹3,00,000', spent: '₹2,10,000', remaining: '₹90,000' },
+          { category: 'Infrastructure', allocated: '₹4,00,000', spent: '₹2,85,000', remaining: '₹1,15,000' },
+          { category: 'Operations', allocated: '₹3,00,000', spent: '₹1,44,500', remaining: '₹1,55,500' },
+        ],
+        dbBinding: 'budgets.category_breakdown',
+        refreshOn: 'onLoad',
+      },
+    },
+  ],
+};
+
+export default budgetMonitor;

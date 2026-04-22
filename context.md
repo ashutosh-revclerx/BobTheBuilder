@@ -298,7 +298,7 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 ### Phases Overview
 
 - [x] **Phase 0** — Template Gallery & Component Editor ← DONE
-- [ ] **Phase 1** — Core Engine (config → render → query → result)
+- [x] **Phase 1** — Core Engine (config → render → query → result) ← DONE
 - [ ] **Phase 2** — Persistence & Reactivity
 - [ ] **Phase 3** — Full Visual Builder
 - [ ] **Phase 4** — White-Label & Mobile
@@ -419,18 +419,18 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 > **Done when:** A hardcoded config dashboard renders a Table with live API data, a Button that triggers an agent, and a Logs Viewer that shows the output.
 
-- [ ] **1.1** — Project scaffolding: React + Tailwind frontend, Node/Express backend, monorepo config, CI pipeline, shared linting rules
-- [ ] **1.2** — JSON config schema v1: `components[]`, `queries[]`, `resources[]` — add Zod validation
-- [ ] **1.3** — Table component: rows from query data, column config, basic search, row click events
-- [ ] **1.4** — Button component: trigger query on click, loading / success / error states
-- [ ] **1.5** — Chart component: bar / line / pie via Recharts, auto-update on data change
-- [ ] **1.6** — Logs Viewer: INFO / WARN / ERROR colour coding, keyword filter
-- [ ] **1.7** — Dashboard renderer: reads JSON config, renders components in order with props wired via registry
-- [ ] **1.8** — Query engine (basic): `onLoad` and `manual` triggers, results written to Zustand
-- [ ] **1.9** — Binding resolver: resolves `queries.getUsers.data` and `queries.runAgent.trigger` from store
-- [ ] **1.10** — Backend `/execute` endpoint: POST, accepts `{ resource, endpoint, method, params }`, returns `{ success, data, error }`
-- [ ] **1.11** — One end-to-end dashboard: hardcoded config, Table shows live API data, Button triggers agent, Logs Viewer shows output
-- [ ] **1.12** — Basic error handling: readable error state in bound component, retry button, server-side failure logging
+- [x] **1.1** — Project scaffolding: React + Tailwind frontend, Node/Express backend, monorepo config, CI pipeline, shared linting rules
+- [x] **1.2** — JSON config schema v1: `components[]`, `queries[]`, `resources[]` — add Zod validation
+- [x] **1.3** — Table component: rows from query data, column config, basic search, row click events
+- [x] **1.4** — Button component: trigger query on click, loading / success / error states
+- [x] **1.5** — Chart component: bar / line / pie via Recharts, auto-update on data change
+- [x] **1.6** — Logs Viewer: INFO / WARN / ERROR colour coding, keyword filter
+- [x] **1.7** — Dashboard renderer: reads JSON config, renders components in order with props wired via registry
+- [x] **1.8** — Query engine (basic): `onLoad` and `manual` triggers, results written to Zustand
+- [x] **1.9** — Binding resolver: resolves `queries.getUsers.data` and `queries.runAgent.trigger` from store
+- [x] **1.10** — Backend `/execute` endpoint: POST, accepts `{ resource, endpoint, method, params }`, returns `{ success, data, error }`
+- [x] **1.11** — One end-to-end dashboard: hardcoded config, Table shows live API data, Button triggers agent, Logs Viewer shows output
+- [x] **1.12** — Basic error handling: readable error state in bound component, retry button, server-side failure logging
 
 ---
 
@@ -529,4 +529,4 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 ---
 
-*Current status: Phase 0 & 0.5 — COMPLETE. All sub-tasks 0.1–0.8 done (including visual aesthetic rewrite and pretext integration). Ready for Phase 1.*
+*Current status: Phase 0, 0.5, & 1 — COMPLETE. All sub-tasks 1.1–1.12 done. Ready for Phase 2.*
