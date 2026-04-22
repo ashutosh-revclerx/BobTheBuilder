@@ -4,6 +4,7 @@ import { useEditorStore } from '../store/editorStore';
 import { getTemplateById, getBlankTemplate } from '../templates';
 import Canvas from '../components/editor/Canvas';
 import RightPanel from '../components/editor/RightPanel';
+import LeftPanel from '../components/editor/LeftPanel';
 import { useKineticWidth } from '../hooks/useTextMeasure';
 
 export default function BuilderPage() {
@@ -23,6 +24,9 @@ export default function BuilderPage() {
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
+  
+  // Left panel toggle state
+  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
 
   // Feature C: pretext kinetic width for name input
   const nameWidth = useKineticWidth(dashboardName);
@@ -134,9 +138,13 @@ export default function BuilderPage() {
 
       {/* Body */}
       <div className="builder-body">
-        {/* Left Sidebar */}
+        {/* Narrow Sidebar Toggle */}
         <div className="builder-sidebar">
-          <div className="sidebar-icon active" data-tooltip="Components">
+          <div 
+            className={`sidebar-icon ${isLeftPanelOpen ? 'active' : ''}`} 
+            data-tooltip="Components"
+            onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+          >
             <span>⊞</span>
           </div>
           <div className="sidebar-icon" data-tooltip="Layers">
@@ -146,6 +154,9 @@ export default function BuilderPage() {
             <span>⚙</span>
           </div>
         </div>
+
+        {/* Left Panel */}
+        {isLeftPanelOpen && <LeftPanel />}
 
         {/* Canvas */}
         <Canvas />

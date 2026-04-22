@@ -4,7 +4,7 @@ import type { ComponentConfig, ComponentStyle, ComponentData, SavedTemplate, Com
 const STORAGE_KEY = 'dashboard_templates';
 
 // Default styles & data per component type
-const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: ComponentData }> = {
+const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: ComponentData; layout: ComponentConfig['layout'] }> = {
   StatCard: {
     style: {
       backgroundColor: '#ffffff',
@@ -22,6 +22,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       dbBinding: '',
       refreshOn: 'onLoad',
     },
+    layout: { x: 0, y: 0, w: 3, h: 3 }
   },
   Table: {
     style: {
@@ -46,6 +47,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       dbBinding: '',
       refreshOn: 'onLoad',
     },
+    layout: { x: 0, y: 0, w: 12, h: 8 }
   },
   BarChart: {
     style: {
@@ -68,6 +70,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       dbBinding: '',
       refreshOn: 'onLoad',
     },
+    layout: { x: 0, y: 0, w: 6, h: 6 }
   },
   LineChart: {
     style: {
@@ -90,6 +93,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       dbBinding: '',
       refreshOn: 'onLoad',
     },
+    layout: { x: 0, y: 0, w: 6, h: 6 }
   },
   StatusBadge: {
     style: {
@@ -108,6 +112,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       dbBinding: '',
       refreshOn: 'onLoad',
     },
+    layout: { x: 0, y: 0, w: 2, h: 2 }
   },
   Button: {
     style: {
@@ -121,7 +126,8 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
     data: {
       dbBinding: '',
       mockValue: null
-    }
+    },
+    layout: { x: 0, y: 0, w: 2, h: 2 }
   },
   LogsViewer: {
     style: {
@@ -136,7 +142,99 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
     data: {
       dbBinding: '',
       mockValue: ['[INFO] Ready.']
-    }
+    },
+    layout: { x: 0, y: 0, w: 12, h: 4 }
+  },
+  Container: {
+    style: {
+      backgroundColor: '#ffffff',
+      textColor: '#0f1117',
+      borderRadius: 10,
+      borderColor: '#e3e6ec',
+      borderWidth: 1,
+      padding: 16
+    },
+    data: {},
+    layout: { x: 0, y: 0, w: 12, h: 6 }
+  },
+  TabbedContainer: {
+    style: {
+      backgroundColor: '#ffffff',
+      textColor: '#0f1117',
+      fontFamily: 'Inter',
+      borderRadius: 10,
+      borderColor: '#e3e6ec',
+      borderWidth: 1,
+      padding: 0
+    },
+    data: {
+      tabs: ['View 1', 'View 2', 'View 3']
+    },
+    layout: { x: 0, y: 0, w: 12, h: 8 }
+  },
+  Text: {
+    style: {
+      textColor: '#0f1117',
+      fontFamily: 'Inter',
+      fontSize: 14,
+      padding: 8
+    },
+    data: {
+      mockValue: 'This is a text component. You can bind data to it or type markdown.'
+    },
+    layout: { x: 0, y: 0, w: 6, h: 2 }
+  },
+  TextInput: {
+    style: {
+      backgroundColor: '#ffffff',
+      textColor: '#0f1117',
+      fontFamily: 'Inter',
+      fontSize: 13,
+      borderRadius: 6,
+      borderColor: '#e3e6ec',
+      borderWidth: 1,
+      padding: 8
+    },
+    data: {
+      label: 'Input label',
+      mockValue: ''
+    },
+    layout: { x: 0, y: 0, w: 4, h: 2 }
+  },
+  NumberInput: {
+    style: {
+      backgroundColor: '#ffffff',
+      textColor: '#0f1117',
+      fontFamily: 'Inter',
+      fontSize: 13,
+      borderRadius: 6,
+      borderColor: '#e3e6ec',
+      borderWidth: 1,
+      padding: 8
+    },
+    data: {
+      label: 'Number label',
+      mockValue: 0
+    },
+    layout: { x: 0, y: 0, w: 4, h: 2 }
+  },
+  Select: {
+    style: {
+      backgroundColor: '#ffffff',
+      textColor: '#0f1117',
+      fontFamily: 'Inter',
+      fontSize: 13,
+      borderRadius: 6,
+      borderColor: '#e3e6ec',
+      borderWidth: 1,
+      padding: 8
+    },
+    data: {
+      label: 'Select label',
+      options: ['Option 1', 'Option 2', 'Option 3'],
+      mockValue: 'Option 1'
+    },
+    layout: { x: 0, y: 0, w: 4, h: 2 }
   }
 };
 
@@ -156,13 +254,18 @@ interface EditorState {
   queries: Record<string, { data: any; isLoading: boolean; error: string | null; lastRunAt: string | null }>;
   componentState: Record<string, any>;
 
+  // UI State for editing
+  activeTabs: Record<string, string>; // Tracks which tab is currently viewed in a TabbedContainer
+
   // Actions
   loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[]) => void;
   loadSavedTemplate: (saved: SavedTemplate) => void;
   selectComponent: (id: string | null) => void;
+  setActiveTab: (containerId: string, tab: string) => void;
   setDashboardName: (name: string) => void;
   updateStyle: (componentId: string, style: Partial<ComponentStyle>) => void;
   updateData: (componentId: string, data: Partial<ComponentData>) => void;
+  updateLayouts: (layouts: { id: string; x: number; y: number; w: number; h: number }[]) => void;
   addComponent: (type: ComponentType) => void;
   removeComponent: (id: string) => void;
   saveToLocalStorage: () => void;
@@ -182,11 +285,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   components: [],
   queriesConfig: [],
   selectedComponentId: null,
+  activeTabs: {},
   dirtyStyleMap: {},
   dirtyDataMap: {},
   savedTemplates: {},
   queries: {},
   componentState: {},
+
+  setActiveTab: (containerId, tab) => set((state) => ({
+    activeTabs: { ...state.activeTabs, [containerId]: tab }
+  })),
 
   setQueryState: (queryName, stateUpdates) => set((state) => ({
     queries: {
@@ -216,6 +324,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       components: JSON.parse(JSON.stringify(components)),
       queriesConfig: JSON.parse(JSON.stringify(queries)),
       selectedComponentId: null,
+      activeTabs: {},
       dirtyStyleMap: {},
       dirtyDataMap: {},
       queries: {},
@@ -231,6 +340,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       components: JSON.parse(JSON.stringify(saved.components)),
       queriesConfig: JSON.parse(JSON.stringify((saved as any).queries || [])),
       selectedComponentId: null,
+      activeTabs: {},
       dirtyStyleMap: {},
       dirtyDataMap: {},
       queries: {},
@@ -287,27 +397,88 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
+  updateLayouts: (newLayouts) => {
+    set((state) => {
+      const newComponents = state.components.map((c) => {
+        const matchingLayout = newLayouts.find((l) => l.id === c.id);
+        if (matchingLayout) {
+          return {
+            ...c,
+            layout: {
+              x: matchingLayout.x,
+              y: matchingLayout.y,
+              w: matchingLayout.w,
+              h: matchingLayout.h,
+            },
+          };
+        }
+        return c;
+      });
+      return { components: newComponents };
+    });
+  },
+
   addComponent: (type) => {
-    const id = `${type.toLowerCase()}-${Date.now()}`;
-    const defaults = defaultConfigs[type];
-    const newComponent: ComponentConfig = {
-      id,
-      type,
-      label: `New ${type}`,
-      style: { ...defaults.style },
-      data: JSON.parse(JSON.stringify(defaults.data)),
-    };
-    set((state) => ({
-      components: [...state.components, newComponent],
-      selectedComponentId: id,
-    }));
+    set((state) => {
+      const id = `${type.toLowerCase()}-${Date.now()}`;
+      const defaults = defaultConfigs[type];
+      
+      let parentId: string | undefined = undefined;
+      let parentTab: string | undefined = undefined;
+      
+      if (state.selectedComponentId) {
+        const selectedComp = state.components.find((c) => c.id === state.selectedComponentId);
+        if (selectedComp) {
+          if (selectedComp.type === 'Container') {
+            parentId = selectedComp.id;
+          } else if (selectedComp.type === 'TabbedContainer') {
+            parentId = selectedComp.id;
+            parentTab = state.activeTabs[selectedComp.id] || selectedComp.data.tabs?.[0];
+          }
+        }
+      }
+
+      const newComponent: ComponentConfig = {
+        id,
+        type,
+        label: `New ${type}`,
+        style: { ...defaults.style },
+        data: JSON.parse(JSON.stringify(defaults.data)),
+        parentId,
+        parentTab,
+        layout: { ...(defaults as any).layout }
+      };
+
+      return {
+        components: [...state.components, newComponent],
+        selectedComponentId: id,
+      };
+    });
   },
 
   removeComponent: (id) => {
-    set((state) => ({
-      components: state.components.filter((c) => c.id !== id),
-      selectedComponentId: state.selectedComponentId === id ? null : state.selectedComponentId,
-    }));
+    set((state) => {
+      let idsToRemove = new Set<string>([id]);
+      
+      // Cascade recursively find all children
+      let hasNewChildren = true;
+      while (hasNewChildren) {
+        hasNewChildren = false;
+        const currentCount = idsToRemove.size;
+        for (const comp of state.components) {
+          if (comp.parentId && idsToRemove.has(comp.parentId) && !idsToRemove.has(comp.id)) {
+            idsToRemove.add(comp.id);
+            hasNewChildren = true;
+          }
+        }
+        if (idsToRemove.size === currentCount) break;
+      }
+
+      return {
+        components: state.components.filter((c) => !idsToRemove.has(c.id)),
+        selectedComponentId: (state.selectedComponentId && idsToRemove.has(state.selectedComponentId)) ? null : state.selectedComponentId,
+      };
+    });
   },
 
   saveToLocalStorage: () => {

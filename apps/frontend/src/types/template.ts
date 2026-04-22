@@ -18,9 +18,15 @@ export interface ComponentData {
   series?: Array<{ name: string; fieldKey: string }>;
   columns?: Array<{ name: string; fieldKey: string }>;
   _resolvedBindings?: Record<string, boolean>;
+  tabs?: string[]; // for TabbedContainer
+  options?: string[]; // for Select
 }
 
-export type ComponentType = 'StatCard' | 'Table' | 'BarChart' | 'LineChart' | 'StatusBadge' | 'Button' | 'LogsViewer';
+export type ComponentType = 
+  | 'StatCard' | 'Table' | 'BarChart' | 'LineChart' 
+  | 'StatusBadge' | 'Button' | 'LogsViewer'
+  | 'Container' | 'TabbedContainer'
+  | 'Text' | 'TextInput' | 'NumberInput' | 'Select';
 
 export interface ComponentConfig {
   id: string;
@@ -28,6 +34,14 @@ export interface ComponentConfig {
   label: string;
   style: ComponentStyle;
   data: ComponentData;
+  parentId?: string; // used for nesting inside containers
+  parentTab?: string; // used when nested inside a TabbedContainer
+  layout?: {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  };
 }
 
 export interface TemplateConfig {

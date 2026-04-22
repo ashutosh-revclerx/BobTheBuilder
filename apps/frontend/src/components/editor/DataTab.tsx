@@ -58,6 +58,26 @@ export default function DataTab() {
     handleDataField('series', series.filter((_, i) => i !== index));
   };
 
+  const isTabbed = type === 'TabbedContainer';
+  const tabs = data.tabs || [];
+  const handleTabChange = (index: number, val: string) => {
+    const newTabs = [...tabs];
+    newTabs[index] = val;
+    handleDataField('tabs', newTabs);
+  };
+  const handleAddTab = () => handleDataField('tabs', [...tabs, `Tab ${tabs.length + 1}`]);
+  const handleDeleteTab = (index: number) => handleDataField('tabs', tabs.filter((_, i) => i !== index));
+
+  const isSelect = type === 'Select';
+  const options = data.options || [];
+  const handleOptionChange = (index: number, val: string) => {
+    const newOptions = [...options];
+    newOptions[index] = val;
+    handleDataField('options', newOptions);
+  };
+  const handleAddOption = () => handleDataField('options', [...options, `Option ${options.length + 1}`]);
+  const handleDeleteOption = (index: number) => handleDataField('options', options.filter((_, i) => i !== index));
+
   const mockValueDisplay = (isChart || isTable)
     ? JSON.stringify(data.mockValue, null, 2)
     : String(data.mockValue ?? '');
@@ -179,6 +199,46 @@ export default function DataTab() {
             <button className="mini-editor-add" onClick={handleAddSeries}>
               + Add series
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs list for TabbedContainer */}
+      {isTabbed && (
+        <div className="form-group">
+          <label className="form-label">Tabs</label>
+          <div className="mini-editor">
+            {tabs.map((tab, i) => (
+              <div key={i} className="mini-editor-row">
+                <input
+                  value={tab}
+                  onChange={(e) => handleTabChange(i, e.target.value)}
+                  placeholder="Tab name"
+                />
+                <button className="mini-editor-delete" onClick={() => handleDeleteTab(i)}>×</button>
+              </div>
+            ))}
+            <button className="mini-editor-add" onClick={handleAddTab}>+ 'New Tab'</button>
+          </div>
+        </div>
+      )}
+
+      {/* Options list for Select dropdowns */}
+      {isSelect && (
+        <div className="form-group">
+          <label className="form-label">Options</label>
+          <div className="mini-editor">
+            {options.map((opt, i) => (
+              <div key={i} className="mini-editor-row">
+                <input
+                  value={opt}
+                  onChange={(e) => handleOptionChange(i, e.target.value)}
+                  placeholder="Option name"
+                />
+                <button className="mini-editor-delete" onClick={() => handleDeleteOption(i)}>×</button>
+              </div>
+            ))}
+            <button className="mini-editor-add" onClick={handleAddOption}>+ 'New Option'</button>
           </div>
         </div>
       )}

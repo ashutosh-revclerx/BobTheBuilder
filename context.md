@@ -457,14 +457,14 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 > **Goal:** Engineers build dashboards entirely in the UI. No JSON editing required.
 
-- [ ] **3.1** — Builder shell: three-panel layout (Component Picker | Canvas | Properties Panel)
-- [ ] **3.2** — Component picker sidebar: all types with icons and descriptions, click to add
-- [ ] **3.3** — Canvas rendering: live preview, real-time updates as config changes
-- [ ] **3.4** — Component selection: click to select, properties panel loads its config
-- [ ] **3.5** — Properties panel — display: label, data binding, trigger, column list, chart type
-- [ ] **3.6** — Properties panel — queries: resource picker, endpoint, method, trigger type, dependsOn
-- [ ] **3.7** — Component reorder: drag handles, updates config order live
-- [ ] **3.8** — Delete component / query: trash icon with inline confirmation
+- [x] **3.1** — Builder shell: three-panel layout (Component Picker | Canvas | Properties Panel)
+- [x] **3.2** — Component picker sidebar: all types with icons and descriptions, click to add
+- [x] **3.3** — Container architecture: recursive RenderTree for infinitely nested Container/TabbedContainer blocks
+- [x] **3.4** — Component selection: click to select, properties panel loads its config
+- [x] **3.5** — Properties panel — display: label, data binding, trigger, column list, chart type
+- [x] **3.6** — Properties panel — queries: resource picker, endpoint, method, trigger type, dependsOn
+- [x] **3.7** — Component reorder: drag handles, updates config order live
+- [x] **3.8** — Delete component / query: trash icon with inline confirmation
 - [ ] **3.9** — JSON config editor: collapsible pane, bidirectionally synced with visual builder
 - [ ] **3.10** — Mobile preview toggle: Desktop vs Mobile (375px) canvas preview
 - [ ] **3.11** — Templates: migrate Phase 0 templates into full builder; add new ones
