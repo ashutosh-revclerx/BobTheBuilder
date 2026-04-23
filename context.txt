@@ -1,0 +1,205 @@
+## PROJECT CONTEXT — BobTheBuilder (Retool-style UI Builder)
+
+### Stack
+- React + Vite + TypeScript
+- Zustand (editorStore) for state management
+- react-grid-layout (legacy Responsive + WidthProvider) for canvas grid
+- Tailwind CSS v4 (imported via @import "tailwindcss") — used only for
+  spacing utilities, NOT for colors or effects
+- DM Sans (base UI font) + Fira Code (monospace/code) from Google Fonts
+- No tailwind.config.js — Tailwind v4 project
+
+---
+
+### Design System — "Daylight Precision" (Light Theme, Retool-like)
+
+:root {
+  --bg-primary:    #ffffff;
+  --bg-secondary:  #f8f9fb;
+  --bg-card:       #ffffff;
+  --bg-surface:    #f2f4f7;
+  --bg-elevated:   #ffffff;
+
+  --border:        #e3e6ec;
+  --border-hover:  #c9cdd6;
+  --border-active: #2563eb;
+
+  --blue-600:  #1d4ed8;
+  --blue-500:  #2563eb;
+  --blue-400:  #3b82f6;
+  --blue-50:   #eff6ff;
+  --blue-glow: rgba(37, 99, 235, 0.10);
+
+  --text-primary:   #0f1117;
+  --text-secondary: #5c6370;
+  --text-muted:     #9ba3af;
+  --text-inverse:   #ffffff;
+
+  --success: #059669;
+  --danger:  #dc2626;
+  --warning: #d97706;
+
+  --shadow-sm:  0 1px 2px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md:  0 4px 8px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg:  0 12px 24px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.04);
+
+  --transition-fast:   150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow:   400ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Patch legacy variable references */
+  --gradient-accent:  #2563eb;
+  --gradient-surface: #f2f4f7;
+  --glow:             var(--shadow-md);
+  --glow-strong:      var(--shadow-lg);
+}
+
+Font: 'DM Sans' for all UI. 'Fira Code' for code/JSON/monospace fields.
+Color rule: Blue (#2563eb) is the only brand hue.
+Used ONLY for interactive states — hover, focus, selection, active.
+Never decorative. Two-hue palette maximum (blue + semantic colors).
+
+---
+
+### File Structure (relevant files only)
+apps/frontend/src/
+  index.css                          — all design tokens + BEM component styles
+  components/
+    editor/
+      GridLayer.tsx                  — RGL canvas, scoped by parentId
+      LeftPanel.tsx                  — component sidebar (drag + click to add)
+      RightPanel.tsx                 — properties panel
+      DataTab.tsx                    — data tab inside right panel
+      StyleTab.tsx                   — style tab inside right panel
+    dashboard-components/
+      StatCard.tsx
+      BarChart.tsx
+      LineChart.tsx
+      Table.tsx
+      Button.tsx
+      StatusBadge.tsx
+      LogsViewer.tsx
+  store/
+    editorStore.ts                   — Zustand store
+  pages/
+    TemplateGallery.tsx
+  templates/
+    budget-monitor.ts
+    phase1-testing.ts
+    project-overview.ts
+    sprint-tracker.ts
+
+---
+
+### Architecture
+
+#### Canvas & Grid
+- react-grid-layout Responsive + WidthProvider, 12-column grid
+- Components stored as flat array in Zustand with parentId pointers for nesting
+- GridLayer.tsx maps Zustand components → RGL layout, scoped by parentId
+- **Freestyle Engine**: `compactType={null}` and `preventCollision={true}` are active.
+- **Constraints**: Every component has `minW` and `minH` enforced in the store and mapped to RGL.
+- **Auto-expansion**: Canvas height calculates dynamically based on `lowestPoint * (rowHeight + margin)`.
+- Drag handle tied to `.canvas-component-label` floating pill.
+- onLayoutChange → updateLayouts() → Zustand.
+
+#### Component shape in Zustand
+{
+  id: 'barchart-12345678',
+  type: 'BarChart',
+  label: 'New BarChart',
+  parentId: undefined,       // undefined = root canvas
+  parentTab: undefined,      // for TabbedContainer tabs
+  layout: { x: 0, y: 0, w: 6, h: 6, minW: 4, minH: 6 },
+  style: { ... },
+  data: { ... }
+}
+
+#### Drag from Sidebar → Canvas (implemented)
+- LeftPanel cards: draggable=true, onDragStart sets dataTransfer componentType
+- Global draggingType in Zustand (setDraggingType)
+- GridLayer: isDroppable={!!draggingType}, droppingItem, onDrop → addComponent
+- Drop zone shows dashed blue outline when drag is active
+- .react-grid-placeholder styled blue dashed
+
+#### Sidebar click-to-add (fallback, still works)
+- onClick on LeftPanel card → addComponent(type)
+- If a container is selected → auto-assigns parentId
+
+---
+
+### Features Implemented (do not regress these)
+
+1. TRUE DRAG FROM SIDEBAR TO CANVAS
+   - Drag any component card from LeftPanel onto canvas
+   - Drops at exact grid coordinates
+   - New component auto-selected, right panel opens
+
+2. RIGHT PANEL BEHAVIOR
+   - Opens on page load showing first component
+   - Stays open when canvas background is clicked
+   - Shows last selected component config even when nothing active
+   - Only closes via X button (closeRightPanel action)
+   - Zustand fields: rightPanelOpen (bool), lastSelectedComponentId
+
+3. TABLE ROW ADDITION — two surfaces
+   - Inline "+ Add Row" button at table bottom (editor mode only)
+   - Right panel Data tab Rows section with add/delete/edit per row
+   - Cells are inline-editable via contentEditable in editor mode
+   - All writes go to component data.rows in Zustand
+
+4. COMPONENT VERTICAL STRETCH
+   - Components sit inside `.component-inner-content` (Flexbox wrapper).
+   - `.component-inner-content` has `overflow: visible` to avoid clipping resize handles.
+   - Inner component (.stat-card, .table-component) has `height: 100%` and `overflow: hidden`.
+   - Charts use `ResponsiveContainer height="100%"` and parent div with `flex: 1; min-height: 0`.
+
+5. RESIZE FROM ALL FOUR CORNERS
+   - `resizeHandles={['se','sw','ne','nw']}` explicitly set on `ResponsiveGridLayout`.
+   - Custom handle dots styled in index.css (blue dots, white ring).
+   - Handles use `z-index: 60` to stay above all other UI layers (loading overlaps, etc).
+   - Conflicting legacy RGL CSS (bottom/right anchors) must stay removed.
+
+6. COMPONENT LABEL + DELETE BUTTON
+   - .canvas-component-wrapper has position:relative, overflow:visible
+   - .canvas-component-label: position:absolute, top:-11px, left:10px
+   - .remove-btn: position:absolute, top:-8px, right:-8px
+   - NEVER overflow:hidden on wrapper — it clips the floating elements.
+
+7. STABLE DRAG FEEDBACK
+   - `.react-grid-item` transitions limited to `left, top, width, height`.
+   - `.react-draggable-dragging` state has `transition: none !important`.
+
+---
+
+### Known Recurring Bugs (watch for these)
+
+A. overflow:hidden on .canvas-component-wrapper clips labels and handles.
+   Always keep overflow:visible on the wrapper and intermediate content div.
+
+B. `.react-grid-item > * { height:100% }` wildcard catches floating labels.
+   Avoid wildcards; target specific component classes.
+
+C. z-index conflicts: Loading overlays (z-50) can block resize handles if handles are low.
+   Keep handles at z-60.
+
+D. RGL defaults to `['se']` handle only. Always explicitly set all 4.
+
+---
+
+### CSS Architecture Rules
+- All tokens in :root in index.css
+- BEM class names for components
+- Tailwind for spacing only (p-4, flex, gap-2)
+- Selection bg / Scrollbar thumb: rgba(37,99,235,0.15)
+
+---
+
+### What NOT to touch (ever)
+- Routing, Templates, Auth/Backend
+- LeftPanel component card list structure
+ponent card list structure (only style, not logic)

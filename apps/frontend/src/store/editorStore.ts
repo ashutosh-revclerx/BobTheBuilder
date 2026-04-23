@@ -24,7 +24,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       trend: '+12.5%',
       trendType: 'positive',
     },
-    layout: { x: 0, y: 0, w: 3, h: 6 }
+    layout: { x: 0, y: 0, w: 3, h: 6, minW: 2, minH: 4 }
   },
   Table: {
     style: {
@@ -51,7 +51,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       searchable: true,
       pagination: true,
     },
-    layout: { x: 0, y: 0, w: 12, h: 16 }
+    layout: { x: 0, y: 0, w: 12, h: 16, minW: 4, minH: 8 }
   },
   BarChart: {
     style: {
@@ -76,7 +76,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       dbBinding: '',
       refreshOn: 'onLoad',
     },
-    layout: { x: 0, y: 0, w: 6, h: 12 }
+    layout: { x: 0, y: 0, w: 6, h: 12, minW: 4, minH: 6 }
   },
   LineChart: {
     style: {
@@ -101,7 +101,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       dbBinding: '',
       refreshOn: 'onLoad',
     },
-    layout: { x: 0, y: 0, w: 6, h: 12 }
+    layout: { x: 0, y: 0, w: 6, h: 12, minW: 4, minH: 6 }
   },
   StatusBadge: {
     style: {
@@ -125,7 +125,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
         'Error': '#dc2626',
       },
     },
-    layout: { x: 0, y: 0, w: 2, h: 4 }
+    layout: { x: 0, y: 0, w: 2, h: 4, minW: 1, minH: 2 }
   },
   Button: {
     style: {
@@ -141,7 +141,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       mockValue: null,
       events: [{ type: 'onClick', action: 'none' }],
     },
-    layout: { x: 0, y: 0, w: 2, h: 4 }
+    layout: { x: 0, y: 0, w: 2, h: 4, minW: 1, minH: 2 }
   },
   LogsViewer: {
     style: {
@@ -159,7 +159,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       levelFilter: 'all',
       logSearchable: true,
     },
-    layout: { x: 0, y: 0, w: 12, h: 8 }
+    layout: { x: 0, y: 0, w: 12, h: 8, minW: 4, minH: 4 }
   },
   Container: {
     style: {
@@ -174,7 +174,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       containerLayout: 'vertical',
       gap: 10,
     },
-    layout: { x: 0, y: 0, w: 12, h: 12 }
+    layout: { x: 0, y: 0, w: 12, h: 12, minW: 4, minH: 4 }
   },
   TabbedContainer: {
     style: {
@@ -189,7 +189,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
     data: {
       tabs: ['View 1', 'View 2', 'View 3']
     },
-    layout: { x: 0, y: 0, w: 12, h: 16 }
+    layout: { x: 0, y: 0, w: 12, h: 16, minW: 4, minH: 4 }
   },
   Text: {
     style: {
@@ -205,7 +205,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
     data: {
       mockValue: 'This is a text component. You can bind data to it or type markdown.'
     },
-    layout: { x: 0, y: 0, w: 6, h: 4 }
+    layout: { x: 0, y: 0, w: 6, h: 4, minW: 2, minH: 2 }
   },
   TextInput: {
     style: {
@@ -223,7 +223,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       mockValue: '',
       placeholder: 'Enter text...',
     },
-    layout: { x: 0, y: 0, w: 4, h: 4 }
+    layout: { x: 0, y: 0, w: 4, h: 4, minW: 2, minH: 2 }
   },
   NumberInput: {
     style: {
@@ -243,7 +243,7 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       max: 100,
       step: 1,
     },
-    layout: { x: 0, y: 0, w: 4, h: 4 }
+    layout: { x: 0, y: 0, w: 4, h: 4, minW: 2, minH: 2 }
   },
   Select: {
     style: {
@@ -262,9 +262,10 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       mockValue: 'Option 1',
       events: [{ type: 'onChange', action: 'none' }],
     },
-    layout: { x: 0, y: 0, w: 4, h: 4 }
+    layout: { x: 0, y: 0, w: 4, h: 4, minW: 2, minH: 2 }
   }
 };
+;
 
 
 interface EditorState {
@@ -502,11 +503,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         y: placement.y ?? Infinity,
         w: placement.w ?? (defaults as any).layout.w,
         h: placement.h ?? (defaults as any).layout.h,
+        minW: (defaults as any).layout.minW,
+        minH: (defaults as any).layout.minH,
       } : {
         x: 0,
         y: Infinity,
         w: (defaults as any).layout.w,
         h: (defaults as any).layout.h,
+        minW: (defaults as any).layout.minW,
+        minH: (defaults as any).layout.minH,
       };
 
       const newComponent: ComponentConfig = {

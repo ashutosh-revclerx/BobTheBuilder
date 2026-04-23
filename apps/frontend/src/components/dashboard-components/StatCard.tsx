@@ -63,11 +63,6 @@ export default function StatCard({ config }: StatCardProps) {
         <div className="stat-card-value">
           {value}
         </div>
-        {deltaValue && (
-          <span className={`stat-card-delta ${deltaPositive ? 'positive' : 'negative'}`}>
-            {deltaPositive ? '↑' : '↓'} {deltaValue}
-          </span>
-        )}
       </div>
       {trendValue && (
         <span className={`stat-card-delta ${isNeutral ? 'neutral' : (isPositive ? 'positive' : 'negative')}`}>

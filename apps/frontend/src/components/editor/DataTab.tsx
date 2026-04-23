@@ -6,7 +6,7 @@ export default function DataTab() {
   const updateData = useEditorStore((s) => s.updateData);
 
   const selectedComponent = components.find((c) => c.id === lastSelectedComponentId);
-  const rows = selectedComponent?.data?.rows ?? [];
+  const rows = selectedComponent?.data?.rows ?? (Array.isArray(selectedComponent?.data?.mockValue) ? selectedComponent?.data?.mockValue : []);
   const columns = selectedComponent?.data?.columns ?? [];
 
   if (!selectedComponent) return null;
@@ -24,7 +24,12 @@ export default function DataTab() {
     if (isChart || isTable) {
       try {
         const parsed = JSON.parse(rawValue);
-        handleDataField('mockValue', parsed);
+        if (isTable) {
+          handleDataField('rows', parsed);
+          handleDataField('mockValue', parsed); // Sync both to be safe
+        } else {
+          handleDataField('mockValue', parsed);
+        }
       } catch {
         // Don't update if invalid JSON
       }
@@ -99,7 +104,7 @@ export default function DataTab() {
   };
 
   const mockValueDisplay = (isChart || isTable)
-    ? JSON.stringify(data.mockValue, null, 2)
+    ? JSON.stringify(isTable ? (data.rows || data.mockValue) : data.mockValue, null, 2)
     : String(data.mockValue ?? '');
 
   return (
@@ -121,7 +126,7 @@ export default function DataTab() {
         <label className="form-label">Visible</label>
         <select
           className="form-select"
-          value={component.visible !== false ? 'true' : 'false'}
+          value={selectedComponent.visible !== false ? 'true' : 'false'}
           onChange={(e) => handleDataField('visible', e.target.value === 'true')}
         >
           <option value="true">Yes</option>
@@ -213,112 +218,110 @@ export default function DataTab() {
       {/* ─── Table: Columns + Features ─── */}
       {isTable && (
         <>
-          <div className="form-group"><div className="form-group">
-  <label className="form-label">Searchable</label>
-  <select
-    className="form-select"
-    value={data.searchable !== false ? 'true' : 'false'}
-    onChange={(e) => handleDataField('searchable', e.target.value === 'true')}
-  >
-    <option value="true">Yes</option>
-    <option value="false">No</option>
-  </select>
-</div>
-
-<div className="form-group">
-  <label className="form-label">Pagination</label>
-  <select
-    className="form-select"
-    value={data.pagination !== false ? 'true' : 'false'}
-    onChange={(e) => handleDataField('pagination', e.target.value === 'true')}
-  >
-    <option value="true">Yes</option>
-    <option value="false">No</option>
-  </select>
-</div>
-
-<div className="form-group">
-  <label className="form-label">Columns</label>
-  <div className="mini-editor">
-    {columns.map((col: any, i: number) => (
-      <div key={i} className="mini-editor-row">
-        <input
-          value={col.name}
-          onChange={(e) => handleColumnChange(i, 'name', e.target.value)}
-          placeholder="Column name"
-        />
-        <input
-          value={col.fieldKey}
-          onChange={(e) => handleColumnChange(i, 'fieldKey', e.target.value)}
-          placeholder="Field key"
-        />
-        <button className="mini-editor-delete" onClick={() => handleDeleteColumn(i)}>
-          ×
-        </button>
-      </div>
-    ))}
-    <button className="mini-editor-add" onClick={handleAddColumn}>
-      + Add column
-    </button>
-  </div>
-</div>
-
-{selectedComponent?.type === 'Table' && (
-  <div className="panel-rows-section">
-    <div className="panel-section-header">ROWS ({rows.length})</div>
-
-    <div className="row-editor-list">
-      {rows.map((row: any, rowIdx: number) => (
-        <div className="row-editor-item" key={rowIdx}>
-          <span className="row-editor-num">{rowIdx + 1}</span>
-
-          <div className="row-editor-fields">
-            {columns.map((col: any) => (
-              <div className="row-editor-field" key={col.fieldKey}>
-                <span className="row-field-key">{col.fieldKey}</span>
-
-                <input
-                  className="row-field-input"
-                  value={row[col.fieldKey] ?? ''}
-                  onChange={(e) => {
-                    const updatedRows = [...rows];
-                    updatedRows[rowIdx] = {
-                      ...updatedRows[rowIdx],
-                      [col.fieldKey]: e.target.value
-                    };
-                    handleDataField('rows', updatedRows);
-                  }}
-                />
-              </div>
-            ))}
+          <div className="form-group">
+            <label className="form-label">Searchable</label>
+            <select
+              className="form-select"
+              value={data.searchable !== false ? 'true' : 'false'}
+              onChange={(e) => handleDataField('searchable', e.target.value === 'true')}
+            >
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
           </div>
 
-          <button
-            className="row-editor-delete"
-            onClick={() => {
-              const updatedRows = rows.filter((_: any, i: number) => i !== rowIdx);
-              handleDataField('rows', updatedRows);
-            }}
-          >
-            ×
-          </button>
-        </div>
-      ))}
-    </div>
+          <div className="form-group">
+            <label className="form-label">Pagination</label>
+            <select
+              className="form-select"
+              value={data.pagination !== false ? 'true' : 'false'}
+              onChange={(e) => handleDataField('pagination', e.target.value === 'true')}
+            >
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
 
-    <button
-      className="row-editor-add"
-      onClick={() => {
-        const blankRow = Object.fromEntries(
-          columns.map((col: any) => [col.fieldKey, ''])
-        );
-        handleDataField('rows', [...rows, blankRow]);
-      }}
-    >
-      + Add Row
-    </button>
-  </div>
-)}
+          <div className="form-group">
+            <label className="form-label">Columns</label>
+            <div className="mini-editor">
+              {columns.map((col, i: number) => (
+                <div key={i} className="mini-editor-row">
+                  <input
+                    value={col.name}
+                    onChange={(e) => handleColumnChange(i, 'name', e.target.value)}
+                    placeholder="Column name"
+                  />
+                  <input
+                    value={col.fieldKey}
+                    onChange={(e) => handleColumnChange(i, 'fieldKey', e.target.value)}
+                    placeholder="Field key"
+                  />
+                  <button className="mini-editor-delete" onClick={() => handleDeleteColumn(i)}>
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button className="mini-editor-add" onClick={handleAddColumn}>
+                + Add column
+              </button>
+            </div>
+          </div>
+
+          <div className="panel-rows-section">
+            <div className="panel-section-header">ROWS ({rows.length})</div>
+
+            <div className="row-editor-list">
+              {rows.map((row: any, rowIdx: number) => (
+                <div className="row-editor-item" key={rowIdx}>
+                  <span className="row-editor-num">{rowIdx + 1}</span>
+
+                  <div className="row-editor-fields">
+                    {columns.map((col: any) => (
+                      <div className="row-editor-field" key={col.fieldKey}>
+                        <span className="row-field-key">{col.fieldKey}</span>
+
+                        <input
+                          className="row-field-input"
+                          value={row[col.fieldKey] ?? ''}
+                          onChange={(e) => {
+                            const updatedRows = [...rows];
+                            updatedRows[rowIdx] = {
+                              ...updatedRows[rowIdx],
+                              [col.fieldKey]: e.target.value
+                            };
+                            handleDataField('rows', updatedRows);
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    className="row-editor-delete"
+                    onClick={() => {
+                      const updatedRows = rows.filter((_: any, i: number) => i !== rowIdx);
+                      handleDataField('rows', updatedRows);
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button
+              className="row-editor-add"
+              onClick={() => {
+                const blankRow = Object.fromEntries(
+                  columns.map((col: any) => [col.fieldKey, ''])
+                );
+                handleDataField('rows', [...rows, blankRow]);
+              }}
+            >
+              + Add Row
+            </button>
+          </div>
         </>
       )}
 

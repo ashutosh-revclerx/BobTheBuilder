@@ -1,6 +1,5 @@
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
 import { useState, useMemo, useCallback } from 'react';
-import { useLabelWidth } from '../../hooks/useTextMeasure';
 import { resolveBindings } from '../../engine/bindingResolver';
 import { useEditorStore } from '../../store/editorStore';
 
@@ -62,6 +61,10 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
       y: c.layout?.y ?? 0,
       w: c.layout?.w ?? 4,
       h: c.layout?.h ?? 4,
+      minW: c.layout?.minW,
+      minH: c.layout?.minH,
+      maxW: c.layout?.maxW,
+      maxH: c.layout?.maxH,
     }));
   }, [filteredComponents]);
 
@@ -77,7 +80,9 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
     }, 0);
     
     // Convert grid units to pixels: (rows * rowHeight) + (rows * margin) + extra padding
-    const pixelHeight = (lowestPoint * 10) + (lowestPoint * 10) + 400;
+    const rowHeight = 30;
+    const marginSize = customGap ?? 10;
+    const pixelHeight = (lowestPoint * rowHeight) + (lowestPoint * marginSize) + 400;
     const viewportHeight = 'calc(100vh - 100px)';
     
     // Use whichever is larger
@@ -145,7 +150,7 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
         onDrop={(_layout, item, e) => {
           e.preventDefault();
           if (!item) return;
-          const type = (e as DragEvent & { dataTransfer: DataTransfer }).dataTransfer.getData('componentType');
+          const type = (e as any).dataTransfer?.getData('componentType');
           if (!type || !type.length) return;
 
           addComponent(type as any, {
@@ -187,7 +192,7 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
                 </div>
               </div>
             )}
-            <div className="component-inner-content" style={{ height: '100%', overflow: 'hidden', position: 'relative' }}>
+            <div className="component-inner-content" style={{ height: '100%', overflow: 'visible', position: 'relative', display: 'flex', flexDirection: 'column' }}>
               {comp.loading && (
                 <div className="component-loading-overlay">
                   <div className="spinner"></div>

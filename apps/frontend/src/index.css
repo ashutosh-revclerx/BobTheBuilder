@@ -1122,7 +1122,10 @@ body {
 }
 
 .react-grid-item {
-  transition: none !important; /* Items move instantly in drag, layout handles transition */
+  /* Only transition layout properties, avoid generic 'all' to prevent drag jitter */
+  transition-property: left, top, width, height;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
   overflow: visible !important;
 }
 
@@ -1137,39 +1140,13 @@ body {
 
 .react-grid-item.resizing {
   z-index: 100;
+  transition: none !important;
 }
 
 .react-grid-item.react-draggable-dragging {
   z-index: 100;
   cursor: grabbing !important;
-}
-
-.react-resizable-handle {
-  width: 12px;
-  height: 12px;
-  bottom: 0;
-  right: 0;
-  cursor: nwse-resize;
-}
-
-.react-resizable-handle::after {
-  content: '';
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 5px;
-  height: 5px;
-  border-right: 2px solid var(--text-muted);
-  border-bottom: 2px solid var(--text-muted);
-  transition: all var(--transition-fast);
-}
-
-.react-grid-item:hover .react-resizable-handle::after {
-  border-color: var(--text-secondary);
-}
-
-.react-grid-item.selected .react-resizable-handle::after {
-  border-color: var(--blue-500);
+  transition: none !important;
 }
 
 /* Wrapper — the direct child of RGL item */
@@ -1265,6 +1242,20 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;   /* clips content inside the card, not the floating label */
+  border-radius: var(--radius-md);
+}
+
+.component-inner-content > .stat-card,
+.component-inner-content > .chart-component,
+.component-inner-content > .table-component,
+.component-inner-content > .status-badge-card,
+.component-inner-content > .logs-viewer,
+.component-inner-content > .button-component {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border-radius: var(--radius-md);
 }
 
@@ -1381,6 +1372,9 @@ body {
   padding: 20px;
   position: relative;
   overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .chart-component::before {
   content: '';
@@ -1695,7 +1689,7 @@ body {
   position: absolute;
   width: 14px;
   height: 14px;
-  z-index: 15;
+  z-index: 60;
   opacity: 0;
   transition: opacity var(--transition-fast);
 }

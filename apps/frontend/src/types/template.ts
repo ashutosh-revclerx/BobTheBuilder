@@ -33,6 +33,7 @@ export interface ComponentData {
 
   // ─── Table ───
   columns?: Array<{ name: string; fieldKey: string }>;
+  rows?: Record<string, any>[];
   searchable?: boolean;
   pagination?: boolean;
 
@@ -88,6 +89,10 @@ export interface ComponentConfig {
     y: number;
     w: number;
     h: number;
+    minW?: number;
+    minH?: number;
+    maxW?: number;
+    maxH?: number;
   };
 }
 

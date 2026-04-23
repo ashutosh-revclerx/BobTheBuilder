@@ -58,7 +58,12 @@ export default function TabbedContainer({ config, componentMap }: TabbedContaine
 
       {/* Content Area */}
       <div className="tabbed-content" style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
-        <GridLayer parentId={config.id} parentTab={currentTab} componentMap={componentMap} />
+        <GridLayer 
+          parentId={config.id} 
+          parentTab={currentTab} 
+          componentMap={componentMap} 
+          customGap={data.gap ?? 10}
+        />
       </div>
 
       <div style={{ padding: '0 12px 12px' }}>

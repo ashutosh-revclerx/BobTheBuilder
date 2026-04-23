@@ -61,8 +61,10 @@ export default function Table({ config, isEditorMode = true }: TableProps) {
   const updateData = useEditorStore((s) => s.updateData);
   const columns = data.columns || [];
   const isBound = data._resolvedBindings?.['dbBinding'];
-  const rawData = isBound ? data.dbBinding : data.mockValue;
-  const rawRows = (Array.isArray(rawData) ? rawData : []) as Record<string, unknown>[];
+  const rawRows = useMemo(() => {
+    if (isBound) return (Array.isArray(data.dbBinding) ? data.dbBinding : []) as Record<string, unknown>[];
+    return (data.rows || (Array.isArray(data.mockValue) ? data.mockValue : [])) as Record<string, unknown>[];
+  }, [isBound, data.dbBinding, data.rows, data.mockValue]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -105,7 +107,7 @@ export default function Table({ config, isEditorMode = true }: TableProps) {
     return () => obs.disconnect();
   }, [measureCols]);
 const handleCellEdit = (rowIdx: number, colKey: string, value: string) => {
-  const updatedRows = rows.map((row, i) =>
+  const updatedRows = rawRows.map((row, i) =>
     i === rowIdx ? { ...row, [colKey]: value } : row
   );
   updateData(id, { rows: updatedRows });
@@ -113,17 +115,12 @@ const handleCellEdit = (rowIdx: number, colKey: string, value: string) => {
 
 const handleAddRow = () => {
   const blankRow = Object.fromEntries(
-    columns.map(col => [col.fieldKey || col.key || (col as any), ''])
+    columns.map(col => [col.fieldKey || (col as any), ''])
   );
-  updateData(id, { rows: [...rows, blankRow] });
+  updateData(id, { rows: [...rawRows, blankRow] });
 };
 
-
-// ✅ NEW FEATURE (from feature/phase-2)
-const editorStore = useEditorStore;
-const queriesStore = useEditorStore((s) => s.queries);
-
-const handleRowClick = async (row: any, index: number) => {
+const handleRowClick = async (_row: any, index: number) => {
   setSelectedRowIndex(index);
 
   const targetQueryName =
@@ -132,7 +129,7 @@ const handleRowClick = async (row: any, index: number) => {
       : null;
 
   if (targetQueryName) {
-    const state = editorStore.getState();
+    const state = useEditorStore.getState();
     const queryConfig = state.queriesConfig.find(
       q => q.name === targetQueryName
     );
