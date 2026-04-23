@@ -501,14 +501,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       let layout = placement ? {
         x: placement.x ?? 0,
-        y: placement.y ?? Infinity,
+        y: isFinite(placement.y) ? placement.y : 0,
         w: placement.w ?? (defaults as any).layout.w,
         h: placement.h ?? (defaults as any).layout.h,
         minW: (defaults as any).layout.minW,
         minH: (defaults as any).layout.minH,
       } : {
         x: 0,
-        y: Infinity,
+        y: 0,
         w: (defaults as any).layout.w,
         h: (defaults as any).layout.h,
         minW: (defaults as any).layout.minW,

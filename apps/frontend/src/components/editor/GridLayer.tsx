@@ -5,18 +5,18 @@ import { useEditorStore } from '../../store/editorStore';
 
 const DEFAULT_SIZES: Record<string, {w:number, h:number}> = {
   StatCard:        { w: 3, h: 6 },
-  BarChart:        { w: 6, h: 12 },
-  LineChart:       { w: 6, h: 12 },
-  Table:           { w: 12, h: 16 },
+  BarChart:        { w: 4, h: 8 },
+  LineChart:       { w: 4, h: 8 },
+  Table:           { w: 6, h: 10 },
   Button:          { w: 2, h: 4 },
   StatusBadge:     { w: 2, h: 4 },
-  LogsViewer:      { w: 12, h: 8 },
-  Container:       { w: 12, h: 12 },
-  TabbedContainer: { w: 12, h: 16 },
-  Text:            { w: 6, h: 4 },
-  TextInput:       { w: 4, h: 4 },
-  NumberInput:     { w: 4, h: 4 },
-  Select:          { w: 4, h: 4 },
+  LogsViewer:      { w: 6, h: 8 },
+  Container:       { w: 6, h: 8 },
+  TabbedContainer: { w: 6, h: 10 },
+  Text:            { w: 4, h: 4 },
+  TextInput:       { w: 2, h: 4 },
+  NumberInput:     { w: 2, h: 4 },
+  Select:          { w: 2, h: 4 },
 };
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
@@ -65,6 +65,9 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
       minH: c.layout?.minH,
       maxW: c.layout?.maxW,
       maxH: c.layout?.maxH,
+      isResizable: true,
+      isDraggable: true,
+      static: false
     }));
   }, [filteredComponents]);
 
@@ -133,11 +136,14 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
     >
       <ResponsiveGridLayout
         className="layout"
-        layouts={{ lg: layout }}
+        layouts={{ lg: layout, md: layout, sm: layout, xs: layout, xxs: layout }}
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-        cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+        cols={{ lg: 12, md: 12, sm: 12, xs: 12, xxs: 12 }}
         rowHeight={30}
+        isDraggable={true}
+        isResizable={true}
         resizeHandles={['se', 'sw', 'ne', 'nw']}
+        droppingItem={{ i: '__dropping-elem__', x: 0, y: 0, w: size.w, h: size.h }}
         draggableCancel="input, button, select, textarea, .tabbed-header-btn, .inline-picker, .container-empty-dropzone, .recharts-wrapper"
         compactType={null}
         preventCollision={true}
@@ -146,7 +152,6 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
         margin={[customGap ?? 10, customGap ?? 10]}
         style={{ minHeight: canvasMinHeight }}
         isDroppable={!!draggingType}
-        droppingItem={{ i: '__dropping__', x: 0, y: 0, ...size }}
         onDrop={(_layout, item, e) => {
           e.preventDefault();
           if (!item) return;
