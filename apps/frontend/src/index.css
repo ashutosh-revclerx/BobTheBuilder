@@ -83,6 +83,35 @@
   50%      { border-color: transparent; }
 }
 
+@keyframes spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.component-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(1px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--blue-50);
+  border-top: 3px solid var(--blue-500);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+
 /* ========== Globals ========== */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 

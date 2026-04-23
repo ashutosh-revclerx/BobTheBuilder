@@ -8,8 +8,22 @@ export default function NumberInput({ config }: { config: ComponentConfig }) {
   const val = componentState[config.id]?.value ?? data.mockValue ?? 0;
 
   return (
-    <div className="atomic-input-wrapper" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      {data.label && <label className="atomic-input-label" style={{ marginBottom: '4px' }}>{data.label}</label>}
+ <div
+  className="atomic-input-wrapper"
+  style={{
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column'
+  }}
+>
+  {data.label && (
+    <label
+      className="atomic-input-label"
+      style={{ marginBottom: '4px' }}
+    >
+      {data.label}
+    </label>
+  )}
       <input
         type="number"
         className="atomic-text-input"
@@ -24,8 +38,12 @@ export default function NumberInput({ config }: { config: ComponentConfig }) {
           borderColor: style.borderColor,
           borderWidth: `${style.borderWidth}px`,
           padding: `${style.padding}px`,
-          width: '100%'
+          flex: 1,
+          height: '100%'
         }}
+        min={data.min}
+        max={data.max}
+        step={data.step ?? 1}
       />
     </div>
   );

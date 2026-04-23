@@ -26,8 +26,10 @@ export default function TextInput({ config }: { config: ComponentConfig }) {
           borderWidth: `${style.borderWidth}px`,
           padding: `${style.padding}px`,
           width: '100%'
+          flex: 1,
+          height: '100%'
         }}
-        placeholder="Enter text..."
+        placeholder={data.placeholder || 'Enter text...'}
       />
     </div>
   );

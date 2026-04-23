@@ -75,6 +75,7 @@ export default function Button({ config }: ButtonProps) {
           fontWeight: 600,
           opacity: loading ? 0.7 : 1,
           width: '100%',
+          height: '100%',
           transition: 'all 0.2s',
         }}
       >

@@ -36,13 +36,15 @@ export default function BarChart({ config }: BarChartProps) {
   const isBound = data._resolvedBindings?.['dbBinding'];
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const chartData = Array.isArray(rawData) ? rawData : [];
+  
   const series = data.series || [{ name: 'Value', fieldKey: 'value' }];
-
-  const seriesKeys = new Set(series.map((s) => s.fieldKey));
+  const activeSeries = data.yField ? [{ name: 'Value', fieldKey: data.yField }] : series;
+  const seriesKeys = new Set(activeSeries.map((s) => s.fieldKey));
+  
   const firstRow = chartData[0] as Record<string, unknown> | undefined;
-  const xKey = firstRow
+  const xKey = data.xField || (firstRow
     ? Object.keys(firstRow).find((k) => !seriesKeys.has(k) && typeof firstRow[k] === 'string') || 'label'
-    : 'label';
+    : 'label');
 
   return (
     <div
@@ -58,42 +60,41 @@ export default function BarChart({ config }: BarChartProps) {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden'
       }}
     >
-      <div className="chart-component-title" style={{ color: style.textColor, flexShrink: 0, marginBottom: '12px' }}>{label}</div>
+      <div className="chart-component-title" style={{ color: style.textColor }}>{label}</div>
       <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
         <ResponsiveContainer width="100%" height="100%">
-        <RechartsBarChart data={chartData as Record<string, unknown>[]} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-          <XAxis
-            dataKey={xKey}
-            tick={{ fill: '#9ba3af', fontSize: 10, fontFamily: 'DM Sans' }}
-            axisLine={{ stroke: 'rgba(0,0,0,0.06)' }}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fill: '#9ba3af', fontSize: 10, fontFamily: 'DM Sans' }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.02)' }} />
-          <Legend
-            wrapperStyle={{ fontSize: '10px', fontFamily: 'DM Sans', color: '#9ba3af' }}
-            iconType="circle"
-            iconSize={6}
-          />
-          {series.map((s, i) => (
-            <Bar
-              key={s.fieldKey}
-              dataKey={s.fieldKey}
-              name={s.name}
-              fill={CHART_COLORS[i % CHART_COLORS.length]}
-              radius={[4, 4, 0, 0]}
-              maxBarSize={48}
+          <RechartsBarChart data={chartData as Record<string, unknown>[]} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+            <XAxis
+              dataKey={xKey}
+              tick={{ fill: '#9ba3af', fontSize: 10, fontFamily: 'DM Sans' }}
+              axisLine={{ stroke: 'rgba(0,0,0,0.06)' }}
+              tickLine={false}
             />
-          ))}
-        </RechartsBarChart>
+            <YAxis
+              tick={{ fill: '#9ba3af', fontSize: 10, fontFamily: 'DM Sans' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.02)' }} />
+            <Legend
+              wrapperStyle={{ fontSize: '10px', fontFamily: 'DM Sans', color: '#9ba3af' }}
+              iconType="circle"
+              iconSize={6}
+            />
+            {activeSeries.map((s, i) => (
+              <Bar
+                key={s.fieldKey}
+                dataKey={s.fieldKey}
+                name={s.name}
+                fill={CHART_COLORS[i % CHART_COLORS.length]}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={48}
+              />
+            ))}
+          </RechartsBarChart>
         </ResponsiveContainer>
       </div>
     </div>

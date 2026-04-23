@@ -34,7 +34,8 @@ export default function StatusBadge({ config }: StatusBadgeProps) {
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const statusStr = typeof rawData === 'string' ? rawData : String(rawData ?? 'Unknown');
 
-  const badgeColor = resolveColor(statusStr, style.textColor || '#3b82f6');
+  const mapping = data.mapping || {};
+  const badgeColor = mapping[statusStr] || resolveColor(statusStr, style.textColor || '#3b82f6');
 
   return (
     <div
