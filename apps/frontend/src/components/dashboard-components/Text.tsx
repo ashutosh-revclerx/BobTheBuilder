@@ -11,6 +11,12 @@ export default function Text({ config }: { config: ComponentConfig }) {
         fontFamily: style.fontFamily,
         fontSize: `${style.fontSize}px`,
         padding: `${style.padding}px`,
+        backgroundColor: style.backgroundColor,
+        borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
+        border: style.borderWidth ? `${style.borderWidth}px solid ${style.borderColor || '#000000'}` : undefined,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column'
       }}
     >
       {String(data.mockValue || '')}

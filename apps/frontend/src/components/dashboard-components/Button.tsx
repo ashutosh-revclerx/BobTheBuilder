@@ -57,6 +57,7 @@ export default function Button({ config }: ButtonProps) {
         backgroundColor: style.backgroundColor,
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         border: style.borderWidth ? `${style.borderWidth}px solid ${style.borderColor || 'transparent'}` : undefined,
+        height: '100%',
       }}
     >
       <button
@@ -73,6 +74,7 @@ export default function Button({ config }: ButtonProps) {
           fontWeight: 600,
           opacity: loading ? 0.7 : 1,
           width: '100%',
+          height: '100%',
           transition: 'all 0.2s',
         }}
       >

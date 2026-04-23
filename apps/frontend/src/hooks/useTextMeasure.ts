@@ -125,13 +125,13 @@ export function truncateTexts(
 // ─── Feature C — Kinetic width for dashboard name input ─────────────
 export function useKineticWidth(value: string): number {
   return useMemo(() => {
-    if (!value) return 80;
+    if (!value) return 160; // Enough width for the 'Dashboard name' placeholder
     try {
       const prepared = prepareWithSegments(value, NAME_FONT);
       const measured = measureNaturalWidth(prepared);
-      return Math.ceil(measured) + 32; // 16px padding each side
+      return Math.ceil(measured) + 40; // 16px padding + extra cushion for font variations
     } catch {
-      return value.length * 9 + 32;
+      return value.length * 9 + 40;
     }
   }, [value]);
 }
@@ -149,12 +149,12 @@ export function useTextMeasure() {
   }, []);
 
   const measureName = useCallback((text: string): number => {
-    if (!text) return 80;
+    if (!text) return 160;
     try {
       const prepared = prepareWithSegments(text, NAME_FONT);
-      return Math.ceil(measureNaturalWidth(prepared)) + 32;
+      return Math.ceil(measureNaturalWidth(prepared)) + 40;
     } catch {
-      return text.length * 9 + 32;
+      return text.length * 9 + 40;
     }
   }, []);
 

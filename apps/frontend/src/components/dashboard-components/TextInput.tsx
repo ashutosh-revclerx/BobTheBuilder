@@ -9,7 +9,7 @@ export default function TextInput({ config }: { config: ComponentConfig }) {
   const val = componentState[config.id]?.value ?? data.mockValue ?? '';
 
   return (
-    <div className="atomic-input-wrapper">
+    <div className="atomic-input-wrapper" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {data.label && <label className="atomic-input-label">{data.label}</label>}
       <input
         type="text"
@@ -25,8 +25,10 @@ export default function TextInput({ config }: { config: ComponentConfig }) {
           borderColor: style.borderColor,
           borderWidth: `${style.borderWidth}px`,
           padding: `${style.padding}px`,
+          flex: 1,
+          height: '100%'
         }}
-        placeholder="Enter text..."
+        placeholder={data.placeholder || 'Enter text...'}
       />
     </div>
   );

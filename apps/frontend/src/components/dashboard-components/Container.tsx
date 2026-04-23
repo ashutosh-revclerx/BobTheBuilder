@@ -10,7 +10,7 @@ interface ContainerProps {
 }
 
 export default function Container({ config, componentMap }: ContainerProps) {
-  const { style } = config;
+  const { style, data } = config;
   const [showPicker, setShowPicker] = useState(false);
   const addComponent = useEditorStore((s) => s.addComponent);
   const selectComponent = useEditorStore((s) => s.selectComponent);
@@ -21,6 +21,9 @@ export default function Container({ config, componentMap }: ContainerProps) {
     setShowPicker(false);
   };
 
+  const gap = data.gap ?? 10;
+  const innerPadding = style.padding ?? 16;
+
   return (
     <div
       className="container-component"
@@ -29,17 +32,21 @@ export default function Container({ config, componentMap }: ContainerProps) {
         borderRadius: `${style.borderRadius}px`,
         borderColor: style.borderColor,
         borderWidth: `${style.borderWidth}px`,
-        padding: '0', // Let GridLayer handle the internal margin/padding
+        padding: `${innerPadding}px`,
         height: '100%',
         display: 'flex',
         flexDirection: 'column'
       }}
     >
       <div className="container-inner-layout" style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
-        <GridLayer parentId={config.id} componentMap={componentMap} />
+        <GridLayer 
+          parentId={config.id} 
+          componentMap={componentMap} 
+          customGap={gap}
+        />
       </div>
 
-      <button className="container-add-trigger" onClick={() => setShowPicker(true)} style={{ margin: '8px' }}>
+      <button className="container-add-trigger" onClick={() => setShowPicker(true)} style={{ margin: '8px 0 0 0' }}>
         <span className="container-add-plus">+</span>
         <span>Add component</span>
       </button>

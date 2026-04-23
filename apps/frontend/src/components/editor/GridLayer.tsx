@@ -1,19 +1,23 @@
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useLabelWidth } from '../../hooks/useTextMeasure';
 import { resolveBindings } from '../../engine/bindingResolver';
 import { useEditorStore } from '../../store/editorStore';
 
 const DEFAULT_SIZES: Record<string, {w:number, h:number}> = {
-  StatCard:        { w: 3, h: 3 },
-  BarChart:        { w: 6, h: 6 },
-  LineChart:       { w: 6, h: 6 },
-  Table:           { w: 8, h: 6 },
-  Button:          { w: 2, h: 2 },
-  StatusBadge:     { w: 2, h: 2 },
-  LogsViewer:      { w: 6, h: 5 },
-  Container:       { w: 6, h: 8 },
-  TabbedContainer: { w: 8, h: 10 },
+  StatCard:        { w: 3, h: 6 },
+  BarChart:        { w: 6, h: 12 },
+  LineChart:       { w: 6, h: 12 },
+  Table:           { w: 12, h: 16 },
+  Button:          { w: 2, h: 4 },
+  StatusBadge:     { w: 2, h: 4 },
+  LogsViewer:      { w: 12, h: 8 },
+  Container:       { w: 12, h: 12 },
+  TabbedContainer: { w: 12, h: 16 },
+  Text:            { w: 6, h: 4 },
+  TextInput:       { w: 4, h: 4 },
+  NumberInput:     { w: 4, h: 4 },
+  Select:          { w: 4, h: 4 },
 };
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
@@ -34,9 +38,10 @@ interface GridLayerProps {
   parentId: string | 'root';
   parentTab?: string;
   componentMap: Record<string, React.ComponentType<any>>;
+  customGap?: number;
 }
 
-export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps) {
+export function GridLayer({ parentId, parentTab, componentMap, customGap }: GridLayerProps) {
   const components = useEditorStore((s) => s.components);
   const selectedComponentId = useEditorStore((s) => s.selectedComponentId);
   const selectComponent = useEditorStore((s) => s.selectComponent);
@@ -57,22 +62,50 @@ export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps)
   const layout = useMemo(() => {
     return filteredComponents.map(c => ({
       i: c.id,
-      x: c.layout?.x || 0,
-      y: c.layout?.y || 0,
-      w: c.layout?.w || 4,
-      h: c.layout?.h || 4,
+      x: c.layout?.x ?? 0,
+      y: c.layout?.y ?? 0,
+      w: c.layout?.w ?? 4,
+      h: c.layout?.h ?? 4,
     }));
   }, [filteredComponents]);
 
-  const onLayoutChange = (currentLayout: readonly { i: string; x: number; y: number; w: number; h: number }[]) => {
-    updateLayouts(Array.from(currentLayout).map(l => ({
+  // Calculate auto-expanding canvas height based on component positions
+  const canvasMinHeight = useMemo(() => {
+    if (parentId !== 'root') return '100%';
+    if (filteredComponents.length === 0) return 'calc(100vh - 100px)';
+    
+    // Find the lowest point of any component (y + h) and add padding
+    const lowestPoint = filteredComponents.reduce((max, c) => {
+      const bottom = (c.layout?.y ?? 0) + (c.layout?.h ?? 4);
+      return Math.max(max, bottom);
+    }, 0);
+    
+    // Convert grid units to pixels: (rows * rowHeight) + (rows * margin) + extra padding
+    const pixelHeight = (lowestPoint * 10) + (lowestPoint * 10) + 400;
+    const viewportHeight = 'calc(100vh - 100px)';
+    
+    // Use whichever is larger
+    return `max(${viewportHeight}, ${pixelHeight}px)`;
+  }, [filteredComponents, parentId]);
+
+  // Only sync to store on user interaction (drag/resize STOP), not on every render
+  const syncLayoutToStore = useCallback((currentLayout: { i: string; x: number; y: number; w: number; h: number }[]) => {
+    updateLayouts(currentLayout.map(l => ({
       id: l.i,
       x: l.x,
       y: l.y,
       w: l.w,
       h: l.h
     })));
-  };
+  }, [updateLayouts]);
+
+  const handleDragStop = useCallback((_layout: any[], _oldItem: any, _newItem: any, _placeholder: any, _e: any, _node: any) => {
+    syncLayoutToStore(_layout);
+  }, [syncLayoutToStore]);
+
+  const handleResizeStop = useCallback((_layout: any[], _oldItem: any, _newItem: any, _placeholder: any, _e: any, _node: any) => {
+    syncLayoutToStore(_layout);
+  }, [syncLayoutToStore]);
 
   const handleRemoveClick = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -102,11 +135,14 @@ export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps)
         layouts={{ lg: layout }}
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
         cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
-        rowHeight={30}
+        rowHeight={10}
         draggableCancel="input, button, select, textarea, .tabbed-header-btn, .inline-picker, .container-empty-dropzone, .recharts-wrapper"
-        onLayoutChange={onLayoutChange}
-        margin={[10, 10]}
-        style={{ minHeight: parentId === 'root' ? 'calc(100vh - 100px)' : '100px' }}
+        compactType={null}
+        preventCollision={true}
+        onDragStop={handleDragStop}
+        onResizeStop={handleResizeStop}
+        margin={[customGap ?? 10, customGap ?? 10]}
+        style={{ minHeight: canvasMinHeight }}
         isDroppable={!!draggingType}
         droppingItem={{ i: '__dropping__', x: 0, y: 0, ...size }}
         onDrop={(_layout, item, e) => {
@@ -128,7 +164,7 @@ export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps)
       >
       {filteredComponents.map(comp => {
         const Component = componentMap[comp.type];
-        if (!Component) return null;
+        if (!Component || comp.visible === false) return null;
 
         const resolvedData = resolveBindings(comp.data);
         const resolvedComp = { ...comp, data: resolvedData };
@@ -154,7 +190,12 @@ export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps)
                 </div>
               </div>
             )}
-            <div className="component-inner-content" style={{ height: '100%', overflow: 'hidden' }}>
+            <div className="component-inner-content" style={{ height: '100%', overflow: 'hidden', position: 'relative' }}>
+              {comp.loading && (
+                <div className="component-loading-overlay">
+                  <div className="spinner"></div>
+                </div>
+              )}
               <Component config={resolvedComp} componentMap={componentMap} />
             </div>
           </div>

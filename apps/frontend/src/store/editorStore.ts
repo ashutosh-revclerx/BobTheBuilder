@@ -21,8 +21,10 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       mockValue: '0',
       dbBinding: '',
       refreshOn: 'onLoad',
+      trend: '+12.5%',
+      trendType: 'positive',
     },
-    layout: { x: 0, y: 0, w: 3, h: 3 }
+    layout: { x: 0, y: 0, w: 3, h: 6 }
   },
   Table: {
     style: {
@@ -46,8 +48,10 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       ],
       dbBinding: '',
       refreshOn: 'onLoad',
+      searchable: true,
+      pagination: true,
     },
-    layout: { x: 0, y: 0, w: 12, h: 8 }
+    layout: { x: 0, y: 0, w: 12, h: 16 }
   },
   BarChart: {
     style: {
@@ -67,10 +71,12 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
         { label: 'B', value: 50 },
         { label: 'C', value: 40 },
       ],
+      xField: 'label',
+      yField: 'value',
       dbBinding: '',
       refreshOn: 'onLoad',
     },
-    layout: { x: 0, y: 0, w: 6, h: 6 }
+    layout: { x: 0, y: 0, w: 6, h: 12 }
   },
   LineChart: {
     style: {
@@ -90,10 +96,12 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
         { label: 'B', value: 35 },
         { label: 'C', value: 28 },
       ],
+      xField: 'label',
+      yField: 'value',
       dbBinding: '',
       refreshOn: 'onLoad',
     },
-    layout: { x: 0, y: 0, w: 6, h: 6 }
+    layout: { x: 0, y: 0, w: 6, h: 12 }
   },
   StatusBadge: {
     style: {
@@ -111,8 +119,13 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       mockValue: 'Active',
       dbBinding: '',
       refreshOn: 'onLoad',
+      mapping: {
+        'Active': '#059669',
+        'Pending': '#d97706',
+        'Error': '#dc2626',
+      },
     },
-    layout: { x: 0, y: 0, w: 2, h: 2 }
+    layout: { x: 0, y: 0, w: 2, h: 4 }
   },
   Button: {
     style: {
@@ -125,9 +138,10 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
     },
     data: {
       dbBinding: '',
-      mockValue: null
+      mockValue: null,
+      events: [{ type: 'onClick', action: 'none' }],
     },
-    layout: { x: 0, y: 0, w: 2, h: 2 }
+    layout: { x: 0, y: 0, w: 2, h: 4 }
   },
   LogsViewer: {
     style: {
@@ -141,9 +155,11 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
     },
     data: {
       dbBinding: '',
-      mockValue: ['[INFO] Ready.']
+      mockValue: ['[INFO] Ready.'],
+      levelFilter: 'all',
+      logSearchable: true,
     },
-    layout: { x: 0, y: 0, w: 12, h: 4 }
+    layout: { x: 0, y: 0, w: 12, h: 8 }
   },
   Container: {
     style: {
@@ -154,8 +170,11 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
       borderWidth: 1,
       padding: 16
     },
-    data: {},
-    layout: { x: 0, y: 0, w: 12, h: 6 }
+    data: {
+      containerLayout: 'vertical',
+      gap: 10,
+    },
+    layout: { x: 0, y: 0, w: 12, h: 12 }
   },
   TabbedContainer: {
     style: {
@@ -170,19 +189,23 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
     data: {
       tabs: ['View 1', 'View 2', 'View 3']
     },
-    layout: { x: 0, y: 0, w: 12, h: 8 }
+    layout: { x: 0, y: 0, w: 12, h: 16 }
   },
   Text: {
     style: {
+      backgroundColor: '#ffffff',
       textColor: '#0f1117',
       fontFamily: 'Inter',
       fontSize: 14,
+      borderRadius: 6,
+      borderColor: '#000000',
+      borderWidth: 1,
       padding: 8
     },
     data: {
       mockValue: 'This is a text component. You can bind data to it or type markdown.'
     },
-    layout: { x: 0, y: 0, w: 6, h: 2 }
+    layout: { x: 0, y: 0, w: 6, h: 4 }
   },
   TextInput: {
     style: {
@@ -197,9 +220,10 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
     },
     data: {
       label: 'Input label',
-      mockValue: ''
+      mockValue: '',
+      placeholder: 'Enter text...',
     },
-    layout: { x: 0, y: 0, w: 4, h: 2 }
+    layout: { x: 0, y: 0, w: 4, h: 4 }
   },
   NumberInput: {
     style: {
@@ -214,9 +238,12 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
     },
     data: {
       label: 'Number label',
-      mockValue: 0
+      mockValue: 0,
+      min: 0,
+      max: 100,
+      step: 1,
     },
-    layout: { x: 0, y: 0, w: 4, h: 2 }
+    layout: { x: 0, y: 0, w: 4, h: 4 }
   },
   Select: {
     style: {
@@ -232,11 +259,13 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
     data: {
       label: 'Select label',
       options: ['Option 1', 'Option 2', 'Option 3'],
-      mockValue: 'Option 1'
+      mockValue: 'Option 1',
+      events: [{ type: 'onChange', action: 'none' }],
     },
-    layout: { x: 0, y: 0, w: 4, h: 2 }
+    layout: { x: 0, y: 0, w: 4, h: 4 }
   }
 };
+
 
 interface EditorState {
   // Core state

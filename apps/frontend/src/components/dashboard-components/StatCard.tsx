@@ -28,9 +28,10 @@ export default function StatCard({ config }: StatCardProps) {
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const value = typeof rawData === 'string' ? rawData : String(rawData ?? '—');
 
-  const hasNumeric = /[\d]/.test(value);
-  const deltaValue = hasNumeric ? '+12.5%' : null;
-  const deltaPositive = true;
+  const trendValue = data.trend || null;
+  const trendType = data.trendType || 'positive';
+  const isPositive = trendType === 'positive';
+  const isNeutral = trendType === 'neutral';
 
   return (
     <div
@@ -44,6 +45,9 @@ export default function StatCard({ config }: StatCardProps) {
         borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
         borderStyle: 'solid',
         padding: style.padding ? `${style.padding}px` : undefined,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       <div className="stat-card-top">
@@ -57,9 +61,9 @@ export default function StatCard({ config }: StatCardProps) {
       <div className="stat-card-value">
         {value}
       </div>
-      {deltaValue && (
-        <span className={`stat-card-delta ${deltaPositive ? 'positive' : 'negative'}`}>
-          {deltaPositive ? '↑' : '↓'} {deltaValue}
+      {trendValue && (
+        <span className={`stat-card-delta ${isNeutral ? 'neutral' : (isPositive ? 'positive' : 'negative')}`}>
+          {isNeutral ? '—' : (isPositive ? '↑' : '↓')} {trendValue}
         </span>
       )}
     </div>
