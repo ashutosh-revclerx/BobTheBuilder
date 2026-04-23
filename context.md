@@ -455,16 +455,16 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 > **Goal:** Configs saved to DB. All backend types supported. Reactive queries. Each customer gets their own URL.
 
-- [ ] **2.1** — PostgreSQL setup: tables `dashboards`, `customers`, `query_logs`, migration scripts
-- [ ] **2.2** — Dashboard CRUD API: create / read / update / delete with Zod validation on write
+- [x] **2.1** — PostgreSQL setup: tables `dashboards`, `customers`, `query_logs`, migration scripts
+- [x] **2.2** — Dashboard CRUD API: create / read / update / delete with Zod validation on write
 - [ ] **2.3** — Dashboard list screen: engineer-facing, name + last edited + assigned customer count
 - [ ] **2.4** — Agent executor: invocation, poll for completion, result retrieval
-- [ ] **2.5** — DB executor: read-only parameterised queries only, no raw SQL from config
+- [x] **2.5** — DB executor: read-only parameterised queries only, no raw SQL from config
 - [ ] **2.6** — Reactive query engine: `onDependencyChange` trigger, watches component state
 - [ ] **2.7** — Component state binding: resolve `components.{id}.selectedRow` and `components.{id}.value`
 - [ ] **2.8** — Customer profiles: name, assigned dashboards, brand config (empty), URL slug
 - [ ] **2.9** — Customer routing: `/c/:slug` loads assigned dashboard config and renders it
-- [ ] **2.10** — Audit log: every `/execute` writes to `query_logs` with full metadata
+- [x] **2.10** — Audit log: every `/execute` writes to `query_logs` with full metadata
 - [ ] **2.11** — Query error + retry UI: readable error, no stack traces shown to user
 - [ ] **2.12** — Integration test suite: config load → render → query → result, runs in CI on every PR
 
@@ -553,4 +553,4 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 ---
 
-*Current status: Phase 0, 0.5, 1 — COMPLETE. Phase 3.1–3.10 — COMPLETE (grid system + full drag-and-drop + UI polish & fixes). Ready for Phase 2 backend work or Phase 3.11+ advanced features.*
+*Current status: Phase 0, 0.5, 1 — COMPLETE. Phase 3.1–3.10 — COMPLETE (grid system + full drag-and-drop + UI polish & fixes). Phase 2: 2.1, 2.2, 2.5, 2.10 COMPLETE — PostgreSQL, Dashboard CRUD, Resources CRUD, execute proxy with DB/REST executors, audit log. Remaining: 2.3, 2.4, 2.6–2.9, 2.11–2.12.*

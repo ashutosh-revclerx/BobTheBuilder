@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/tsc -p apps/backend/tsconfig.json --noEmit)",
+      "Bash(/c/Users/ayushmaan.singh/BTB/node_modules/.bin/tsx src/db/client.ts)",
+      "Bash(/c/Users/ayushmaan.singh/BTB/node_modules/.bin/tsx src/server.ts)",
+      "Bash(curl -s http://localhost:3001/health)",
+      "Bash(kill %1)",
+      "Bash(npm run *)",
+      "Bash(node -e \"import\\('zod'\\).then\\(m => console.log\\(m.z.ZodType ? 'ok' : 'fail'\\)\\)\")"
+    ]
+  }
+}

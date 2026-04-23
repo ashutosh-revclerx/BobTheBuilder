@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16
+    container_name: dashboard_db
+    environment:
+      POSTGRES_USER: dashboard_user
+      POSTGRES_PASSWORD: dashboard_pass
+      POSTGRES_DB: dashboard_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
