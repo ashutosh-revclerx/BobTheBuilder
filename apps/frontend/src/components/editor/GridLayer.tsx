@@ -103,7 +103,7 @@ export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps)
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
         cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
         rowHeight={30}
-        draggableHandle=".canvas-component-label"
+        draggableCancel="input, button, select, textarea, .tabbed-header-btn, .inline-picker, .container-empty-dropzone, .recharts-wrapper"
         onLayoutChange={onLayoutChange}
         margin={[10, 10]}
         style={{ minHeight: parentId === 'root' ? 'calc(100vh - 100px)' : '100px' }}

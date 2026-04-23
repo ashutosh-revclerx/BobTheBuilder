@@ -68,6 +68,9 @@ export default function Table({ config }: TableProps) {
         borderColor: style.borderColor,
         borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
         borderStyle: 'solid',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       <div className="table-component-header">
@@ -75,31 +78,33 @@ export default function Table({ config }: TableProps) {
           {label}
         </div>
       </div>
-      <table ref={tableRef}>
-        <thead>
-          <tr>
-            {columns.map((col) => (
-              <th key={col.fieldKey}>{col.name}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {columns.map((col, colIdx) => {
-                const cw = colWidths[colIdx] || 0;
-                return (
-                  <TruncatedCell
-                    key={col.fieldKey}
-                    text={String(row[col.fieldKey] ?? '')}
-                    colWidth={cw}
-                  />
-                );
-              })}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        <table ref={tableRef}>
+          <thead>
+            <tr>
+              {columns.map((col) => (
+                <th key={col.fieldKey}>{col.name}</th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {columns.map((col, colIdx) => {
+                  const cw = colWidths[colIdx] || 0;
+                  return (
+                    <TruncatedCell
+                      key={col.fieldKey}
+                      text={String(row[col.fieldKey] ?? '')}
+                      colWidth={cw}
+                    />
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
