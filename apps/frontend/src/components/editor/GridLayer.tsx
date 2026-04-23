@@ -153,6 +153,14 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
           const type = (e as any).dataTransfer?.getData('componentType');
           if (!type || !type.length) return;
 
+          // Sync all existing component positions from RGL's resolved layout at drop time.
+          // This converts any Infinity y-values to their actual rendered positions, preventing
+          // position jumps when the layout prop is recomputed after addComponent.
+          const existingItems = (_layout as any[]).filter((l) => l.i !== '__dropping__');
+          if (existingItems.length > 0) {
+            syncLayoutToStore(existingItems);
+          }
+
           addComponent(type as any, {
             x: item.x,
             y: item.y,

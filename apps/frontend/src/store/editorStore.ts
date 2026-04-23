@@ -464,6 +464,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           return {
             ...c,
             layout: {
+              ...c.layout,  // preserve minW, minH, maxW, maxH
               x: matchingLayout.x,
               y: matchingLayout.y,
               w: matchingLayout.w,
@@ -513,6 +514,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         minW: (defaults as any).layout.minW,
         minH: (defaults as any).layout.minH,
       };
+
+      // Collision guard: if the explicit drop position overlaps an existing sibling,
+      // fall back to placing the component below all siblings. This handles cases where
+      // RGL's preventCollision doesn't fully block overlapping drops.
+      if (isFinite(layout.y)) {
+        const levelSiblings = state.components.filter(c =>
+          parentId !== undefined ? c.parentId === parentId : !c.parentId
+        );
+        const lx = layout.x;
+        const ly = layout.y;
+        const lw = layout.w;
+        const lh = layout.h;
+        const collides = levelSiblings.some(c => {
+          const cx = c.layout?.x ?? 0;
+          const cy = c.layout?.y ?? 0;
+          const cw = c.layout?.w ?? 4;
+          const ch = c.layout?.h ?? 4;
+          if (!isFinite(cy)) return false;
+          return lx < cx + cw && lx + lw > cx && ly < cy + ch && ly + lh > cy;
+        });
+        if (collides) {
+          layout = {
+            ...layout,
+            y: levelSiblings.reduce((max, c) => {
+              const cy = c.layout?.y ?? 0;
+              const ch = c.layout?.h ?? 4;
+              if (!isFinite(cy)) return max;
+              return Math.max(max, cy + ch);
+            }, 0),
+          };
+        }
+      }
 
       const newComponent: ComponentConfig = {
         id,
