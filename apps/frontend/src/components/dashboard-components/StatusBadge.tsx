@@ -47,6 +47,13 @@ export default function StatusBadge({ config }: StatusBadgeProps) {
         borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
         borderStyle: 'solid',
         padding: style.padding ? `${style.padding}px` : undefined,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '12px',
+        overflow: 'hidden'
       }}
     >
       <span
@@ -54,6 +61,7 @@ export default function StatusBadge({ config }: StatusBadgeProps) {
         style={{
           backgroundColor: `${badgeColor}18`,
           color: badgeColor,
+          flexShrink: 0
         }}
       >
         <span
@@ -64,7 +72,7 @@ export default function StatusBadge({ config }: StatusBadgeProps) {
       </span>
       <div
         className="status-badge-label"
-        style={{ color: `${style.textColor || '#9ba3af'}88` }}
+        style={{ color: `${style.textColor || '#9ba3af'}88`, flexShrink: 0 }}
       >
         {label}
       </div>

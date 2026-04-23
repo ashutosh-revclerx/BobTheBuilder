@@ -19,14 +19,10 @@ const DEFAULT_SIZES: Record<string, {w:number, h:number}> = {
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
 function FloatingLabel({ text }: { text: string }) {
-  const pillWidth = useLabelWidth(text);
   return (
-    <div
-      className="canvas-component-label"
-      style={{ width: pillWidth > 0 ? `${pillWidth}px` : undefined }}
-    >
+    <span className="canvas-component-label">
       {text}
-    </div>
+    </span>
   );
 }
 
@@ -103,6 +99,7 @@ export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps)
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
         cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
         rowHeight={30}
+        resizeHandles={['se', 'sw', 'ne', 'nw']}
         draggableCancel="input, button, select, textarea, .tabbed-header-btn, .inline-picker, .container-empty-dropzone, .recharts-wrapper"
         onLayoutChange={onLayoutChange}
         margin={[10, 10]}
@@ -154,9 +151,7 @@ export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps)
                 </div>
               </div>
             )}
-            <div className="component-inner-content" style={{ height: '100%', overflow: 'hidden' }}>
-              <Component config={resolvedComp} componentMap={componentMap} />
-            </div>
+            <Component config={resolvedComp} componentMap={componentMap} />
           </div>
         );
       })}

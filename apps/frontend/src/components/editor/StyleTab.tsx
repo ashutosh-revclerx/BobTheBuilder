@@ -4,18 +4,18 @@ import type { ComponentStyle } from '../../types/template';
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Poppins', 'DM Sans', 'Fira Code', 'system-ui'];
 
 export default function StyleTab() {
-  const selectedComponentId = useEditorStore((s) => s.selectedComponentId);
+  const lastSelectedComponentId = useEditorStore((s) => s.lastSelectedComponentId);
   const components = useEditorStore((s) => s.components);
   const updateStyle = useEditorStore((s) => s.updateStyle);
 
-  const component = components.find((c) => c.id === selectedComponentId);
+  const component = components.find((c) => c.id === lastSelectedComponentId);
   if (!component) return null;
 
   const style = component.style;
 
   const handleChange = (key: keyof ComponentStyle, value: string | number) => {
-    if (!selectedComponentId) return;
-    updateStyle(selectedComponentId, { [key]: value });
+    if (!lastSelectedComponentId) return;
+    updateStyle(lastSelectedComponentId, { [key]: value });
   };
 
   return (

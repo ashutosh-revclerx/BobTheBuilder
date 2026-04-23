@@ -11,6 +11,9 @@ export default function Text({ config }: { config: ComponentConfig }) {
         fontFamily: style.fontFamily,
         fontSize: `${style.fontSize}px`,
         padding: `${style.padding}px`,
+        height: '100%',
+        overflow: 'auto',
+        minHeight: 0
       }}
     >
       {String(data.mockValue || '')}

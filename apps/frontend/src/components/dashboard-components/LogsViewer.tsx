@@ -43,7 +43,7 @@ export default function LogsViewer({ config }: LogsViewerProps) {
         borderStyle: 'solid',
         padding: '0',
         height: '100%',
-        minHeight: '200px',
+        overflow: 'hidden'
       }}
     >
       <div 
@@ -57,7 +57,8 @@ export default function LogsViewer({ config }: LogsViewerProps) {
           fontSize: '13px',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: '8px',
+          flexShrink: 0
         }}
       >
         <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#059669' }}></span>
@@ -72,7 +73,8 @@ export default function LogsViewer({ config }: LogsViewerProps) {
           padding: '12px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '4px'
+          gap: '4px',
+          minHeight: 0
         }}
       >
         {logs.length === 0 ? (

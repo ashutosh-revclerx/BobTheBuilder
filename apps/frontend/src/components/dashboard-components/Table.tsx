@@ -1,12 +1,24 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ComponentConfig } from '../../types/template';
 import { truncateTexts } from '../../hooks/useTextMeasure';
+import { useEditorStore } from '../../store/editorStore';
 
 interface TableProps {
   config: ComponentConfig;
+  isEditorMode?: boolean;
 }
 
-function TruncatedCell({ text, colWidth }: { text: string; colWidth: number }) {
+function TruncatedCell({ 
+  text, 
+  colWidth, 
+  isEditorMode,
+  onEdit
+}: { 
+  text: string; 
+  colWidth: number;
+  isEditorMode?: boolean;
+  onEdit?: (val: string) => void;
+}) {
   const [hover, setHover] = useState(false);
   const str = String(text ?? '');
 
@@ -16,6 +28,19 @@ function TruncatedCell({ text, colWidth }: { text: string; colWidth: number }) {
   const result = availW > 0
     ? truncateTexts([str], availW)[0]
     : { display: str, full: str, isTruncated: false };
+
+  if (isEditorMode) {
+    return (
+      <td
+        contentEditable={true}
+        suppressContentEditableWarning
+        onBlur={(e) => onEdit?.(e.currentTarget.textContent ?? '')}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+      >
+        {str}
+      </td>
+    );
+  }
 
   return (
     <td
@@ -31,11 +56,14 @@ function TruncatedCell({ text, colWidth }: { text: string; colWidth: number }) {
   );
 }
 
-export default function Table({ config }: TableProps) {
-  const { style, data, label } = config;
+export default function Table({ config, isEditorMode = true }: TableProps) {
+  const { id, style, data, label } = config;
+  const updateData = useEditorStore((s) => s.updateData);
   const columns = data.columns || [];
   const isBound = data._resolvedBindings?.['dbBinding'];
-  const rawData = isBound ? data.dbBinding : data.mockValue;
+  
+  // Bug 2: Source of truth is data.rows
+  const rawData = isBound ? data.dbBinding : (data.rows || data.mockValue);
   const rows = (Array.isArray(rawData) ? rawData : []) as Record<string, unknown>[];
 
   const tableRef = useRef<HTMLTableElement>(null);
@@ -57,6 +85,18 @@ export default function Table({ config }: TableProps) {
     return () => obs.disconnect();
   }, [measureCols]);
 
+  const handleCellEdit = (rowIdx: number, colKey: string, value: string) => {
+    const updatedRows = rows.map((row, i) =>
+      i === rowIdx ? { ...row, [colKey]: value } : row
+    );
+    updateData(id, { rows: updatedRows });
+  };
+
+  const handleAddRow = () => {
+    const blankRow = Object.fromEntries(columns.map(col => [col.fieldKey || col.key || (col as any), '']));
+    updateData(id, { rows: [...rows, blankRow] });
+  };
+
   return (
     <div
       className="table-component"
@@ -71,15 +111,16 @@ export default function Table({ config }: TableProps) {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
+        overflow: 'hidden'
       }}
     >
-      <div className="table-component-header">
+      <div className="table-component-header" style={{ flexShrink: 0 }}>
         <div className="table-component-title" style={{ color: style.textColor }}>
           {label}
         </div>
       </div>
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <table ref={tableRef}>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, overflowX: 'auto' }}>
+        <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr>
               {columns.map((col) => (
@@ -97,12 +138,25 @@ export default function Table({ config }: TableProps) {
                       key={col.fieldKey}
                       text={String(row[col.fieldKey] ?? '')}
                       colWidth={cw}
+                      isEditorMode={isEditorMode}
+                      onEdit={(val) => handleCellEdit(rowIndex, col.fieldKey, val)}
                     />
                   );
                 })}
               </tr>
             ))}
           </tbody>
+          {isEditorMode && (
+            <tfoot>
+              <tr>
+                <td colSpan={columns.length} style={{ padding: 0 }}>
+                  <button className="table-add-row-btn" onClick={handleAddRow}>
+                    + Add Row
+                  </button>
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>

@@ -10,8 +10,8 @@ export default function Select({ config }: { config: ComponentConfig }) {
   const val = componentState[config.id]?.value ?? data.mockValue ?? options[0];
 
   return (
-    <div className="atomic-input-wrapper">
-      {data.label && <label className="atomic-input-label">{data.label}</label>}
+    <div className="atomic-input-wrapper" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      {data.label && <label className="atomic-input-label" style={{ marginBottom: '4px' }}>{data.label}</label>}
       <select
         className="atomic-select-input"
         value={val}
@@ -25,6 +25,7 @@ export default function Select({ config }: { config: ComponentConfig }) {
           borderColor: style.borderColor,
           borderWidth: `${style.borderWidth}px`,
           padding: `${style.padding}px`,
+          width: '100%'
         }}
       >
         {options.map((opt, idx) => (

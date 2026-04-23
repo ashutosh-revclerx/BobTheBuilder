@@ -483,12 +483,18 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 - [x] **3.7** — Component reorder/reposition: react-grid-layout drag handles + resize handles; layout persisted to Zustand via `updateLayouts`
 - [x] **3.8** — Delete component / query: trash icon with inline confirmation
 - [x] **3.9** — True drag-from-sidebar onto canvas: `draggable` cards in LeftPanel → RGL `isDroppable`/`onDrop`; component placed at exact hovered grid cell; nested container drops supported via `stopPropagation`; drop-active visual feedback (dashed blue outline + brightened dot grid); RGL placeholder styled blue while hovering
-- [ ] **3.10** — JSON config editor: collapsible pane, bidirectionally synced with visual builder
-- [ ] **3.11** — Mobile preview toggle: Desktop vs Mobile (375px) canvas preview
-- [ ] **3.12** — Templates: migrate Phase 0 templates into full builder; add new ones
-- [ ] **3.13** — Customer assignment UI: assign a dashboard to one or more customers
-- [ ] **3.14** — Publish flow: explicit Publish button, draft state for unpublished changes
-- [ ] **3.15** — Config validation UI: inline error highlights for missing fields or bad bindings
+- [x] **3.10** — UI Polish & Critical Bug Fixes (Completed)
+  - Fixed component label and delete button positioning (floating pills + absolute alignment)
+  - Enabled and styled quad-corner resize handles (Retool-style dots)
+  - Redesigned right-panel row editor for higher data density efficiently
+  - Fixed overflow clipping issues to ensure floating UI elements are never cut off
+  - Resolved "rows is not defined" crash in DataTab via robust data extraction
+- [ ] **3.11** — JSON config editor: collapsible pane, bidirectionally synced with visual builder
+- [ ] **3.12** — Mobile preview toggle: Desktop vs Mobile (375px) canvas preview
+- [ ] **3.13** — Templates: migrate Phase 0 templates into full builder; add new ones
+- [ ] **3.14** — Customer assignment UI: assign a dashboard to one or more customers
+- [ ] **3.15** — Publish flow: explicit Publish button, draft state for unpublished changes
+- [ ] **3.16** — Config validation UI: inline error highlights for missing fields or bad bindings
 
 ---
 
@@ -547,4 +553,4 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 ---
 
-*Current status: Phase 0, 0.5, 1 — COMPLETE. Phase 3.1–3.9 — COMPLETE (grid system + full drag-and-drop from sidebar). Ready for Phase 2 backend work or Phase 3.10+ polish.*
+*Current status: Phase 0, 0.5, 1 — COMPLETE. Phase 3.1–3.10 — COMPLETE (grid system + full drag-and-drop + UI polish & fixes). Ready for Phase 2 backend work or Phase 3.11+ advanced features.*

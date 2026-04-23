@@ -55,10 +55,15 @@ export default function BarChart({ config }: BarChartProps) {
         borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
         borderStyle: 'solid',
         padding: style.padding ? `${style.padding}px` : undefined,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
       }}
     >
-      <div className="chart-component-title" style={{ color: style.textColor }}>{label}</div>
-      <ResponsiveContainer width="100%" height={240}>
+      <div className="chart-component-title" style={{ color: style.textColor, flexShrink: 0, marginBottom: '12px' }}>{label}</div>
+      <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
+        <ResponsiveContainer width="100%" height="100%">
         <RechartsBarChart data={chartData as Record<string, unknown>[]} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
           <XAxis
@@ -89,7 +94,8 @@ export default function BarChart({ config }: BarChartProps) {
             />
           ))}
         </RechartsBarChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

@@ -1,49 +1,70 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import StyleTab from './StyleTab';
 import DataTab from './DataTab';
 
 export default function RightPanel() {
-  const selectedComponentId = useEditorStore((s) => s.selectedComponentId);
+  const rightPanelOpen = useEditorStore((s) => s.rightPanelOpen);
+  const lastSelectedComponentId = useEditorStore((s) => s.lastSelectedComponentId);
   const components = useEditorStore((s) => s.components);
-  const selectComponent = useEditorStore((s) => s.selectComponent);
+  const closeRightPanel = useEditorStore((s) => s.closeRightPanel);
   const [activeTab, setActiveTab] = useState<'style' | 'data'>('style');
+  
+  const hasMounted = useRef(false);
 
-  if (!selectedComponentId) return null;
+  useEffect(() => {
+    hasMounted.current = true;
+  }, []);
 
-  const component = components.find((c) => c.id === selectedComponentId);
-  if (!component) return null;
+  if (!rightPanelOpen) return null;
+
+  const component = components.find((c) => c.id === lastSelectedComponentId);
 
   return (
-    <div className="right-panel">
+    <div className={`right-panel ${hasMounted.current ? 'panel-animate' : ''}`}>
       <div className="right-panel-header">
         <div className="right-panel-title">
-          {component.label}
-          <span className="right-panel-type-badge">{component.type}</span>
+          {component ? (
+            <>
+              {component.label}
+              <span className="right-panel-type-badge">{component.type}</span>
+            </>
+          ) : (
+            'Configuration'
+          )}
         </div>
-        <button className="right-panel-close" onClick={() => selectComponent(null)}>
+        <button className="right-panel-close" onClick={closeRightPanel}>
           ✕
         </button>
       </div>
 
-      <div className="right-panel-tabs">
-        <button
-          className={`right-panel-tab ${activeTab === 'style' ? 'active' : ''}`}
-          onClick={() => setActiveTab('style')}
-        >
-          Style
-        </button>
-        <button
-          className={`right-panel-tab ${activeTab === 'data' ? 'active' : ''}`}
-          onClick={() => setActiveTab('data')}
-        >
-          Data
-        </button>
-      </div>
+      {!component ? (
+        <div className="right-panel-empty">
+          <div className="panel-empty-icon">🎛️</div>
+          <p>Select a component to configure it</p>
+        </div>
+      ) : (
+        <>
+          <div className="right-panel-tabs">
+            <button
+              className={`right-panel-tab ${activeTab === 'style' ? 'active' : ''}`}
+              onClick={() => setActiveTab('style')}
+            >
+              Style
+            </button>
+            <button
+              className={`right-panel-tab ${activeTab === 'data' ? 'active' : ''}`}
+              onClick={() => setActiveTab('data')}
+            >
+              Data
+            </button>
+          </div>
 
-      <div className="right-panel-content">
-        {activeTab === 'style' ? <StyleTab /> : <DataTab />}
-      </div>
+          <div className="right-panel-content">
+            {activeTab === 'style' ? <StyleTab /> : <DataTab />}
+          </div>
+        </>
+      )}
     </div>
   );
 }

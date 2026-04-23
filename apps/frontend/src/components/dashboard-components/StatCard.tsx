@@ -44,9 +44,13 @@ export default function StatCard({ config }: StatCardProps) {
         borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
         borderStyle: 'solid',
         padding: style.padding ? `${style.padding}px` : undefined,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
       }}
     >
-      <div className="stat-card-top">
+      <div className="stat-card-top" style={{ flexShrink: 0 }}>
         <div className="stat-card-label" style={{ color: style.textColor ? `${style.textColor}88` : undefined }}>
           {label}
         </div>
@@ -54,14 +58,16 @@ export default function StatCard({ config }: StatCardProps) {
           {pickIcon(label)}
         </div>
       </div>
-      <div className="stat-card-value">
-        {value}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start' }}>
+        <div className="stat-card-value">
+          {value}
+        </div>
+        {deltaValue && (
+          <span className={`stat-card-delta ${deltaPositive ? 'positive' : 'negative'}`}>
+            {deltaPositive ? '↑' : '↓'} {deltaValue}
+          </span>
+        )}
       </div>
-      {deltaValue && (
-        <span className={`stat-card-delta ${deltaPositive ? 'positive' : 'negative'}`}>
-          {deltaPositive ? '↑' : '↓'} {deltaValue}
-        </span>
-      )}
     </div>
   );
 }

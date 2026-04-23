@@ -57,6 +57,8 @@ export default function Button({ config }: ButtonProps) {
         backgroundColor: style.backgroundColor,
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         border: style.borderWidth ? `${style.borderWidth}px solid ${style.borderColor || 'transparent'}` : undefined,
+        height: '100%',
+        overflow: 'hidden'
       }}
     >
       <button

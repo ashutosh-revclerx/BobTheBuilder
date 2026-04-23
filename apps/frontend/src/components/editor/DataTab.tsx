@@ -1,20 +1,23 @@
 import { useEditorStore } from '../../store/editorStore';
 
 export default function DataTab() {
-  const selectedComponentId = useEditorStore((s) => s.selectedComponentId);
+  const lastSelectedComponentId = useEditorStore((s) => s.lastSelectedComponentId);
   const components = useEditorStore((s) => s.components);
   const updateData = useEditorStore((s) => s.updateData);
 
-  const component = components.find((c) => c.id === selectedComponentId);
-  if (!component) return null;
+  const selectedComponent = components.find((c) => c.id === lastSelectedComponentId);
+  const rows = selectedComponent?.data?.rows ?? [];
+  const columns = selectedComponent?.data?.columns ?? [];
 
-  const { data, type } = component;
+  if (!selectedComponent) return null;
+
+  const { data, type } = selectedComponent;
   const isChart = type === 'BarChart' || type === 'LineChart';
   const isTable = type === 'Table';
 
   const handleDataField = (key: string, value: unknown) => {
-    if (!selectedComponentId) return;
-    updateData(selectedComponentId, { [key]: value });
+    if (!lastSelectedComponentId) return;
+    updateData(lastSelectedComponentId, { [key]: value });
   };
 
   const handleMockValueChange = (rawValue: string) => {
@@ -31,7 +34,6 @@ export default function DataTab() {
   };
 
   // Column editor for Tables
-  const columns = data.columns || [];
   const handleColumnChange = (index: number, field: 'name' | 'fieldKey', value: string) => {
     const newColumns = [...columns];
     newColumns[index] = { ...newColumns[index], [field]: value };
@@ -90,7 +92,7 @@ export default function DataTab() {
         <input
           type="text"
           className="form-input"
-          value={component.label}
+          value={selectedComponent.label}
           onChange={(e) => handleDataField('label', e.target.value)}
           placeholder="Component label"
         />
@@ -147,31 +149,80 @@ export default function DataTab() {
 
       {/* Table: Column Editor */}
       {isTable && (
-        <div className="form-group">
-          <label className="form-label">Columns</label>
-          <div className="mini-editor">
-            {columns.map((col, i) => (
-              <div key={i} className="mini-editor-row">
-                <input
-                  value={col.name}
-                  onChange={(e) => handleColumnChange(i, 'name', e.target.value)}
-                  placeholder="Column name"
-                />
-                <input
-                  value={col.fieldKey}
-                  onChange={(e) => handleColumnChange(i, 'fieldKey', e.target.value)}
-                  placeholder="Field key"
-                />
-                <button className="mini-editor-delete" onClick={() => handleDeleteColumn(i)}>
-                  ×
-                </button>
-              </div>
-            ))}
-            <button className="mini-editor-add" onClick={handleAddColumn}>
-              + Add column
-            </button>
+        <>
+          <div className="form-group">
+            <label className="form-label">Columns</label>
+            <div className="mini-editor">
+              {columns.map((col, i) => (
+                <div key={i} className="mini-editor-row">
+                  <input
+                    value={col.name}
+                    onChange={(e) => handleColumnChange(i, 'name', e.target.value)}
+                    placeholder="Column name"
+                  />
+                  <input
+                    value={col.fieldKey}
+                    onChange={(e) => handleColumnChange(i, 'fieldKey', e.target.value)}
+                    placeholder="Field key"
+                  />
+                  <button className="mini-editor-delete" onClick={() => handleDeleteColumn(i)}>
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button className="mini-editor-add" onClick={handleAddColumn}>
+                + Add column
+              </button>
+            </div>
           </div>
-        </div>
+
+          {selectedComponent?.type === 'Table' && (
+            <div className="panel-rows-section">
+              <div className="panel-section-header">ROWS ({rows.length})</div>
+              <div className="row-editor-list">
+                {rows.map((row: any, rowIdx: number) => (
+                  <div className="row-editor-item" key={rowIdx}>
+                    <span className="row-editor-num">{rowIdx + 1}</span>
+                    <div className="row-editor-fields">
+                      {columns.map((col: any) => (
+                        <div className="row-editor-field" key={col.fieldKey}>
+                          <span className="row-field-key">{col.fieldKey}</span>
+                          <input
+                            className="row-field-input"
+                            value={row[col.fieldKey] ?? ''}
+                            onChange={(e) => {
+                              const updatedRows = [...rows];
+                              updatedRows[rowIdx] = { ...updatedRows[rowIdx], [col.fieldKey]: e.target.value };
+                              handleDataField('rows', updatedRows);
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <button 
+                      className="row-editor-delete" 
+                      onClick={() => {
+                        const updatedRows = rows.filter((_: any, i: number) => i !== rowIdx);
+                        handleDataField('rows', updatedRows);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button 
+                className="row-editor-add" 
+                onClick={() => {
+                  const blankRow = Object.fromEntries(columns.map((col: any) => [col.fieldKey, '']));
+                  handleDataField('rows', [...rows, blankRow]);
+                }}
+              >
+                + Add Row
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Chart: Series Editor */}

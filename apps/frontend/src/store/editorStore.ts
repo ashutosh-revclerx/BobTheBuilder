@@ -257,6 +257,8 @@ interface EditorState {
   // UI State for editing
   activeTabs: Record<string, string>; // Tracks which tab is currently viewed in a TabbedContainer
   draggingType: string | null;
+  rightPanelOpen: boolean;
+  lastSelectedComponentId: string | null;
 
   // Actions
   loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[]) => void;
@@ -282,6 +284,7 @@ interface EditorState {
   getResolvedComponent: (id: string) => ComponentConfig | undefined;
   deleteSavedTemplate: (templateId: string) => void;
   setDraggingType: (type: string | null) => void;
+  closeRightPanel: () => void;
 
   setQueryState: (queryName: string, state: Partial<{ data: any; isLoading: boolean; error: string | null; lastRunAt: string | null }>) => void;
   setComponentState: (componentId: string, state: any) => void;
@@ -301,8 +304,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   savedTemplates: {},
   queries: {},
   componentState: {},
+  rightPanelOpen: true,
+  lastSelectedComponentId: null,
 
   setDraggingType: (type) => set({ draggingType: type }),
+
+  closeRightPanel: () => set({ rightPanelOpen: false, selectedComponentId: null }),
 
   setActiveTab: (containerId, tab) => set((state) => ({
     activeTabs: { ...state.activeTabs, [containerId]: tab }
@@ -336,6 +343,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       components: JSON.parse(JSON.stringify(components)),
       queriesConfig: JSON.parse(JSON.stringify(queries)),
       selectedComponentId: null,
+      lastSelectedComponentId: components[0]?.id ?? null,
+      rightPanelOpen: true,
       activeTabs: {},
       dirtyStyleMap: {},
       dirtyDataMap: {},
@@ -352,6 +361,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       components: JSON.parse(JSON.stringify(saved.components)),
       queriesConfig: JSON.parse(JSON.stringify((saved as any).queries || [])),
       selectedComponentId: null,
+      lastSelectedComponentId: saved.components[0]?.id ?? null,
+      rightPanelOpen: true,
       activeTabs: {},
       dirtyStyleMap: {},
       dirtyDataMap: {},
@@ -360,7 +371,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  selectComponent: (id) => set({ selectedComponentId: id }),
+  selectComponent: (id) => {
+    if (id) {
+      set({ selectedComponentId: id, lastSelectedComponentId: id, rightPanelOpen: true });
+    } else {
+      set({ selectedComponentId: null });
+    }
+  },
 
   setDashboardName: (name) => set({ dashboardName: name }),
 
@@ -477,6 +494,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         components: [...state.components, newComponent],
         selectedComponentId: id,
+        lastSelectedComponentId: id,
+        rightPanelOpen: true,
       };
     });
   },
