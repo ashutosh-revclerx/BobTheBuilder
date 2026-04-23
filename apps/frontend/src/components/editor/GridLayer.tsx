@@ -4,6 +4,18 @@ import { useLabelWidth } from '../../hooks/useTextMeasure';
 import { resolveBindings } from '../../engine/bindingResolver';
 import { useEditorStore } from '../../store/editorStore';
 
+const DEFAULT_SIZES: Record<string, {w:number, h:number}> = {
+  StatCard:        { w: 3, h: 3 },
+  BarChart:        { w: 6, h: 6 },
+  LineChart:       { w: 6, h: 6 },
+  Table:           { w: 8, h: 6 },
+  Button:          { w: 2, h: 2 },
+  StatusBadge:     { w: 2, h: 2 },
+  LogsViewer:      { w: 6, h: 5 },
+  Container:       { w: 6, h: 8 },
+  TabbedContainer: { w: 8, h: 10 },
+};
+
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
 function FloatingLabel({ text }: { text: string }) {
@@ -30,6 +42,9 @@ export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps)
   const selectComponent = useEditorStore((s) => s.selectComponent);
   const removeComponent = useEditorStore((s) => s.removeComponent);
   const updateLayouts = useEditorStore((s) => s.updateLayouts);
+  const addComponent = useEditorStore((s) => s.addComponent);
+  const draggingType = useEditorStore((s) => s.draggingType);
+  const setDraggingType = useEditorStore((s) => s.setDraggingType);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   const filteredComponents = useMemo(() => {
@@ -49,8 +64,8 @@ export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps)
     }));
   }, [filteredComponents]);
 
-  const onLayoutChange = (currentLayout: any[]) => {
-    updateLayouts(currentLayout.map(l => ({
+  const onLayoutChange = (currentLayout: readonly { i: string; x: number; y: number; w: number; h: number }[]) => {
+    updateLayouts(Array.from(currentLayout).map(l => ({
       id: l.i,
       x: l.x,
       y: l.y,
@@ -75,18 +90,42 @@ export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps)
     setConfirmRemoveId(null);
   };
 
+  const size = draggingType ? DEFAULT_SIZES[draggingType] ?? {w:4,h:4} : {w:4,h:4};
+
   return (
-    <ResponsiveGridLayout
-      className="layout"
-      layouts={{ lg: layout }}
-      breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-      cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
-      rowHeight={30}
-      draggableHandle=".canvas-component-label"
-      onLayoutChange={onLayoutChange}
-      margin={[10, 10]}
-      style={{ minHeight: parentId === 'root' ? 'calc(100vh - 100px)' : '100px' }}
+    <div 
+      className={`grid-layer-wrapper ${draggingType ? 'drop-active' : ''}`}
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
     >
+      <ResponsiveGridLayout
+        className="layout"
+        layouts={{ lg: layout }}
+        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+        cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+        rowHeight={30}
+        draggableHandle=".canvas-component-label"
+        onLayoutChange={onLayoutChange}
+        margin={[10, 10]}
+        style={{ minHeight: parentId === 'root' ? 'calc(100vh - 100px)' : '100px' }}
+        isDroppable={!!draggingType}
+        droppingItem={{ i: '__dropping__', x: 0, y: 0, ...size }}
+        onDrop={(_layout, item, e) => {
+          e.preventDefault();
+          if (!item) return;
+          const type = (e as DragEvent & { dataTransfer: DataTransfer }).dataTransfer.getData('componentType');
+          if (!type || !type.length) return;
+
+          addComponent(type as any, {
+            x: item.x,
+            y: item.y,
+            w: item.w,
+            h: item.h,
+            parentId: parentId === 'root' ? undefined : parentId,
+            parentTab: parentTab ?? undefined,
+          });
+          setDraggingType(null);
+        }}
+      >
       {filteredComponents.map(comp => {
         const Component = componentMap[comp.type];
         if (!Component) return null;
@@ -122,5 +161,6 @@ export function GridLayer({ parentId, parentTab, componentMap }: GridLayerProps)
         );
       })}
     </ResponsiveGridLayout>
+  </div>
   );
 }

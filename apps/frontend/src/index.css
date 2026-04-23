@@ -603,9 +603,24 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 16px 8px;
-  cursor: pointer;
   transition: all var(--transition-fast);
   color: var(--text-primary);
+  position: relative;
+}
+.draggable-card {
+  cursor: grab;
+  user-select: none;
+}
+.draggable-card:active {
+  cursor: grabbing;
+}
+.component-card-drag-handle {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  color: var(--text-muted);
+  font-size: 14px;
+  opacity: 0.5;
 }
 .component-card:hover {
   background: var(--bg-secondary);
@@ -640,6 +655,31 @@ body {
     var(--bg-primary);
   background-size: 24px 24px;
   padding: 28px;
+}
+.builder-canvas-wrapper.drop-active {
+  background-image: radial-gradient(circle, rgba(37,99,235,0.12) 1px, transparent 1px);
+  background-size: 24px 24px;
+  outline: 2px dashed rgba(37,99,235,0.25);
+  outline-offset: -8px;
+  border-radius: var(--radius-lg);
+  transition: all 150ms ease;
+}
+.react-grid-placeholder {
+  background: rgba(37,99,235,0.12) !important;
+  border: 2px dashed #2563eb !important;
+  border-radius: var(--radius-md) !important;
+  opacity: 1 !important;
+}
+/* GridLayer wrapper — used as drop target for nested containers too */
+.grid-layer-wrapper {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-lg);
+  transition: outline 150ms ease, background 150ms ease;
+}
+.grid-layer-wrapper.drop-active {
+  outline: 2px dashed rgba(37,99,235,0.35);
+  outline-offset: -4px;
 }
 .builder-canvas {
   max-width: 1020px;

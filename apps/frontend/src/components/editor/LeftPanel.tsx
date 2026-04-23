@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import type { ComponentType } from '../../types/template';
 import { COMPONENT_REGISTRY } from '../../config/componentRegistry';
@@ -6,6 +6,13 @@ import { COMPONENT_REGISTRY } from '../../config/componentRegistry';
 export default function LeftPanel() {
   const [searchTerm, setSearchTerm] = useState('');
   const addComponent = useEditorStore((s) => s.addComponent);
+  const setDraggingType = useEditorStore((s) => s.setDraggingType);
+
+  useEffect(() => {
+    const reset = () => setDraggingType(null);
+    window.addEventListener('dragend', reset);
+    return () => window.removeEventListener('dragend', reset);
+  }, [setDraggingType]);
 
   const handleAdd = (type: ComponentType) => {
     addComponent(type);
@@ -46,10 +53,25 @@ export default function LeftPanel() {
                 {category.options.map((opt) => (
                   <button
                     key={opt.type}
-                    className="component-card"
+                    className="component-card draggable-card"
                     onClick={() => handleAdd(opt.type)}
-                    title={`Add ${opt.label}`}
+                    draggable={true}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('componentType', opt.type);
+                      e.dataTransfer.effectAllowed = 'copy';
+                      setDraggingType(opt.type);
+
+                      const ghost = e.currentTarget.cloneNode(true) as HTMLElement;
+                      ghost.style.position = 'fixed';
+                      ghost.style.top = '-1000px';
+                      document.body.appendChild(ghost);
+                      e.dataTransfer.setDragImage(ghost, 60, 20);
+                      setTimeout(() => document.body.removeChild(ghost), 0);
+                    }}
+                    onDragEnd={() => setDraggingType(null)}
+                    title={`Drag to canvas or click to add`}
                   >
+                    <span className="component-card-drag-handle">⠿</span>
                     <span className="component-card-icon">{opt.icon}</span>
                     <span className="component-card-label">{opt.label}</span>
                   </button>

@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import { useEditorStore } from '../../store/editorStore';
 import { COMPONENT_REGISTRY } from '../../config/componentRegistry';
 import type { ComponentType } from '../../types/template';
 

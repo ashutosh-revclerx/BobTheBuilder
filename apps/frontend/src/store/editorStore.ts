@@ -256,6 +256,7 @@ interface EditorState {
 
   // UI State for editing
   activeTabs: Record<string, string>; // Tracks which tab is currently viewed in a TabbedContainer
+  draggingType: string | null;
 
   // Actions
   loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[]) => void;
@@ -266,13 +267,21 @@ interface EditorState {
   updateStyle: (componentId: string, style: Partial<ComponentStyle>) => void;
   updateData: (componentId: string, data: Partial<ComponentData>) => void;
   updateLayouts: (layouts: { id: string; x: number; y: number; w: number; h: number }[]) => void;
-  addComponent: (type: ComponentType) => void;
+  addComponent: (type: ComponentType, placement?: {
+    x?: number;
+    y?: number;
+    w?: number;
+    h?: number;
+    parentId?: string;
+    parentTab?: string;
+  }) => void;
   removeComponent: (id: string) => void;
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => void;
   resetToDefault: () => void;
   getResolvedComponent: (id: string) => ComponentConfig | undefined;
   deleteSavedTemplate: (templateId: string) => void;
+  setDraggingType: (type: string | null) => void;
 
   setQueryState: (queryName: string, state: Partial<{ data: any; isLoading: boolean; error: string | null; lastRunAt: string | null }>) => void;
   setComponentState: (componentId: string, state: any) => void;
@@ -286,11 +295,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   queriesConfig: [],
   selectedComponentId: null,
   activeTabs: {},
+  draggingType: null,
   dirtyStyleMap: {},
   dirtyDataMap: {},
   savedTemplates: {},
   queries: {},
   componentState: {},
+
+  setDraggingType: (type) => set({ draggingType: type }),
 
   setActiveTab: (containerId, tab) => set((state) => ({
     activeTabs: { ...state.activeTabs, [containerId]: tab }
@@ -418,15 +430,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  addComponent: (type) => {
+  addComponent: (type, placement) => {
     set((state) => {
       const id = `${type.toLowerCase()}-${Date.now()}`;
       const defaults = defaultConfigs[type];
       
-      let parentId: string | undefined = undefined;
-      let parentTab: string | undefined = undefined;
+      let parentId: string | undefined = placement?.parentId;
+      let parentTab: string | undefined = placement?.parentTab;
       
-      if (state.selectedComponentId) {
+      // Auto-nesting only if no explicit placement is provided
+      if (!placement && state.selectedComponentId) {
         const selectedComp = state.components.find((c) => c.id === state.selectedComponentId);
         if (selectedComp) {
           if (selectedComp.type === 'Container') {
@@ -438,6 +451,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
       }
 
+      let layout = placement ? {
+        x: placement.x ?? 0,
+        y: placement.y ?? Infinity,
+        w: placement.w ?? (defaults as any).layout.w,
+        h: placement.h ?? (defaults as any).layout.h,
+      } : {
+        x: 0,
+        y: Infinity,
+        w: (defaults as any).layout.w,
+        h: (defaults as any).layout.h,
+      };
+
       const newComponent: ComponentConfig = {
         id,
         type,
@@ -446,7 +471,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         data: JSON.parse(JSON.stringify(defaults.data)),
         parentId,
         parentTab,
-        layout: { ...(defaults as any).layout }
+        layout
       };
 
       return {

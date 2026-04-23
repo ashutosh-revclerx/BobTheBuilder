@@ -38,6 +38,7 @@ export default function Canvas() {
   const components = useEditorStore((s) => s.components);
   const queriesConfig = useEditorStore((s) => s.queriesConfig);
   const selectComponent = useEditorStore((s) => s.selectComponent);
+  const draggingType = useEditorStore((s) => s.draggingType);
 
   useEffect(() => {
     if (queriesConfig && queriesConfig.length > 0) {
@@ -52,7 +53,10 @@ export default function Canvas() {
   };
 
   return (
-    <div className="builder-canvas-wrapper" onClick={handleCanvasClick}>
+    <div
+      className={`builder-canvas-wrapper${draggingType ? ' drop-active' : ''}`}
+      onClick={handleCanvasClick}
+    >
       <div className="builder-canvas">
         <GridLayer parentId="root" componentMap={ComponentMap} />
         {components.length === 0 && (

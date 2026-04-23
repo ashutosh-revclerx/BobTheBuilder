@@ -33,8 +33,9 @@ We are replicating this experience. Phase 0 is the foundation of this editor.
 | Layer | Choice |
 |---|---|
 | Frontend | React + Vite + TypeScript |
-| Styling | Tailwind CSS |
+| Styling | Tailwind CSS + Vanilla CSS (`index.css`) |
 | State management | Zustand |
+| Grid / Drag-Drop | `react-grid-layout` v2 (Responsive + WidthProvider, legacy API) |
 | Charts | Recharts |
 | Routing | React Router v6 |
 | Backend (Phase 1+) | Node.js + Express |
@@ -137,17 +138,22 @@ function resolveProps(compConfig: ComponentConfig, store: StoreState) {
 ### 5. Zustand Store Shape
 
 ```ts
-// Phase 0 store — mock data only
+// Current store shape
 {
   // Editor state
   activeTemplateId: string | null,
-  components: ComponentConfig[],
+  originalTemplateId: string | null,
+  dashboardName: string,
+  components: ComponentConfig[],       // flat array — nesting encoded via parentId/parentTab
+  queriesConfig: any[],
   selectedComponentId: string | null,
-  dirtyStyleMap: Record<string, StyleOverride>,
-  dirtyDataMap: Record<string, DataOverride>,
+  activeTabs: Record<string, string>,  // which tab is active in each TabbedContainer
+  draggingType: string | null,         // set when a sidebar card is being dragged
+  dirtyStyleMap: Record<string, Partial<ComponentStyle>>,
+  dirtyDataMap: Record<string, Partial<ComponentData>>,
   savedTemplates: Record<string, SavedTemplate>,
 
-  // Phase 1+ additions (DO NOT build yet)
+  // Engine state (Phase 1+)
   queries: {
     [queryName: string]: {
       data: unknown,
@@ -156,12 +162,14 @@ function resolveProps(compConfig: ComponentConfig, store: StoreState) {
       lastRunAt: string | null,
     }
   },
-  componentState: {
-    [componentId: string]: {
-      selectedRow: unknown,
-      value: unknown,
-    }
-  }
+  componentState: Record<string, any>,
+
+  // Key actions
+  addComponent(type, placement?: { x,y,w,h,parentId,parentTab }): void,
+  updateLayouts(layouts: {id,x,y,w,h}[]): void,
+  setDraggingType(type: string | null): void,
+  setActiveTab(containerId, tab): void,
+  // ...save/load/reset actions unchanged
 }
 ```
 
@@ -190,34 +198,44 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
   /components
     /editor                         ← Builder UI pieces
-      Canvas.tsx                    ← Centre panel, renders components from store
+      Canvas.tsx                    ← Centre panel; renders GridLayer, applies drop-active class
+      GridLayer.tsx                 ← Wraps react-grid-layout Responsive grid; handles isDroppable/onDrop
+      LeftPanel.tsx                 ← Component picker sidebar; draggable cards + click-to-add
+      InlinePicker.tsx              ← Floating inline component picker (click-to-add in containers)
       RightPanel.tsx                ← Right panel shell with tab switcher
       StyleTab.tsx                  ← Style controls (color, font, border, padding)
       DataTab.tsx                   ← Data/binding controls
-      ComponentPicker.tsx           ← Minimal list for Phase 0
     /dashboard-components           ← The actual renderable components
       StatCard.tsx
       Table.tsx
       BarChart.tsx
       LineChart.tsx
       StatusBadge.tsx
-      Button.tsx                    ← Phase 1
-      LogsViewer.tsx                ← Phase 1
+      Button.tsx
+      LogsViewer.tsx
+      Container.tsx                 ← Nestable container; renders its own child GridLayer
+      TabbedContainer.tsx           ← Tabbed container; each tab renders its own child GridLayer
+      Text.tsx
+      TextInput.tsx
+      NumberInput.tsx
+      Select.tsx
+
+  /config
+    componentRegistry.ts            ← COMPONENT_REGISTRY array: type, label, icon, description per component
 
   /pages
     TemplateGallery.tsx             ← Route: /templates
     BuilderPage.tsx                 ← Route: /builder/:templateId
 
   /store
-    editorStore.ts                  ← Zustand store
+    editorStore.ts                  ← Zustand store (see Store Shape below)
 
-  /engine                           ← Phase 1+, scaffold folders now
+  /engine                           ← Phase 1+
     bindingResolver.ts
-    queryEngine.ts                  ← Phase 1
+    queryEngine.ts
 
-  /renderer
-    DashboardRenderer.tsx           ← Phase 1
-    ComponentRegistry.ts
+  /hooks
+    useTextMeasure.ts               ← Pretext-powered label width, cell truncation, kinetic input width
 
   /types
     template.ts
@@ -282,7 +300,6 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 ## Hard Constraints — Read Before Coding
 
 - **Phase 0 is frontend only.** No backend calls. No API. Everything is mocked data.
-- **No drag-and-drop** — components stack in order defined in the template JSON.
 - **No custom CSS injection** — style is controlled only through the defined right-panel fields.
 - **No WebSocket / streaming** — polling only (Phase 1+).
 - **Engineers use the builder. Customers never do.** Customers only see the rendered dashboard.
@@ -458,19 +475,20 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 > **Goal:** Engineers build dashboards entirely in the UI. No JSON editing required.
 
 - [x] **3.1** — Builder shell: three-panel layout (Component Picker | Canvas | Properties Panel)
-- [x] **3.2** — Component picker sidebar: all types with icons and descriptions, click to add
+- [x] **3.2** — Component picker sidebar: all types with icons and descriptions, click-to-add and drag-to-canvas
 - [x] **3.3** — Container architecture: recursive RenderTree for infinitely nested Container/TabbedContainer blocks
 - [x] **3.4** — Component selection: click to select, properties panel loads its config
 - [x] **3.5** — Properties panel — display: label, data binding, trigger, column list, chart type
 - [x] **3.6** — Properties panel — queries: resource picker, endpoint, method, trigger type, dependsOn
-- [x] **3.7** — Component reorder: drag handles, updates config order live
+- [x] **3.7** — Component reorder/reposition: react-grid-layout drag handles + resize handles; layout persisted to Zustand via `updateLayouts`
 - [x] **3.8** — Delete component / query: trash icon with inline confirmation
-- [ ] **3.9** — JSON config editor: collapsible pane, bidirectionally synced with visual builder
-- [ ] **3.10** — Mobile preview toggle: Desktop vs Mobile (375px) canvas preview
-- [ ] **3.11** — Templates: migrate Phase 0 templates into full builder; add new ones
-- [ ] **3.12** — Customer assignment UI: assign a dashboard to one or more customers
-- [ ] **3.13** — Publish flow: explicit Publish button, draft state for unpublished changes
-- [ ] **3.14** — Config validation UI: inline error highlights for missing fields or bad bindings
+- [x] **3.9** — True drag-from-sidebar onto canvas: `draggable` cards in LeftPanel → RGL `isDroppable`/`onDrop`; component placed at exact hovered grid cell; nested container drops supported via `stopPropagation`; drop-active visual feedback (dashed blue outline + brightened dot grid); RGL placeholder styled blue while hovering
+- [ ] **3.10** — JSON config editor: collapsible pane, bidirectionally synced with visual builder
+- [ ] **3.11** — Mobile preview toggle: Desktop vs Mobile (375px) canvas preview
+- [ ] **3.12** — Templates: migrate Phase 0 templates into full builder; add new ones
+- [ ] **3.13** — Customer assignment UI: assign a dashboard to one or more customers
+- [ ] **3.14** — Publish flow: explicit Publish button, draft state for unpublished changes
+- [ ] **3.15** — Config validation UI: inline error highlights for missing fields or bad bindings
 
 ---
 
@@ -529,4 +547,4 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 ---
 
-*Current status: Phase 0, 0.5, & 1 — COMPLETE. All sub-tasks 1.1–1.12 done. Ready for Phase 2.*
+*Current status: Phase 0, 0.5, 1 — COMPLETE. Phase 3.1–3.9 — COMPLETE (grid system + full drag-and-drop from sidebar). Ready for Phase 2 backend work or Phase 3.10+ polish.*

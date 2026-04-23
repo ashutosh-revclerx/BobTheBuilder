@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { prepareWithSegments, measureNaturalWidth } from '@chenglou/pretext';
 
 // ─── Shared constants ───────────────────────────────────────────────
