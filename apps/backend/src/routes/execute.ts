@@ -3,6 +3,7 @@ import { z }             from 'zod';
 import { pool }          from '../db/client.js';
 import { restExecutor }  from '../executors/restExecutor.js';
 import { dbExecutor }    from '../executors/dbExecutor.js';
+import { agentExecutor } from '../executors/agentExecutor.js';
 import type { ExecutorResult } from '../executors/restExecutor.js';
 
 const router = Router();
@@ -13,8 +14,8 @@ const ExecuteSchema = z.object({
   resource:    z.string().min(1, 'resource name is required'),
   endpoint:    z.string().min(1, 'endpoint is required'),
   method:      z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).default('GET'),
-  params:      z.record(z.unknown()).optional(),
-  body:        z.record(z.unknown()).optional(),
+  params:      z.record(z.string(), z.unknown()).optional(),
+  body:        z.record(z.string(), z.unknown()).optional(),
   dashboardId: z.string().uuid().optional(), // forwarded to query_logs
 });
 
@@ -102,8 +103,7 @@ router.post('/', async (req, res) => {
 
   try {
     switch (resource.type) {
-      case 'REST':
-      case 'agent': {
+      case 'REST': {
         if (!resource.base_url) {
           result = { success: false, error: `Resource "${resourceName}" has no base_url configured` };
           break;
@@ -114,6 +114,22 @@ router.post('/', async (req, res) => {
           resolvedSecret,
           endpoint,
           method,
+          params,
+          body,
+        });
+        break;
+      }
+
+      case 'agent': {
+        if (!resource.base_url) {
+          result = { success: false, error: `Resource "${resourceName}" has no base_url configured` };
+          break;
+        }
+        result = await agentExecutor({
+          baseUrl:        resource.base_url,
+          authType:       resource.auth_type,
+          resolvedSecret,
+          endpoint,
           params,
           body,
         });

@@ -34,9 +34,10 @@ interface GridLayerProps {
   parentTab?: string;
   componentMap: Record<string, React.ComponentType<any>>;
   customGap?: number;
+  readOnly?: boolean;
 }
 
-export function GridLayer({ parentId, parentTab, componentMap, customGap }: GridLayerProps) {
+export function GridLayer({ parentId, parentTab, componentMap, customGap, readOnly = false }: GridLayerProps) {
   const components = useEditorStore((s) => s.components);
   const selectedComponentId = useEditorStore((s) => s.selectedComponentId);
   const selectComponent = useEditorStore((s) => s.selectComponent);
@@ -65,11 +66,11 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
       minH: c.layout?.minH,
       maxW: c.layout?.maxW,
       maxH: c.layout?.maxH,
-      isResizable: true,
-      isDraggable: true,
-      static: false
+      isResizable: !readOnly,
+      isDraggable: !readOnly,
+      static: readOnly,
     }));
-  }, [filteredComponents]);
+  }, [filteredComponents, readOnly]);
 
   // Calculate auto-expanding canvas height based on component positions
   const canvasMinHeight = useMemo(() => {
@@ -140,18 +141,18 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
         cols={{ lg: 12, md: 12, sm: 12, xs: 12, xxs: 12 }}
         rowHeight={30}
-        isDraggable={true}
-        isResizable={true}
+        isDraggable={!readOnly}
+        isResizable={!readOnly}
         resizeHandles={['se', 'sw', 'ne', 'nw']}
         droppingItem={{ i: '__dropping-elem__', x: 0, y: 0, w: size.w, h: size.h }}
         draggableCancel="input, button, select, textarea, .tabbed-header-btn, .inline-picker, .container-empty-dropzone, .recharts-wrapper"
         compactType={null}
         preventCollision={true}
-        onDragStop={handleDragStop}
-        onResizeStop={handleResizeStop}
+        onDragStop={readOnly ? undefined : handleDragStop}
+        onResizeStop={readOnly ? undefined : handleResizeStop}
         margin={[customGap ?? 10, customGap ?? 10]}
         style={{ minHeight: canvasMinHeight }}
-        isDroppable={!!draggingType}
+        isDroppable={!readOnly && !!draggingType}
         onDrop={(_layout, item, e) => {
           e.preventDefault();
           if (!item) return;
@@ -187,16 +188,18 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
         return (
           <div
             key={comp.id}
-            className={`canvas-component-wrapper ${selectedComponentId === comp.id ? 'selected' : ''}`}
-            onClick={(e) => {
+            className={`canvas-component-wrapper${readOnly ? ' read-only' : ''} ${selectedComponentId === comp.id && !readOnly ? 'selected' : ''}`}
+            onClick={readOnly ? undefined : (e) => {
               e.stopPropagation();
               selectComponent(comp.id);
               if (confirmRemoveId !== comp.id) setConfirmRemoveId(null);
             }}
           >
-            <FloatingLabel text={comp.label} />
-            <button className="remove-btn" onClick={(e) => handleRemoveClick(e, comp.id)} title="Remove component">×</button>
-            {confirmRemoveId === comp.id && (
+            {!readOnly && <FloatingLabel text={comp.label} />}
+            {!readOnly && (
+              <button className="remove-btn" onClick={(e) => handleRemoveClick(e, comp.id)} title="Remove component">×</button>
+            )}
+            {!readOnly && confirmRemoveId === comp.id && (
               <div className="remove-confirm">
                 <span>Remove?</span>
                 <div className="remove-confirm-buttons">

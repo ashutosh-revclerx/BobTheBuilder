@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { executeOnLoadQueries } from '../../engine/queryEngine';
+import { executeOnLoadQueries, watchDependencies, resetReactiveState } from '../../engine/queryEngine';
 import { useEditorStore } from '../../store/editorStore';
 import { GridLayer } from './GridLayer';
 
@@ -41,9 +41,18 @@ export default function Canvas() {
   const draggingType = useEditorStore((s) => s.draggingType);
 
   useEffect(() => {
+    resetReactiveState();
     if (queriesConfig && queriesConfig.length > 0) {
       executeOnLoadQueries(queriesConfig);
+      // seed the dependency snapshots with current values
+      watchDependencies(queriesConfig);
     }
+  }, [queriesConfig]);
+
+  useEffect(() => {
+    if (!queriesConfig || queriesConfig.length === 0) return;
+    const unsub = useEditorStore.subscribe(() => watchDependencies(queriesConfig));
+    return unsub;
   }, [queriesConfig]);
 
   const handleCanvasClick = (e: React.MouseEvent) => {

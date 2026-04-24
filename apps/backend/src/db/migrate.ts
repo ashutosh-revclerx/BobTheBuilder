@@ -58,6 +58,6 @@ async function run() {
 }
 
 run().catch((err) => {
-  console.error('[migrate] Fatal:', err.message);
+  console.error('[migrate] Fatal:', err);
   process.exit(1);
 });

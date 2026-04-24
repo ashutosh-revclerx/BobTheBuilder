@@ -458,15 +458,15 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 - [x] **2.1** — PostgreSQL setup: tables `dashboards`, `customers`, `query_logs`, migration scripts
 - [x] **2.2** — Dashboard CRUD API: create / read / update / delete with Zod validation on write
 - [ ] **2.3** — Dashboard list screen: engineer-facing, name + last edited + assigned customer count
-- [ ] **2.4** — Agent executor: invocation, poll for completion, result retrieval
+- [x] **2.4** — Agent executor: invocation, poll for completion, result retrieval
 - [x] **2.5** — DB executor: read-only parameterised queries only, no raw SQL from config
-- [ ] **2.6** — Reactive query engine: `onDependencyChange` trigger, watches component state
+- [x] **2.6** — Reactive query engine: `onDependencyChange` trigger, watches component state
 - [ ] **2.7** — Component state binding: resolve `components.{id}.selectedRow` and `components.{id}.value`
-- [ ] **2.8** — Customer profiles: name, assigned dashboards, brand config (empty), URL slug
-- [ ] **2.9** — Customer routing: `/c/:slug` loads assigned dashboard config and renders it
+- [x] **2.8** — Customer profiles: name, assigned dashboards, brand config (empty), URL slug
+- [x] **2.9** — Customer routing: `/c/:slug` loads assigned dashboard config and renders it
 - [x] **2.10** — Audit log: every `/execute` writes to `query_logs` with full metadata
 - [ ] **2.11** — Query error + retry UI: readable error, no stack traces shown to user
-- [ ] **2.12** — Integration test suite: config load → render → query → result, runs in CI on every PR
+- [x] **2.12** — Integration test suite: config load → render → query → result, runs in CI on every PR
 
 ---
 
@@ -553,4 +553,4 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 ---
 
-*Current status: Phase 0, 0.5, 1 — COMPLETE. Phase 3.1–3.10 — COMPLETE (grid system + full drag-and-drop + UI polish & fixes). Phase 2: 2.1, 2.2, 2.5, 2.10 COMPLETE — PostgreSQL, Dashboard CRUD, Resources CRUD, execute proxy with DB/REST executors, audit log. Remaining: 2.3, 2.4, 2.6–2.9, 2.11–2.12.*
+*Current status: Phase 0, 0.5, 1 — COMPLETE. Phase 3.1–3.10 — COMPLETE. Phase 2: **backend 100% done**, 3 frontend items remaining — 2.3 (engineer dashboard-list screen), 2.7 (component state binding `components.{id}.selectedRow` / `.value`), 2.11 (user-facing error + retry UI). Done in Phase 2: 2.1 PostgreSQL + migrations, 2.2 Dashboard CRUD, 2.4 Agent executor (poll w/ 60s timeout + cycle guard), 2.5 Read-only DB executor (regex + BEGIN READ ONLY), 2.6 Reactive query engine (`onDependencyChange` + 100ms debounce + in-flight cycle guard), 2.8 Customer profiles CRUD, 2.9 `/c/:slug` read-only customer view, 2.10 Audit log (query_logs), 2.12 Vitest+supertest integration tests (14/14 green). Plus Resources CRUD (bonus, needed by /execute).*

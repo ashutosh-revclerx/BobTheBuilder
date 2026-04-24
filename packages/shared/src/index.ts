@@ -26,8 +26,9 @@ export const QueryConfigSchema = z.object({
   resource: z.string(),
   endpoint: z.string(),
   method: z.enum(['GET', 'POST', 'PUT', 'DELETE']).optional().default('POST'),
-  trigger: z.enum(['onLoad', 'manual']).default('onLoad'),
-  params: z.record(z.any()).optional()
+  trigger: z.enum(['onLoad', 'manual', 'onDependencyChange']).default('onLoad'),
+  params: z.record(z.string(), z.any()).optional(),
+  dependsOn: z.array(z.string()).optional()
 });
 
 export const ResourceConfigSchema = z.object({
@@ -58,7 +59,7 @@ export const ExecuteRequestSchema = z.object({
   queryName: z.string().optional(),
   endpoint: z.string().optional(),
   method: z.string().optional(),
-  params: z.record(z.any()).optional()
+  params: z.record(z.string(), z.any()).optional()
 });
 
 export type ExecuteRequest = z.infer<typeof ExecuteRequestSchema>;
