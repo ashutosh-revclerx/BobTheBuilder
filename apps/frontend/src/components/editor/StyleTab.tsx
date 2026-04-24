@@ -3,162 +3,359 @@ import type { ComponentStyle } from '../../types/template';
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Poppins', 'DM Sans', 'Fira Code', 'system-ui'];
 
+function FormField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function SliderField({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  suffix = 'px',
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  suffix?: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <FormField label={label}>
+      <div className="slider-group">
+        <input
+          type="range"
+          className="slider-input"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+        />
+        <span className="slider-value">
+          {value}
+          {suffix}
+        </span>
+      </div>
+    </FormField>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <FormField label={label}>
+      <select className="form-select" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </FormField>
+  );
+}
+
+function BooleanField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <SelectField
+      label={label}
+      value={value ? 'true' : 'false'}
+      onChange={(nextValue) => onChange(nextValue === 'true')}
+      options={['true', 'false']}
+    />
+  );
+}
+
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <FormField label={label}>
+      <div className="color-picker-group">
+        <input type="color" className="color-swatch-input" value={value} onChange={(e) => onChange(e.target.value)} />
+        <input type="text" className="color-hex-input" value={value} onChange={(e) => onChange(e.target.value)} placeholder="#ffffff" />
+      </div>
+    </FormField>
+  );
+}
+
 export default function StyleTab() {
   const lastSelectedComponentId = useEditorStore((s) => s.lastSelectedComponentId);
   const components = useEditorStore((s) => s.components);
   const updateStyle = useEditorStore((s) => s.updateStyle);
 
-  const component = components.find((c) => c.id === lastSelectedComponentId);
-  if (!component) return null;
+  const component = components.find((currentComponent) => currentComponent.id === lastSelectedComponentId);
+  if (!component) {
+    return null;
+  }
 
   const style = component.style;
 
-  const handleChange = (key: keyof ComponentStyle, value: string | number) => {
-    if (!lastSelectedComponentId) return;
+  const handleChange = (key: keyof ComponentStyle, value: string | number | boolean | Record<any, any>) => {
+    if (!lastSelectedComponentId) {
+      return;
+    }
     updateStyle(lastSelectedComponentId, { [key]: value });
   };
 
   return (
     <div>
-      {/* Background Color */}
-      <div className="form-group">
-        <label className="form-label">Background Color</label>
-        <div className="color-picker-group">
-          <input
-            type="color"
-            className="color-swatch-input"
-            value={style.backgroundColor || '#ffffff'}
-            onChange={(e) => handleChange('backgroundColor', e.target.value)}
-          />
-          <input
-            type="text"
-            className="color-hex-input"
-            value={style.backgroundColor || '#ffffff'}
-            onChange={(e) => handleChange('backgroundColor', e.target.value)}
-            placeholder="#ffffff"
-          />
-        </div>
-      </div>
+      <ColorField label="Background Color" value={style.backgroundColor || '#ffffff'} onChange={(value) => handleChange('backgroundColor', value)} />
+      <ColorField label="Text Color" value={style.textColor || '#0f1117'} onChange={(value) => handleChange('textColor', value)} />
 
-      {/* Text Color */}
-      <div className="form-group">
-        <label className="form-label">Text Color</label>
-        <div className="color-picker-group">
-          <input
-            type="color"
-            className="color-swatch-input"
-            value={style.textColor || '#0f1117'}
-            onChange={(e) => handleChange('textColor', e.target.value)}
-          />
-          <input
-            type="text"
-            className="color-hex-input"
-            value={style.textColor || '#0f1117'}
-            onChange={(e) => handleChange('textColor', e.target.value)}
-            placeholder="#000000"
-          />
-        </div>
-      </div>
+      <SelectField
+        label="Font Family"
+        value={style.fontFamily || 'Inter'}
+        onChange={(value) => handleChange('fontFamily', value)}
+        options={FONT_OPTIONS}
+      />
 
-      {/* Font Family */}
-      <div className="form-group">
-        <label className="form-label">Font Family</label>
-        <select
-          className="form-select"
-          value={style.fontFamily || 'Inter'}
-          onChange={(e) => handleChange('fontFamily', e.target.value)}
-        >
-          {FONT_OPTIONS.map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
-        </select>
-      </div>
+      <SliderField label="Font Size" value={style.fontSize || 14} min={12} max={24} onChange={(value) => handleChange('fontSize', value)} />
+      <SliderField
+        label="Border Radius"
+        value={style.borderRadius || 0}
+        min={0}
+        max={16}
+        onChange={(value) => handleChange('borderRadius', value)}
+      />
 
-      {/* Font Size */}
-      <div className="form-group">
-        <label className="form-label">Font Size</label>
-        <div className="slider-group">
-          <input
-            type="range"
-            className="slider-input"
-            min={12}
-            max={24}
-            value={style.fontSize || 14}
-            onChange={(e) => handleChange('fontSize', Number(e.target.value))}
-          />
-          <span className="slider-value">{style.fontSize || 14}px</span>
-        </div>
-      </div>
+      <ColorField label="Border Color" value={style.borderColor || '#e3e6ec'} onChange={(value) => handleChange('borderColor', value)} />
+      <SliderField label="Border Width" value={style.borderWidth || 0} min={0} max={4} onChange={(value) => handleChange('borderWidth', value)} />
+      <SliderField label="Padding" value={style.padding || 16} min={0} max={32} onChange={(value) => handleChange('padding', value)} />
 
-      {/* Border Radius */}
-      <div className="form-group">
-        <label className="form-label">Border Radius</label>
-        <div className="slider-group">
-          <input
-            type="range"
-            className="slider-input"
-            min={0}
-            max={16}
-            value={style.borderRadius || 0}
-            onChange={(e) => handleChange('borderRadius', Number(e.target.value))}
+      {component.type === 'Table' && (
+        <>
+          <ColorField
+            label="Header Background Color"
+            value={style.headerBackgroundColor || '#f2f4f7'}
+            onChange={(value) => handleChange('headerBackgroundColor', value)}
           />
-          <span className="slider-value">{style.borderRadius || 0}px</span>
-        </div>
-      </div>
+          <ColorField
+            label="Alternating Row Color"
+            value={style.rowAlternateColor || '#ffffff'}
+            onChange={(value) => handleChange('rowAlternateColor', value)}
+          />
+          <BooleanField label="Strikethrough" value={style.strikethrough === true} onChange={(value) => handleChange('strikethrough', value)} />
+          {style.strikethrough && (
+            <>
+              <FormField label="Strikethrough field">
+                <input
+                  type="text"
+                  className="form-input"
+                  value={style.strikethroughField || ''}
+                  onChange={(e) => handleChange('strikethroughField', e.target.value)}
+                  placeholder="Field name"
+                />
+              </FormField>
+              <FormField label="Strikethrough value">
+                <input
+                  type="text"
+                  className="form-input"
+                  value={style.strikethroughValue || ''}
+                  onChange={(e) => handleChange('strikethroughValue', e.target.value)}
+                  placeholder="Match value"
+                />
+              </FormField>
+            </>
+          )}
+        </>
+      )}
 
-      {/* Border Color */}
-      <div className="form-group">
-        <label className="form-label">Border Color</label>
-        <div className="color-picker-group">
-          <input
-            type="color"
-            className="color-swatch-input"
-            value={style.borderColor || '#e3e6ec'}
-            onChange={(e) => handleChange('borderColor', e.target.value)}
+      {component.type === 'Button' && (
+        <>
+          <SelectField
+            label="Variant"
+            value={style.variant || 'Primary'}
+            onChange={(value) => handleChange('variant', value)}
+            options={['Primary', 'Secondary', 'Danger', 'Ghost']}
           />
-          <input
-            type="text"
-            className="color-hex-input"
-            value={style.borderColor || '#e3e6ec'}
-            onChange={(e) => handleChange('borderColor', e.target.value)}
-            placeholder="#000000"
-          />
-        </div>
-      </div>
+          <FormField label="Icon Left">
+            <input
+              type="text"
+              className="form-input"
+              value={style.iconLeft || ''}
+              onChange={(e) => handleChange('iconLeft', e.target.value)}
+              placeholder="Icon name or emoji"
+            />
+          </FormField>
+          <BooleanField label="Full Width" value={style.fullWidth === true} onChange={(value) => handleChange('fullWidth', value)} />
+        </>
+      )}
 
-      {/* Border Width */}
-      <div className="form-group">
-        <label className="form-label">Border Width</label>
-        <div className="slider-group">
-          <input
-            type="range"
-            className="slider-input"
-            min={0}
-            max={4}
-            value={style.borderWidth || 0}
-            onChange={(e) => handleChange('borderWidth', Number(e.target.value))}
+      {component.type === 'Text' && (
+        <>
+          <SelectField
+            label="Text Align"
+            value={style.textAlign || 'Left'}
+            onChange={(value) => handleChange('textAlign', value)}
+            options={['Left', 'Center', 'Right', 'Justify']}
           />
-          <span className="slider-value">{style.borderWidth || 0}px</span>
-        </div>
-      </div>
+          <SliderField
+            label="Line Height"
+            value={style.lineHeight || 1.5}
+            min={1}
+            max={2.5}
+            step={0.1}
+            suffix=""
+            onChange={(value) => handleChange('lineHeight', value)}
+          />
+          <SelectField
+            label="Overflow"
+            value={style.overflow || 'Wrap'}
+            onChange={(value) => handleChange('overflow', value)}
+            options={['Wrap', 'Truncate', 'Scroll']}
+          />
+        </>
+      )}
 
-      {/* Padding */}
-      <div className="form-group">
-        <label className="form-label">Padding</label>
-        <div className="slider-group">
-          <input
-            type="range"
-            className="slider-input"
-            min={8}
-            max={32}
-            value={style.padding || 16}
-            onChange={(e) => handleChange('padding', Number(e.target.value))}
+      {component.type === 'Container' && (
+        <>
+          <SelectField
+            label="Align Items"
+            value={style.alignItems || 'Stretch'}
+            onChange={(value) => handleChange('alignItems', value)}
+            options={['Start', 'Center', 'End', 'Stretch']}
           />
-          <span className="slider-value">{style.padding || 16}px</span>
-        </div>
-      </div>
+          <SelectField
+            label="Justify Content"
+            value={style.justifyContent || 'Start'}
+            onChange={(value) => handleChange('justifyContent', value)}
+            options={['Start', 'Center', 'End', 'Space Between', 'Space Around']}
+          />
+        </>
+      )}
+
+      {component.type === 'TabbedContainer' && (
+        <>
+          <SelectField
+            label="Tab Position"
+            value={style.tabPosition || 'Top'}
+            onChange={(value) => handleChange('tabPosition', value)}
+            options={['Top', 'Bottom', 'Left']}
+          />
+          <SelectField
+            label="Tab Style"
+            value={style.tabStyle || 'Underline'}
+            onChange={(value) => handleChange('tabStyle', value)}
+            options={['Underline', 'Pills', 'Boxed']}
+          />
+        </>
+      )}
+
+      {component.type === 'StatCard' && (
+        <>
+          <SliderField
+            label="Metric Font Size"
+            value={style.metricFontSize || 28}
+            min={16}
+            max={48}
+            onChange={(value) => handleChange('metricFontSize', value)}
+          />
+          <ColorField
+            label="Trend Color Override"
+            value={style.trendColorOverride || '#059669'}
+            onChange={(value) => handleChange('trendColorOverride', value)}
+          />
+        </>
+      )}
+
+      {component.type === 'StatusBadge' && (
+        <SelectField
+          label="Shape"
+          value={style.shape || 'Pill'}
+          onChange={(value) => handleChange('shape', value)}
+          options={['Rounded', 'Pill', 'Square']}
+        />
+      )}
+
+      {(component.type === 'TextInput' || component.type === 'Select' || component.type === 'NumberInput') && (
+        <SelectField
+          label="Label Position"
+          value={style.labelPosition || 'Top'}
+          onChange={(value) => handleChange('labelPosition', value)}
+          options={['Top', 'Left', 'Hidden']}
+        />
+      )}
+
+      {component.type === 'NumberInput' && (
+        <BooleanField label="Show Stepper" value={style.showStepper !== false} onChange={(value) => handleChange('showStepper', value)} />
+      )}
+
+      {component.type === 'BarChart' && (
+        <>
+          <SliderField label="Bar Radius" value={style.barRadius || 4} min={0} max={8} onChange={(value) => handleChange('barRadius', value)} />
+          <BooleanField label="Show Data Labels" value={style.showDataLabels === true} onChange={(value) => handleChange('showDataLabels', value)} />
+        </>
+      )}
+
+      {component.type === 'LineChart' && (
+        <>
+          <SliderField label="Line Width" value={style.lineWidth || 2} min={1} max={6} onChange={(value) => handleChange('lineWidth', value)} />
+          <BooleanField label="Show Data Labels" value={style.showDataLabels === true} onChange={(value) => handleChange('showDataLabels', value)} />
+        </>
+      )}
+
+      {component.type === 'LogsViewer' && (
+        <FormField label="Level Colors">
+          <div className="mini-editor">
+            {(['INFO', 'WARN', 'ERROR', 'DEBUG'] as const).map((level) => (
+              <div key={level} className="mini-editor-row">
+                <span className="form-label">{level}</span>
+                <input
+                  type="color"
+                  className="color-swatch-input"
+                  value={style.levelColors?.[level] || '#2563eb'}
+                  onChange={(e) =>
+                    handleChange('levelColors', {
+                      ...(style.levelColors || {}),
+                      [level]: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        </FormField>
+      )}
     </div>
   );
 }

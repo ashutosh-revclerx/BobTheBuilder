@@ -1,22 +1,23 @@
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
 import { useState, useMemo, useCallback } from 'react';
 import { resolveBindings } from '../../engine/bindingResolver';
+import { evaluateBooleanExpression } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
 
 const DEFAULT_SIZES: Record<string, {w:number, h:number}> = {
-  StatCard:        { w: 3, h: 6 },
-  BarChart:        { w: 4, h: 8 },
-  LineChart:       { w: 4, h: 8 },
-  Table:           { w: 6, h: 10 },
+  StatCard:        { w: 4, h: 6 },
+  BarChart:        { w: 6, h: 12 },
+  LineChart:       { w: 6, h: 12 },
+  Table:           { w: 6, h: 12 },
   Button:          { w: 2, h: 4 },
   StatusBadge:     { w: 2, h: 4 },
-  LogsViewer:      { w: 6, h: 8 },
-  Container:       { w: 6, h: 8 },
-  TabbedContainer: { w: 6, h: 10 },
-  Text:            { w: 4, h: 4 },
-  TextInput:       { w: 2, h: 4 },
-  NumberInput:     { w: 2, h: 4 },
-  Select:          { w: 2, h: 4 },
+  LogsViewer:      { w: 4, h: 12 },
+  Container:       { w: 4, h: 12 },
+  TabbedContainer: { w: 6, h: 12 },
+  Text:            { w: 2, h: 2 },
+  TextInput:       { w: 3, h: 6 },
+  NumberInput:     { w: 3, h: 6 },
+  Select:          { w: 3, h: 6 },
 };
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
@@ -93,7 +94,7 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
   }, [filteredComponents, parentId]);
 
   // Only sync to store on user interaction (drag/resize STOP), not on every render
-  const syncLayoutToStore = useCallback((currentLayout: { i: string; x: number; y: number; w: number; h: number }[]) => {
+  const syncLayoutToStore = useCallback((currentLayout: ReadonlyArray<{ i: string; x: number; y: number; w: number; h: number }>) => {
     updateLayouts(currentLayout.map(l => ({
       id: l.i,
       x: l.x,
@@ -103,11 +104,11 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
     })));
   }, [updateLayouts]);
 
-  const handleDragStop = useCallback((_layout: any[], _oldItem: any, _newItem: any, _placeholder: any, _e: any, _node: any) => {
+  const handleDragStop = useCallback((_layout: ReadonlyArray<{ i: string; x: number; y: number; w: number; h: number }>, _oldItem: any, _newItem: any, _placeholder: any, _e: any, _node: any) => {
     syncLayoutToStore(_layout);
   }, [syncLayoutToStore]);
 
-  const handleResizeStop = useCallback((_layout: any[], _oldItem: any, _newItem: any, _placeholder: any, _e: any, _node: any) => {
+  const handleResizeStop = useCallback((_layout: ReadonlyArray<{ i: string; x: number; y: number; w: number; h: number }>, _oldItem: any, _newItem: any, _placeholder: any, _e: any, _node: any) => {
     syncLayoutToStore(_layout);
   }, [syncLayoutToStore]);
 
@@ -179,10 +180,11 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
       >
       {filteredComponents.map(comp => {
         const Component = componentMap[comp.type];
-        if (!Component || comp.visible === false) return null;
+        const visibleExpression = comp.visible ?? comp.data.visible ?? 'true';
+        if (!Component || !evaluateBooleanExpression(visibleExpression, true)) return null;
 
         const resolvedData = resolveBindings(comp.data);
-        const resolvedComp = { ...comp, data: resolvedData };
+        const resolvedComp = { ...comp, data: resolvedData, visible: visibleExpression };
 
         return (
           <div

@@ -1,33 +1,33 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import type { ComponentConfig } from '../../types/template';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { truncateTexts } from '../../hooks/useTextMeasure';
 import { executeQuery } from '../../engine/queryEngine';
+import { parseQueryName, runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
+import type { ComponentConfig, TableConditionalRowColorRule } from '../../types/template';
 
 interface TableProps {
   config: ComponentConfig;
   isEditorMode?: boolean;
 }
 
-function TruncatedCell({ 
-  text, 
-  colWidth, 
+function TruncatedCell({
+  text,
+  colWidth,
   isEditorMode,
-  onEdit
-}: { 
-  text: string; 
+  onEdit,
+  textDecoration,
+}: {
+  text: string;
   colWidth: number;
   isEditorMode?: boolean;
   onEdit?: (val: string) => void;
+  textDecoration?: string;
 }) {
   const [hover, setHover] = useState(false);
   const str = String(text ?? '');
-
-  const cellPad = 32; 
+  const cellPad = 32;
   const availW = colWidth - cellPad;
-  const result = availW > 0
-    ? truncateTexts([str], availW)[0]
-    : { display: str, full: str, isTruncated: false };
+  const result = availW > 0 ? truncateTexts([str], availW)[0] : { display: str, full: str, isTruncated: false };
 
   if (isEditorMode) {
     return (
@@ -35,7 +35,13 @@ function TruncatedCell({
         contentEditable={true}
         suppressContentEditableWarning
         onBlur={(e) => onEdit?.(e.currentTarget.textContent ?? '')}
-        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
+        style={{ textDecoration }}
       >
         {str}
       </td>
@@ -46,25 +52,46 @@ function TruncatedCell({
     <td
       onMouseEnter={() => result.isTruncated && setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ position: 'relative' }}
+      style={{ position: 'relative', textDecoration }}
     >
       {result.display}
-      {hover && result.isTruncated && (
-        <div className="cell-tooltip">{result.full}</div>
-      )}
+      {hover && result.isTruncated && <div className="cell-tooltip">{result.full}</div>}
     </td>
   );
+}
+
+function matchesRule(row: Record<string, unknown>, rule: TableConditionalRowColorRule) {
+  const candidate = row?.[rule.field];
+  const value = rule.value;
+
+  switch (rule.operator) {
+    case '=':
+      return String(candidate ?? '') === value;
+    case '!=':
+      return String(candidate ?? '') !== value;
+    case '>':
+      return Number(candidate) > Number(value);
+    case '<':
+      return Number(candidate) < Number(value);
+    case 'contains':
+      return String(candidate ?? '').toLowerCase().includes(value.toLowerCase());
+    default:
+      return false;
+  }
 }
 
 export default function Table({ config, isEditorMode = true }: TableProps) {
   const { id, style, data, label } = config;
   const updateData = useEditorStore((s) => s.updateData);
   const columns = data.columns || [];
-  const isBound = data._resolvedBindings?.['dbBinding'];
+  const visibleColumns = columns.filter((column) => data.columnVisibility?.[column.fieldKey] !== false);
+  const isBound = data._resolvedBindings?.dbBinding;
   const rawRows = useMemo(() => {
-    if (isBound) return (Array.isArray(data.dbBinding) ? data.dbBinding : []) as Record<string, unknown>[];
+    if (isBound) {
+      return (Array.isArray(data.dbBinding) ? data.dbBinding : []) as Record<string, unknown>[];
+    }
     return (data.rows || (Array.isArray(data.mockValue) ? data.mockValue : [])) as Record<string, unknown>[];
-  }, [isBound, data.dbBinding, data.rows, data.mockValue]);
+  }, [data.dbBinding, data.mockValue, data.rows, isBound]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,73 +99,90 @@ export default function Table({ config, isEditorMode = true }: TableProps) {
   const pageSize = 10;
 
   const filteredRows = useMemo(() => {
-    if (!data.searchable || !searchTerm) return rawRows;
-    return rawRows.filter(row => 
-      Object.values(row).some(val => 
-        String(val).toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    );
-  }, [rawRows, searchTerm, data.searchable]);
+    if (!data.searchable || !searchTerm) {
+      return rawRows;
+    }
+    return rawRows.filter((row) => Object.values(row).some((value) => String(value).toLowerCase().includes(searchTerm.toLowerCase())));
+  }, [data.searchable, rawRows, searchTerm]);
 
   const pagedRows = useMemo(() => {
-    if (!data.pagination) return filteredRows;
+    if (!data.pagination) {
+      return filteredRows;
+    }
     const start = (currentPage - 1) * pageSize;
     return filteredRows.slice(start, start + pageSize);
-  }, [filteredRows, currentPage, data.pagination]);
+  }, [currentPage, data.pagination, filteredRows]);
 
   const totalPages = Math.ceil(filteredRows.length / pageSize);
-
   const tableRef = useRef<HTMLTableElement>(null);
   const [colWidths, setColWidths] = useState<number[]>([]);
 
   const measureCols = useCallback(() => {
-    if (!tableRef.current || columns.length === 0) return;
+    if (!tableRef.current || visibleColumns.length === 0) {
+      return;
+    }
     const ths = tableRef.current.querySelectorAll('thead th');
     if (ths.length > 0) {
-      const widths = Array.from(ths).map((th) => (th as HTMLElement).offsetWidth);
-      setColWidths(widths);
+      setColWidths(Array.from(ths).map((th) => (th as HTMLElement).offsetWidth));
     }
-  }, [columns.length]);
+  }, [visibleColumns.length]);
 
   useEffect(() => {
     measureCols();
-    const obs = new ResizeObserver(measureCols);
-    if (tableRef.current) obs.observe(tableRef.current);
-    return () => obs.disconnect();
+    const observer = new ResizeObserver(measureCols);
+    if (tableRef.current) {
+      observer.observe(tableRef.current);
+    }
+    return () => observer.disconnect();
   }, [measureCols]);
-const handleCellEdit = (rowIdx: number, colKey: string, value: string) => {
-  const updatedRows = rawRows.map((row, i) =>
-    i === rowIdx ? { ...row, [colKey]: value } : row
-  );
-  updateData(id, { rows: updatedRows });
-};
 
-const handleAddRow = () => {
-  const blankRow = Object.fromEntries(
-    columns.map(col => [col.fieldKey || (col as any), ''])
-  );
-  updateData(id, { rows: [...rawRows, blankRow] });
-};
+  const handleCellEdit = (rowIndex: number, colKey: string, value: string) => {
+    const updatedRows = rawRows.map((row, currentIndex) => (currentIndex === rowIndex ? { ...row, [colKey]: value } : row));
+    updateData(id, { rows: updatedRows });
+  };
 
-const handleRowClick = async (_row: any, index: number) => {
-  setSelectedRowIndex(index);
+  const handleAddRow = () => {
+    const blankRow = Object.fromEntries(visibleColumns.map((column) => [column.fieldKey, '']));
+    updateData(id, { rows: [...rawRows, blankRow] });
+  };
 
-  const targetQueryName =
-    typeof data.dbBinding === 'string'
-      ? data.dbBinding.replace('{{queries.', '').replace('.data}}', '')
-      : null;
+  const handleRowClick = async (row: Record<string, unknown>, index: number) => {
+    setSelectedRowIndex(index);
+    runAction(data.onRowSelectAction, row);
 
-  if (targetQueryName) {
+    const targetQueryName = parseQueryName(data.dbBinding);
+    if (!targetQueryName) {
+      return;
+    }
+
     const state = useEditorStore.getState();
-    const queryConfig = state.queriesConfig.find(
-      q => q.name === targetQueryName
-    );
-
+    const queryConfig = state.queriesConfig.find((query) => query.name === targetQueryName);
     if (queryConfig) {
       await executeQuery(queryConfig);
     }
-  }
-};
+  };
+
+  const resolveRowBackground = (row: Record<string, unknown>, rowIndex: number) => {
+    const conditionalRule = (data.conditionalRowColor ?? []).find((rule) => matchesRule(row, rule));
+    if (selectedRowIndex === rowIndex) {
+      return '#eff6ff';
+    }
+    if (conditionalRule) {
+      return conditionalRule.color;
+    }
+    if (style.rowAlternateColor && style.rowAlternateColor !== 'transparent' && rowIndex % 2 === 1) {
+      return style.rowAlternateColor;
+    }
+    return 'transparent';
+  };
+
+  const shouldStrikeThrough = (row: Record<string, unknown>) => {
+    if (!style.strikethrough || !style.strikethroughField) {
+      return false;
+    }
+    return String(row[style.strikethroughField] ?? '') === String(style.strikethroughValue ?? '');
+  };
+
   return (
     <div
       className="table-component"
@@ -153,21 +197,18 @@ const handleRowClick = async (_row: any, index: number) => {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden'
+        overflow: 'hidden',
       }}
     >
-      <div className="table-component-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px' }}>
-        <div className="table-component-title" style={{ color: style.textColor, fontWeight: 600 }}>
-          {label}
-        </div>
+      <div className="table-component-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="table-component-title" style={{ color: style.textColor }}>{label}</div>
         {data.searchable && (
-          <input 
-            className="table-search-input"
+          <input
+            className="form-input"
             type="text"
             placeholder="Search..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #e3e6ec', fontSize: '12px' }}
           />
         )}
       </div>
@@ -175,41 +216,47 @@ const handleRowClick = async (_row: any, index: number) => {
         <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              {columns.map((col) => (
-                <th key={col.fieldKey} style={{ textAlign: 'left', padding: '10px 16px', borderBottom: '1px solid #e3e6ec', backgroundColor: '#f8f9fb', fontSize: '12px', fontWeight: 600 }}>{col.name}</th>
+              {visibleColumns.map((column) => (
+                <th
+                  key={column.fieldKey}
+                  style={{
+                    textAlign: 'left',
+                    backgroundColor: style.headerBackgroundColor,
+                  }}
+                >
+                  {column.name}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {pagedRows.map((row, rowIndex) => (
-              <tr 
-                key={rowIndex} 
+              <tr
+                key={rowIndex}
                 onClick={() => handleRowClick(row, rowIndex)}
-                style={{ 
-                  borderBottom: '1px solid #f2f4f7', 
+                style={{
+                  borderBottom: '1px solid #f2f4f7',
                   cursor: 'pointer',
-                  backgroundColor: selectedRowIndex === rowIndex ? '#eff6ff' : 'transparent'
+                  backgroundColor: resolveRowBackground(row, rowIndex),
                 }}
               >
-                {columns.map((col, colIdx) => {
-                  const cw = colWidths[colIdx] || 0;
-                  return (
-                    <TruncatedCell
-                      key={col.fieldKey}
-                      text={String(row[col.fieldKey] ?? '')}
-                      colWidth={cw}
-                      isEditorMode={isEditorMode}
-                      onEdit={(val) => handleCellEdit(rowIndex, col.fieldKey, val)}
-                    />
-                  );
-                })}
+                {visibleColumns.map((column, columnIndex) => (
+                  <TruncatedCell
+                    key={column.fieldKey}
+                    text={String(row[column.fieldKey] ?? '')}
+                    colWidth={colWidths[columnIndex] || 0}
+                    isEditorMode={isEditorMode}
+                    onEdit={(value) => handleCellEdit(rowIndex, column.fieldKey, value)}
+                    textDecoration={shouldStrikeThrough(row) ? 'line-through' : undefined}
+                  />
+                ))}
               </tr>
             ))}
           </tbody>
           {isEditorMode && (
             <tfoot>
               <tr>
-                <td colSpan={columns.length} style={{ padding: 0 }}>
+                <td colSpan={Math.max(visibleColumns.length, 1)} style={{ padding: 0 }}>
                   <button className="table-add-row-btn" onClick={handleAddRow}>
                     + Add Row
                   </button>
@@ -220,20 +267,12 @@ const handleRowClick = async (_row: any, index: number) => {
         </table>
       </div>
       {data.pagination && totalPages > 1 && (
-        <div className="table-pagination" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '12px 16px', borderTop: '1px solid #e3e6ec' }}>
-          <button 
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            style={{ padding: '2px 8px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
-          >
+        <div className="table-pagination" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '12px 16px' }}>
+          <button disabled={currentPage === 1} onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}>
             Prev
           </button>
-          <span style={{ fontSize: '12px', color: '#5c6370' }}>Page {currentPage} of {totalPages}</span>
-          <button 
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            style={{ padding: '2px 8px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
-          >
+          <span>Page {currentPage} of {totalPages}</span>
+          <button disabled={currentPage === totalPages} onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}>
             Next
           </button>
         </div>

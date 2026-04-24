@@ -1,143 +1,223 @@
+import { useMemo } from 'react';
 import { useEditorStore } from '../../store/editorStore';
+import type {
+  ComponentData,
+  SelectOptionItem,
+  TableColumn,
+  TableConditionalRowColorRule,
+} from '../../types/template';
+
+const ROLE_OPTIONS = ['admin', 'editor', 'viewer'] as const;
+const CONDITION_OPERATORS: TableConditionalRowColorRule['operator'][] = ['=', '!=', '>', '<', 'contains'];
+
+function FormField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function BooleanField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <FormField label={label}>
+      <select className="form-select" value={value ? 'true' : 'false'} onChange={(e) => onChange(e.target.value === 'true')}>
+        <option value="true">Yes</option>
+        <option value="false">No</option>
+      </select>
+    </FormField>
+  );
+}
+
+function TextField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+}: {
+  label: string;
+  value: string | number;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <FormField label={label}>
+      <input
+        type={type}
+        className="form-input"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+    </FormField>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+}) {
+  return (
+    <FormField label={label}>
+      <select className="form-select" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </FormField>
+  );
+}
 
 export default function DataTab() {
   const lastSelectedComponentId = useEditorStore((s) => s.lastSelectedComponentId);
   const components = useEditorStore((s) => s.components);
   const updateData = useEditorStore((s) => s.updateData);
 
-  const selectedComponent = components.find((c) => c.id === lastSelectedComponentId);
-  const rows = selectedComponent?.data?.rows ?? (Array.isArray(selectedComponent?.data?.mockValue) ? selectedComponent?.data?.mockValue : []);
-  const columns = selectedComponent?.data?.columns ?? [];
-
-  if (!selectedComponent) return null;
+  const selectedComponent = components.find((component) => component.id === lastSelectedComponentId);
+  if (!selectedComponent) {
+    return null;
+  }
 
   const { data, type } = selectedComponent;
-  const isChart = type === 'BarChart' || type === 'LineChart';
+  const rows = data.rows ?? (Array.isArray(data.mockValue) ? (data.mockValue as Record<string, any>[]) : []);
+  const columns = (data.columns ?? []) as TableColumn[];
+  const visibleRoles = selectedComponent.visibleForRoles ?? data.visibleForRoles ?? [];
   const isTable = type === 'Table';
+  const isChart = type === 'BarChart' || type === 'LineChart';
+  const tabs = data.tabs ?? [];
+  const optionsList = data.optionsList ?? [];
 
-  const handleDataField = (key: string, value: unknown) => {
-    if (!lastSelectedComponentId) return;
-    updateData(lastSelectedComponentId, { [key]: value });
+  const mockValueDisplay = useMemo(() => {
+    if (isTable || isChart) {
+      return JSON.stringify(isTable ? rows : data.mockValue, null, 2);
+    }
+    if (Array.isArray(data.mockValue) || typeof data.mockValue === 'object') {
+      return JSON.stringify(data.mockValue, null, 2);
+    }
+    return String(data.mockValue ?? '');
+  }, [data.mockValue, isChart, isTable, rows]);
+
+  const handleDataField = (key: keyof ComponentData | 'label' | 'visible' | 'visibleForRoles', value: unknown) => {
+    if (!lastSelectedComponentId) {
+      return;
+    }
+    updateData(lastSelectedComponentId, { [key]: value } as Partial<ComponentData>);
   };
 
   const handleMockValueChange = (rawValue: string) => {
-    if (isChart || isTable) {
+    if (isTable || isChart || type === 'StatCard') {
       try {
         const parsed = JSON.parse(rawValue);
         if (isTable) {
           handleDataField('rows', parsed);
-          handleDataField('mockValue', parsed); // Sync both to be safe
-        } else {
-          handleDataField('mockValue', parsed);
         }
+        handleDataField('mockValue', parsed);
+        return;
       } catch {
-        // Don't update if invalid JSON
+        if (isTable || isChart) {
+          return;
+        }
       }
-    } else {
-      handleDataField('mockValue', rawValue);
     }
+    handleDataField('mockValue', rawValue);
   };
 
-  // Column editor for Tables
-  const handleColumnChange = (index: number, field: 'name' | 'fieldKey', value: string) => {
-    const newColumns = [...columns];
-    newColumns[index] = { ...newColumns[index], [field]: value };
-    handleDataField('columns', newColumns);
-  };
-  const handleAddColumn = () => {
-    handleDataField('columns', [...columns, { name: '', fieldKey: '' }]);
-  };
-  const handleDeleteColumn = (index: number) => {
-    handleDataField('columns', columns.filter((_: any, i: number) => i !== index));
-  };
-
-  // Series editor for Charts
-  const series = data.series || [];
-  const handleSeriesChange = (index: number, field: 'name' | 'fieldKey', value: string) => {
-    const newSeries = [...series];
-    newSeries[index] = { ...newSeries[index], [field]: value };
-    handleDataField('series', newSeries);
-  };
-  const handleAddSeries = () => {
-    handleDataField('series', [...series, { name: '', fieldKey: '' }]);
-  };
-  const handleDeleteSeries = (index: number) => {
-    handleDataField('series', series.filter((_: any, i: number) => i !== index));
+  const handleColumnChange = (index: number, field: keyof TableColumn, value: string) => {
+    const next = [...columns];
+    next[index] = { ...next[index], [field]: value };
+    handleDataField('columns', next);
+    handleDataField(
+      'columnVisibility',
+      next.reduce<Record<string, boolean>>((acc, column) => {
+        acc[column.fieldKey] = data.columnVisibility?.[column.fieldKey] ?? true;
+        return acc;
+      }, {}),
+    );
   };
 
-  const isTabbed = type === 'TabbedContainer';
-  const tabs = data.tabs || [];
-  const handleTabChange = (index: number, val: string) => {
-    const newTabs = [...tabs];
-    newTabs[index] = val;
-    handleDataField('tabs', newTabs);
-  };
-  const handleAddTab = () => handleDataField('tabs', [...tabs, `Tab ${tabs.length + 1}`]);
-  const handleDeleteTab = (index: number) => handleDataField('tabs', tabs.filter((_: any, i: number) => i !== index));
-
-  const isSelect = type === 'Select';
-  const options = data.options || [];
-  const handleOptionChange = (index: number, val: string) => {
-    const newOptions = [...options];
-    newOptions[index] = val;
-    handleDataField('options', newOptions);
-  };
-  const handleAddOption = () => handleDataField('options', [...options, `Option ${options.length + 1}`]);
-  const handleDeleteOption = (index: number) => handleDataField('options', options.filter((_: any, i: number) => i !== index));
-
-  // StatusBadge mapping editor
-  const mapping = data.mapping || {};
-  const mappingEntries = Object.entries(mapping);
-  const handleMappingChange = (oldKey: string, newKey: string, color: string) => {
-    const newMapping = { ...mapping };
-    if (oldKey !== newKey) delete newMapping[oldKey];
-    newMapping[newKey] = color;
-    handleDataField('mapping', newMapping);
-  };
-  const handleAddMapping = () => {
-    handleDataField('mapping', { ...mapping, ['New Value']: '#3b82f6' });
-  };
-  const handleDeleteMapping = (key: string) => {
-    const newMapping = { ...mapping };
-    delete newMapping[key];
-    handleDataField('mapping', newMapping);
+  const handleConditionalRowRuleChange = (
+    index: number,
+    field: keyof TableConditionalRowColorRule,
+    value: string,
+  ) => {
+    const next = [...(data.conditionalRowColor ?? [])];
+    next[index] = { ...next[index], [field]: value };
+    handleDataField('conditionalRowColor', next);
   };
 
-  const mockValueDisplay = (isChart || isTable)
-    ? JSON.stringify(isTable ? (data.rows || data.mockValue) : data.mockValue, null, 2)
-    : String(data.mockValue ?? '');
+  const handleOptionListChange = (index: number, field: keyof SelectOptionItem, value: string) => {
+    const next = [...optionsList];
+    next[index] = { ...next[index], [field]: value };
+    handleDataField('optionsList', next);
+    handleDataField('options', next.map((option) => option.label));
+  };
+
+  const renderRoleCheckboxes = (
+    <div className="mini-editor">
+      {ROLE_OPTIONS.map((role) => (
+        <label key={role} className="mini-editor-row">
+          <input
+            type="checkbox"
+            checked={visibleRoles.includes(role)}
+            onChange={(e) =>
+              handleDataField(
+                'visibleForRoles',
+                e.target.checked ? [...visibleRoles, role] : visibleRoles.filter((currentRole) => currentRole !== role),
+              )
+            }
+          />
+          <span className="form-label">{role}</span>
+        </label>
+      ))}
+    </div>
+  );
 
   return (
     <div>
-      {/* ─── Display Label ─── */}
-      <div className="form-group">
-        <label className="form-label">Display Label</label>
-        <input
-          type="text"
-          className="form-input"
-          value={selectedComponent.label}
-          onChange={(e) => handleDataField('label', e.target.value)}
-          placeholder="Component label"
-        />
-      </div>
+      <TextField
+        label="Display Label"
+        value={selectedComponent.label}
+        onChange={(value) => handleDataField('label', value)}
+        placeholder="Component label"
+      />
 
-      {/* ─── Visibility (global) ─── */}
-      <div className="form-group">
-        <label className="form-label">Visible</label>
-        <select
-          className="form-select"
-          value={selectedComponent.visible !== false ? 'true' : 'false'}
-          onChange={(e) => handleDataField('visible', e.target.value === 'true')}
-        >
-          <option value="true">Yes</option>
-          <option value="false">No</option>
-        </select>
-      </div>
+      <TextField
+        label="Visible"
+        value={String(selectedComponent.visible ?? data.visible ?? 'true')}
+        onChange={(value) => handleDataField('visible', value)}
+        placeholder="{{expression}} or true"
+      />
 
-      {/* ─── Mock Value ─── */}
-      <div className="form-group">
-        <label className="form-label">Mock Value</label>
-        {isChart || isTable ? (
+      <FormField label="Visible for roles">{renderRoleCheckboxes}</FormField>
+
+      <FormField label="Mock Value">
+        {isTable || isChart ? (
           <textarea
             className="form-textarea"
             value={mockValueDisplay}
@@ -154,417 +234,531 @@ export default function DataTab() {
             placeholder="Display value"
           />
         )}
-      </div>
+      </FormField>
 
-      {/* ─── DB Field Binding ─── */}
-      <div className="form-group">
-        <label className="form-label">DB Field Binding</label>
-        <input
-          type="text"
-          className="form-input"
-          value={data.dbBinding || ''}
-          onChange={(e) => handleDataField('dbBinding', e.target.value)}
-          placeholder="e.g. {{queries.getData.data}}"
-          style={{ fontFamily: "'Fira Code', monospace", fontSize: '12px' }}
-        />
-      </div>
+      <TextField
+        label="DB Field Binding"
+        value={String(data.dbBinding ?? '')}
+        onChange={(value) => handleDataField('dbBinding', value)}
+        placeholder="e.g. {{queries.getData.data}}"
+      />
 
-      {/* ─── Refresh Trigger ─── */}
-      <div className="form-group">
-        <label className="form-label">Refresh Trigger</label>
-        <select
-          className="form-select"
-          value={data.refreshOn || 'manual'}
-          onChange={(e) => handleDataField('refreshOn', e.target.value)}
-        >
-          <option value="manual">Manual</option>
-          <option value="onLoad">On Load</option>
-          <option value="onRowSelect">On Row Select</option>
-        </select>
-      </div>
+      <SelectField
+        label="Refresh Trigger"
+        value={data.refreshOn || 'manual'}
+        onChange={(value) => handleDataField('refreshOn', value)}
+        options={['manual', 'onLoad', 'onRowSelect']}
+      />
 
-      {/* ════════════════════════════════════════
-          COMPONENT-SPECIFIC SECTIONS
-         ════════════════════════════════════════ */}
-
-      {/* ─── StatCard: Trend ─── */}
       {type === 'StatCard' && (
         <>
-          <div className="form-group">
-            <label className="form-label">Trend Value</label>
-            <input
-              type="text"
-              className="form-input"
-              value={data.trend ?? ''}
-              onChange={(e) => handleDataField('trend', e.target.value)}
-              placeholder="+12.5%"
+          <TextField label="Trend Value" value={data.trend ?? ''} onChange={(value) => handleDataField('trend', value)} />
+          <SelectField
+            label="Trend Type"
+            value={data.trendType || 'positive'}
+            onChange={(value) => handleDataField('trendType', value)}
+            options={['positive', 'negative', 'neutral']}
+          />
+          <TextField label="Value prefix" value={data.prefix ?? ''} onChange={(value) => handleDataField('prefix', value)} />
+          <TextField label="Value suffix" value={data.suffix ?? ''} onChange={(value) => handleDataField('suffix', value)} />
+          <TextField
+            label="Comparison value"
+            value={data.comparisonValue ?? ''}
+            onChange={(value) => handleDataField('comparisonValue', value)}
+          />
+          <FormField label="Sparkline data">
+            <textarea
+              className="form-textarea"
+              value={JSON.stringify(data.sparklineData ?? [], null, 2)}
+              onChange={(e) => {
+                try {
+                  handleDataField('sparklineData', JSON.parse(e.target.value));
+                } catch {
+                  // Ignore invalid JSON while typing.
+                }
+              }}
+              placeholder="[10,20,15,30,25]"
+              rows={4}
             />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Trend Type</label>
-            <select
-              className="form-select"
-              value={data.trendType || 'positive'}
-              onChange={(e) => handleDataField('trendType', e.target.value)}
-            >
-              <option value="positive">Positive ↑</option>
-              <option value="negative">Negative ↓</option>
-              <option value="neutral">Neutral —</option>
-            </select>
-          </div>
+          </FormField>
         </>
       )}
 
-      {/* ─── Table: Columns + Features ─── */}
       {isTable && (
         <>
-          <div className="form-group">
-            <label className="form-label">Searchable</label>
-            <select
-              className="form-select"
-              value={data.searchable !== false ? 'true' : 'false'}
-              onChange={(e) => handleDataField('searchable', e.target.value === 'true')}
-            >
-              <option value="true">Yes</option>
-              <option value="false">No</option>
-            </select>
-          </div>
+          <BooleanField label="Searchable" value={data.searchable !== false} onChange={(value) => handleDataField('searchable', value)} />
+          <BooleanField label="Pagination" value={data.pagination !== false} onChange={(value) => handleDataField('pagination', value)} />
+          <TextField
+            label="On row select -> set variable"
+            value={data.onRowSelectAction ?? ''}
+            onChange={(value) => handleDataField('onRowSelectAction', value)}
+          />
 
-          <div className="form-group">
-            <label className="form-label">Pagination</label>
-            <select
-              className="form-select"
-              value={data.pagination !== false ? 'true' : 'false'}
-              onChange={(e) => handleDataField('pagination', e.target.value === 'true')}
-            >
-              <option value="true">Yes</option>
-              <option value="false">No</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Columns</label>
+          <FormField label="Columns">
             <div className="mini-editor">
-              {columns.map((col, i: number) => (
-                <div key={i} className="mini-editor-row">
+              {columns.map((column, index) => (
+                <div key={`${column.fieldKey}-${index}`} className="mini-editor-row">
+                  <input value={column.name} onChange={(e) => handleColumnChange(index, 'name', e.target.value)} placeholder="Column name" />
                   <input
-                    value={col.name}
-                    onChange={(e) => handleColumnChange(i, 'name', e.target.value)}
-                    placeholder="Column name"
-                  />
-                  <input
-                    value={col.fieldKey}
-                    onChange={(e) => handleColumnChange(i, 'fieldKey', e.target.value)}
+                    value={column.fieldKey}
+                    onChange={(e) => handleColumnChange(index, 'fieldKey', e.target.value)}
                     placeholder="Field key"
                   />
-                  <button className="mini-editor-delete" onClick={() => handleDeleteColumn(i)}>
-                    ×
+                  <button
+                    className="mini-editor-delete"
+                    onClick={() => handleDataField('columns', columns.filter((_, currentIndex) => currentIndex !== index))}
+                  >
+                    x
                   </button>
                 </div>
               ))}
-              <button className="mini-editor-add" onClick={handleAddColumn}>
+              <button
+                className="mini-editor-add"
+                onClick={() => handleDataField('columns', [...columns, { name: '', fieldKey: '' }])}
+              >
                 + Add column
               </button>
             </div>
-          </div>
+          </FormField>
 
-          <div className="panel-rows-section">
-            <div className="panel-section-header">ROWS ({rows.length})</div>
+          <FormField label="Column visibility">
+            <div className="mini-editor">
+              {columns.map((column) => (
+                <label key={column.fieldKey} className="mini-editor-row">
+                  <input
+                    type="checkbox"
+                    checked={data.columnVisibility?.[column.fieldKey] !== false}
+                    onChange={(e) =>
+                      handleDataField('columnVisibility', {
+                        ...(data.columnVisibility ?? {}),
+                        [column.fieldKey]: e.target.checked,
+                      })
+                    }
+                  />
+                  <span className="form-label">{column.name || column.fieldKey}</span>
+                </label>
+              ))}
+            </div>
+          </FormField>
 
-            <div className="row-editor-list">
-              {rows.map((row: any, rowIdx: number) => (
-                <div className="row-editor-item" key={rowIdx}>
-                  <span className="row-editor-num">{rowIdx + 1}</span>
-
-                  <div className="row-editor-fields">
-                    {columns.map((col: any) => (
-                      <div className="row-editor-field" key={col.fieldKey}>
-                        <span className="row-field-key">{col.fieldKey}</span>
-
-                        <input
-                          className="row-field-input"
-                          value={row[col.fieldKey] ?? ''}
-                          onChange={(e) => {
-                            const updatedRows = [...rows];
-                            updatedRows[rowIdx] = {
-                              ...updatedRows[rowIdx],
-                              [col.fieldKey]: e.target.value
-                            };
-                            handleDataField('rows', updatedRows);
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  <button
-                    className="row-editor-delete"
-                    onClick={() => {
-                      const updatedRows = rows.filter((_: any, i: number) => i !== rowIdx);
-                      handleDataField('rows', updatedRows);
-                    }}
+          <FormField label="Conditional row color">
+            <div className="mini-editor">
+              {(data.conditionalRowColor ?? []).map((rule, index) => (
+                <div key={`${rule.field}-${index}`} className="mini-editor-row">
+                  <input value={rule.field} onChange={(e) => handleConditionalRowRuleChange(index, 'field', e.target.value)} placeholder="Field" />
+                  <select
+                    className="form-select"
+                    value={rule.operator}
+                    onChange={(e) => handleConditionalRowRuleChange(index, 'operator', e.target.value)}
                   >
-                    ×
+                    {CONDITION_OPERATORS.map((operator) => (
+                      <option key={operator} value={operator}>
+                        {operator}
+                      </option>
+                    ))}
+                  </select>
+                  <input value={rule.value} onChange={(e) => handleConditionalRowRuleChange(index, 'value', e.target.value)} placeholder="Value" />
+                  <input
+                    type="color"
+                    className="color-swatch-input"
+                    value={rule.color}
+                    onChange={(e) => handleConditionalRowRuleChange(index, 'color', e.target.value)}
+                  />
+                  <button
+                    className="mini-editor-delete"
+                    onClick={() =>
+                      handleDataField(
+                        'conditionalRowColor',
+                        (data.conditionalRowColor ?? []).filter((_, currentIndex) => currentIndex !== index),
+                      )
+                    }
+                  >
+                    x
                   </button>
                 </div>
               ))}
+              <button
+                className="mini-editor-add"
+                onClick={() =>
+                  handleDataField('conditionalRowColor', [
+                    ...(data.conditionalRowColor ?? []),
+                    { field: '', operator: '=', value: '', color: '#eff6ff' },
+                  ])
+                }
+              >
+                + Add rule
+              </button>
             </div>
-
-            <button
-              className="row-editor-add"
-              onClick={() => {
-                const blankRow = Object.fromEntries(
-                  columns.map((col: any) => [col.fieldKey, ''])
-                );
-                handleDataField('rows', [...rows, blankRow]);
-              }}
-            >
-              + Add Row
-            </button>
-          </div>
+          </FormField>
         </>
       )}
 
-      {/* ─── Charts: xField, yField, Series ─── */}
       {isChart && (
         <>
-          <div className="form-group">
-            <label className="form-label">X Field</label>
-            <input
-              type="text"
-              className="form-input"
-              value={data.xField ?? ''}
-              onChange={(e) => handleDataField('xField', e.target.value)}
-              placeholder="e.g. label"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Y Field</label>
-            <input
-              type="text"
-              className="form-input"
-              value={data.yField ?? ''}
-              onChange={(e) => handleDataField('yField', e.target.value)}
-              placeholder="e.g. value"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Series</label>
+          <TextField label="X Field" value={data.xField ?? ''} onChange={(value) => handleDataField('xField', value)} />
+          <TextField label="Y Field" value={data.yField ?? ''} onChange={(value) => handleDataField('yField', value)} />
+          <BooleanField label="Show legend" value={data.showLegend !== false} onChange={(value) => handleDataField('showLegend', value)} />
+          <BooleanField label="Show grid" value={data.showGrid !== false} onChange={(value) => handleDataField('showGrid', value)} />
+          <TextField label="X axis label" value={data.xAxisLabel ?? ''} onChange={(value) => handleDataField('xAxisLabel', value)} />
+          <TextField label="Y axis label" value={data.yAxisLabel ?? ''} onChange={(value) => handleDataField('yAxisLabel', value)} />
+          <SelectField
+            label="Color scheme"
+            value={data.colorScheme || 'Blue'}
+            onChange={(value) => handleDataField('colorScheme', value)}
+            options={['Blue', 'Green', 'Amber', 'Multi']}
+          />
+          <FormField label="Series">
             <div className="mini-editor">
-              {series.map((s: any, i: number) => (
-                <div key={i} className="mini-editor-row">
+              {(data.series ?? []).map((series, index) => (
+                <div key={`${series.fieldKey}-${index}`} className="mini-editor-row">
                   <input
-                    value={s.name}
-                    onChange={(e) => handleSeriesChange(i, 'name', e.target.value)}
+                    value={series.name}
+                    onChange={(e) =>
+                      handleDataField(
+                        'series',
+                        (data.series ?? []).map((current, currentIndex) =>
+                          currentIndex === index ? { ...current, name: e.target.value } : current,
+                        ),
+                      )
+                    }
                     placeholder="Series name"
                   />
                   <input
-                    value={s.fieldKey}
-                    onChange={(e) => handleSeriesChange(i, 'fieldKey', e.target.value)}
-                    placeholder="Data field key"
+                    value={series.fieldKey}
+                    onChange={(e) =>
+                      handleDataField(
+                        'series',
+                        (data.series ?? []).map((current, currentIndex) =>
+                          currentIndex === index ? { ...current, fieldKey: e.target.value } : current,
+                        ),
+                      )
+                    }
+                    placeholder="Field key"
                   />
-                  <button className="mini-editor-delete" onClick={() => handleDeleteSeries(i)}>
-                    ×
+                  <button
+                    className="mini-editor-delete"
+                    onClick={() => handleDataField('series', (data.series ?? []).filter((_, currentIndex) => currentIndex !== index))}
+                  >
+                    x
                   </button>
                 </div>
               ))}
-              <button className="mini-editor-add" onClick={handleAddSeries}>
+              <button
+                className="mini-editor-add"
+                onClick={() => handleDataField('series', [...(data.series ?? []), { name: '', fieldKey: '' }])}
+              >
                 + Add series
               </button>
             </div>
-          </div>
+          </FormField>
         </>
       )}
 
-      {/* ─── StatusBadge: Color Mapping ─── */}
-      {type === 'StatusBadge' && (
-        <div className="form-group">
-          <label className="form-label">Status → Color Mapping</label>
-          <div className="mini-editor">
-            {mappingEntries.map(([key, color], i) => (
-              <div key={i} className="mini-editor-row">
-                <input
-                  value={key}
-                  onChange={(e) => handleMappingChange(key, e.target.value, color as string)}
-                  placeholder="Status value"
-                />
-                <input
-                  type="color"
-                  value={color as string}
-                  onChange={(e) => handleMappingChange(key, key, e.target.value)}
-                  style={{ width: '32px', height: '28px', padding: 0, border: 'none', cursor: 'pointer' }}
-                />
-                <button className="mini-editor-delete" onClick={() => handleDeleteMapping(key)}>×</button>
-              </div>
-            ))}
-            <button className="mini-editor-add" onClick={handleAddMapping}>+ Add mapping</button>
-          </div>
-        </div>
+      {type === 'BarChart' && (
+        <>
+          <SelectField
+            label="Orientation"
+            value={data.orientation || 'Vertical'}
+            onChange={(value) => handleDataField('orientation', value)}
+            options={['Vertical', 'Horizontal']}
+          />
+          <BooleanField label="Stacked" value={data.stacked === true} onChange={(value) => handleDataField('stacked', value)} />
+          <TextField
+            label="On bar click -> set variable"
+            value={data.onBarClickAction ?? ''}
+            onChange={(value) => handleDataField('onBarClickAction', value)}
+          />
+        </>
       )}
 
-      {/* ─── LogsViewer: Level Filter + Search ─── */}
+      {type === 'LineChart' && (
+        <>
+          <BooleanField label="Smooth" value={data.smooth !== false} onChange={(value) => handleDataField('smooth', value)} />
+          <BooleanField label="Show dots" value={data.showDots !== false} onChange={(value) => handleDataField('showDots', value)} />
+          <BooleanField label="Fill area" value={data.fillArea === true} onChange={(value) => handleDataField('fillArea', value)} />
+          <TextField
+            label="On point click -> set variable"
+            value={data.onPointClickAction ?? ''}
+            onChange={(value) => handleDataField('onPointClickAction', value)}
+          />
+        </>
+      )}
+
+      {type === 'StatusBadge' && (
+        <>
+          <FormField label="Status -> Color Mapping">
+            <div className="mini-editor">
+              {Object.entries(data.mapping ?? {}).map(([key, color]) => (
+                <div key={key} className="mini-editor-row">
+                  <input
+                    value={key}
+                    onChange={(e) => {
+                      const next = { ...(data.mapping ?? {}) };
+                      delete next[key];
+                      next[e.target.value] = color;
+                      handleDataField('mapping', next);
+                    }}
+                    placeholder="Status value"
+                  />
+                  <input
+                    type="color"
+                    className="color-swatch-input"
+                    value={color}
+                    onChange={(e) => handleDataField('mapping', { ...(data.mapping ?? {}), [key]: e.target.value })}
+                  />
+                  <button
+                    className="mini-editor-delete"
+                    onClick={() => {
+                      const next = { ...(data.mapping ?? {}) };
+                      delete next[key];
+                      handleDataField('mapping', next);
+                    }}
+                  >
+                    x
+                  </button>
+                </div>
+              ))}
+              <button className="mini-editor-add" onClick={() => handleDataField('mapping', { ...(data.mapping ?? {}), New: '#3b82f6' })}>
+                + Add mapping
+              </button>
+            </div>
+          </FormField>
+          <TextField label="Default color" value={data.defaultColor ?? '#9ba3af'} onChange={(value) => handleDataField('defaultColor', value)} />
+          <BooleanField label="Show dot" value={data.showDot !== false} onChange={(value) => handleDataField('showDot', value)} />
+          <SelectField
+            label="Size"
+            value={data.size || 'Medium'}
+            onChange={(value) => handleDataField('size', value)}
+            options={['Small', 'Medium', 'Large']}
+          />
+        </>
+      )}
+
       {type === 'LogsViewer' && (
         <>
-          <div className="form-group">
-            <label className="form-label">Level Filter</label>
-            <select
-              className="form-select"
-              value={data.levelFilter || 'all'}
-              onChange={(e) => handleDataField('levelFilter', e.target.value)}
-            >
-              <option value="all">All</option>
-              <option value="info">Info only</option>
-              <option value="warn">Warn only</option>
-              <option value="error">Error only</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Searchable</label>
-            <select
-              className="form-select"
-              value={data.logSearchable !== false ? 'true' : 'false'}
-              onChange={(e) => handleDataField('logSearchable', e.target.value === 'true')}
-            >
-              <option value="true">Yes</option>
-              <option value="false">No</option>
-            </select>
-          </div>
+          <SelectField
+            label="Level Filter"
+            value={data.levelFilter || 'all'}
+            onChange={(value) => handleDataField('levelFilter', value)}
+            options={['all', 'info', 'warn', 'error']}
+          />
+          <BooleanField label="Searchable" value={data.logSearchable !== false} onChange={(value) => handleDataField('logSearchable', value)} />
+          <TextField label="Max lines" value={String(data.maxLines ?? 200)} onChange={(value) => handleDataField('maxLines', Number(value))} type="number" />
+          <BooleanField label="Auto-scroll" value={data.autoScroll !== false} onChange={(value) => handleDataField('autoScroll', value)} />
+          <TextField
+            label="Timestamp field"
+            value={data.timestampField ?? 'timestamp'}
+            onChange={(value) => handleDataField('timestampField', value)}
+          />
+          <TextField label="Level field" value={data.levelField ?? 'level'} onChange={(value) => handleDataField('levelField', value)} />
+          <TextField
+            label="Message field"
+            value={data.messageField ?? 'message'}
+            onChange={(value) => handleDataField('messageField', value)}
+          />
+          <BooleanField label="Wrap lines" value={data.wrapLines === true} onChange={(value) => handleDataField('wrapLines', value)} />
         </>
       )}
 
-      {/* ─── Container: Layout Direction + Gap ─── */}
       {type === 'Container' && (
         <>
-          <div className="form-group">
-            <label className="form-label">Layout Direction</label>
-            <select
-              className="form-select"
-              value={data.containerLayout || 'vertical'}
-              onChange={(e) => handleDataField('containerLayout', e.target.value)}
-            >
-              <option value="vertical">Vertical</option>
-              <option value="horizontal">Horizontal</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Gap</label>
-            <div className="slider-group">
-              <input
-                type="range"
-                className="slider-input"
-                min={0}
-                max={32}
-                value={data.gap ?? 10}
-                onChange={(e) => handleDataField('gap', Number(e.target.value))}
-              />
-              <span className="slider-value">{data.gap ?? 10}px</span>
-            </div>
-          </div>
+          <SelectField
+            label="Layout Direction"
+            value={data.containerLayout || 'vertical'}
+            onChange={(value) => handleDataField('containerLayout', value)}
+            options={['vertical', 'horizontal']}
+          />
+          <TextField label="Gap" value={String(data.gap ?? 10)} onChange={(value) => handleDataField('gap', Number(value))} type="number" />
+          <BooleanField label="Scrollable" value={data.scrollable === true} onChange={(value) => handleDataField('scrollable', value)} />
+          <BooleanField label="Divider" value={data.divider === true} onChange={(value) => handleDataField('divider', value)} />
         </>
       )}
 
-      {/* ─── TabbedContainer: Tabs Editor ─── */}
-      {isTabbed && (
-        <div className="form-group">
-          <label className="form-label">Tabs</label>
-          <div className="mini-editor">
-            {tabs.map((tab: string, i: number) => (
-              <div key={i} className="mini-editor-row">
-                <input
-                  value={tab}
-                  onChange={(e) => handleTabChange(i, e.target.value)}
-                  placeholder="Tab name"
-                />
-                <button className="mini-editor-delete" onClick={() => handleDeleteTab(i)}>×</button>
-              </div>
-            ))}
-            <button className="mini-editor-add" onClick={handleAddTab}>+ New Tab</button>
-          </div>
-        </div>
-      )}
-
-      {/* ─── TextInput: Placeholder ─── */}
-      {type === 'TextInput' && (
-        <div className="form-group">
-          <label className="form-label">Placeholder</label>
-          <input
-            type="text"
-            className="form-input"
-            value={data.placeholder ?? ''}
-            onChange={(e) => handleDataField('placeholder', e.target.value)}
-            placeholder="Placeholder text..."
+      {type === 'TabbedContainer' && (
+        <>
+          <FormField label="Tabs">
+            <div className="mini-editor">
+              {tabs.map((tab, index) => (
+                <div key={`${tab}-${index}`} className="mini-editor-row">
+                  <input
+                    value={tab}
+                    onChange={(e) =>
+                      handleDataField(
+                        'tabs',
+                        tabs.map((currentTab, currentIndex) => (currentIndex === index ? e.target.value : currentTab)),
+                      )
+                    }
+                    placeholder="Tab name"
+                  />
+                  <button
+                    className="mini-editor-delete"
+                    onClick={() => handleDataField('tabs', tabs.filter((_, currentIndex) => currentIndex !== index))}
+                  >
+                    x
+                  </button>
+                </div>
+              ))}
+              <button className="mini-editor-add" onClick={() => handleDataField('tabs', [...tabs, `Tab ${tabs.length + 1}`])}>
+                + New tab
+              </button>
+            </div>
+          </FormField>
+          <SelectField
+            label="Default Tab"
+            value={data.defaultTab || tabs[0] || ''}
+            onChange={(value) => handleDataField('defaultTab', value)}
+            options={tabs.length ? tabs : ['View 1']}
           />
-        </div>
+          <TextField
+            label="On tab change -> set variable"
+            value={data.onTabChangeAction ?? ''}
+            onChange={(value) => handleDataField('onTabChangeAction', value)}
+          />
+        </>
       )}
 
-      {/* ─── NumberInput: Min / Max / Step ─── */}
+      {type === 'Text' && (
+        <>
+          <BooleanField label="Dynamic expression" value={data.expression === true} onChange={(value) => handleDataField('expression', value)} />
+          <TextField label="Link URL" value={data.linkTo ?? ''} onChange={(value) => handleDataField('linkTo', value)} />
+        </>
+      )}
+
+      {type === 'TextInput' && (
+        <>
+          <TextField label="Placeholder" value={data.placeholder ?? ''} onChange={(value) => handleDataField('placeholder', value)} />
+          <SelectField
+            label="Type"
+            value={data.type || 'Text'}
+            onChange={(value) => handleDataField('type', value)}
+            options={['Text', 'Email', 'Password', 'URL', 'Search']}
+          />
+          <BooleanField label="Required" value={data.required === true} onChange={(value) => handleDataField('required', value)} />
+          <TextField label="Validation pattern" value={data.regex ?? ''} onChange={(value) => handleDataField('regex', value)} />
+          <TextField label="Error message" value={data.errorMessage ?? 'Invalid input'} onChange={(value) => handleDataField('errorMessage', value)} />
+          <TextField
+            label="Max length"
+            value={String(data.maxLength ?? '')}
+            onChange={(value) => handleDataField('maxLength', value ? Number(value) : null)}
+            type="number"
+          />
+          <TextField
+            label="On change -> set variable"
+            value={data.onChangeAction ?? ''}
+            onChange={(value) => handleDataField('onChangeAction', value)}
+          />
+          <TextField
+            label="On submit -> run query"
+            value={data.onSubmitAction ?? ''}
+            onChange={(value) => handleDataField('onSubmitAction', value)}
+          />
+        </>
+      )}
+
+      {type === 'Select' && (
+        <>
+          <BooleanField label="Required" value={data.required === true} onChange={(value) => handleDataField('required', value)} />
+          <BooleanField label="Multi-select" value={data.multiSelect === true} onChange={(value) => handleDataField('multiSelect', value)} />
+          <BooleanField label="Searchable" value={data.searchable === true} onChange={(value) => handleDataField('searchable', value)} />
+          <TextField
+            label="On change -> set variable"
+            value={data.onChangeAction ?? ''}
+            onChange={(value) => handleDataField('onChangeAction', value)}
+          />
+          <SelectField
+            label="Options Source"
+            value={data.optionsSource || 'Static'}
+            onChange={(value) => handleDataField('optionsSource', value)}
+            options={['Static', 'From query']}
+          />
+          {data.optionsSource === 'From query' ? (
+            <>
+              <TextField label="Query name" value={data.queryBinding ?? ''} onChange={(value) => handleDataField('queryBinding', value)} />
+              <TextField label="Label field" value={data.labelField ?? 'label'} onChange={(value) => handleDataField('labelField', value)} />
+              <TextField label="Value field" value={data.valueField ?? 'value'} onChange={(value) => handleDataField('valueField', value)} />
+            </>
+          ) : (
+            <FormField label="Options">
+              <div className="mini-editor">
+                {optionsList.map((option, index) => (
+                  <div key={`${option.value}-${index}`} className="mini-editor-row">
+                    <input value={option.label} onChange={(e) => handleOptionListChange(index, 'label', e.target.value)} placeholder="Label" />
+                    <input value={option.value} onChange={(e) => handleOptionListChange(index, 'value', e.target.value)} placeholder="Value" />
+                    <button
+                      className="mini-editor-delete"
+                      onClick={() => {
+                        const next = optionsList.filter((_, currentIndex) => currentIndex !== index);
+                        handleDataField('optionsList', next);
+                        handleDataField('options', next.map((optionItem) => optionItem.label));
+                      }}
+                    >
+                      x
+                    </button>
+                  </div>
+                ))}
+                <button
+                  className="mini-editor-add"
+                  onClick={() => handleDataField('optionsList', [...optionsList, { label: '', value: '' }])}
+                >
+                  + Add option
+                </button>
+              </div>
+            </FormField>
+          )}
+        </>
+      )}
+
       {type === 'NumberInput' && (
         <>
-          <div className="form-group">
-            <label className="form-label">Min</label>
-            <input
-              type="number"
-              className="form-input"
-              value={data.min ?? 0}
-              onChange={(e) => handleDataField('min', Number(e.target.value))}
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Max</label>
-            <input
-              type="number"
-              className="form-input"
-              value={data.max ?? 100}
-              onChange={(e) => handleDataField('max', Number(e.target.value))}
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Step</label>
-            <input
-              type="number"
-              className="form-input"
-              value={data.step ?? 1}
-              onChange={(e) => handleDataField('step', Number(e.target.value))}
-              min={0.01}
-              step={0.01}
-            />
-          </div>
+          <TextField label="Min" value={String(data.min ?? 0)} onChange={(value) => handleDataField('min', Number(value))} type="number" />
+          <TextField label="Max" value={String(data.max ?? 100)} onChange={(value) => handleDataField('max', Number(value))} type="number" />
+          <TextField label="Step" value={String(data.step ?? 1)} onChange={(value) => handleDataField('step', Number(value))} type="number" />
+          <BooleanField label="Required" value={data.required === true} onChange={(value) => handleDataField('required', value)} />
+          <TextField label="Prefix" value={data.prefix ?? ''} onChange={(value) => handleDataField('prefix', value)} />
+          <TextField label="Suffix" value={data.suffix ?? ''} onChange={(value) => handleDataField('suffix', value)} />
+          <TextField
+            label="Error message"
+            value={data.errorMessage ?? 'Value out of range'}
+            onChange={(value) => handleDataField('errorMessage', value)}
+          />
+          <TextField
+            label="On change -> set variable"
+            value={data.onChangeAction ?? ''}
+            onChange={(value) => handleDataField('onChangeAction', value)}
+          />
+          <SelectField
+            label="Formatter"
+            value={data.formatter || 'None'}
+            onChange={(value) => handleDataField('formatter', value)}
+            options={['None', 'Currency', 'Percentage', 'Compact']}
+          />
         </>
       )}
 
-      {/* ─── Select: Options Editor ─── */}
-      {isSelect && (
-        <div className="form-group">
-          <label className="form-label">Options</label>
-          <div className="mini-editor">
-            {options.map((opt: string, i: number) => (
-              <div key={i} className="mini-editor-row">
-                <input
-                  value={opt}
-                  onChange={(e) => handleOptionChange(i, e.target.value)}
-                  placeholder="Option name"
-                />
-                <button className="mini-editor-delete" onClick={() => handleDeleteOption(i)}>×</button>
-              </div>
-            ))}
-            <button className="mini-editor-add" onClick={handleAddOption}>+ New Option</button>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Button: Target Query ─── */}
       {type === 'Button' && (
-        <div className="form-group">
-          <label className="form-label">Target Query (onClick)</label>
-          <input
-            type="text"
-            className="form-input"
-            value={data.dbBinding || ''}
-            onChange={(e) => handleDataField('dbBinding', e.target.value)}
-            placeholder="e.g. runAgent"
-            style={{ fontFamily: "'Fira Code', monospace", fontSize: '12px' }}
+        <>
+          <TextField label="Target Query (onClick)" value={String(data.dbBinding ?? '')} onChange={(value) => handleDataField('dbBinding', value)} />
+          <TextField label="Disabled when" value={data.disabled ?? 'false'} onChange={(value) => handleDataField('disabled', value)} />
+          <BooleanField label="Show loading state" value={data.loadingState === true} onChange={(value) => handleDataField('loadingState', value)} />
+          <BooleanField
+            label="Require confirmation"
+            value={data.confirmationDialog === true}
+            onChange={(value) => handleDataField('confirmationDialog', value)}
           />
-        </div>
+          {data.confirmationDialog && (
+            <>
+              <TextField
+                label="Confirmation message"
+                value={data.confirmationMessage ?? 'Are you sure?'}
+                onChange={(value) => handleDataField('confirmationMessage', value)}
+              />
+              <TextField label="Confirm label" value={data.confirmLabel ?? 'Confirm'} onChange={(value) => handleDataField('confirmLabel', value)} />
+              <TextField label="Cancel label" value={data.cancelLabel ?? 'Cancel'} onChange={(value) => handleDataField('cancelLabel', value)} />
+            </>
+          )}
+          <TextField label="On success action" value={data.onSuccessAction ?? ''} onChange={(value) => handleDataField('onSuccessAction', value)} />
+          <TextField label="On error action" value={data.onErrorAction ?? ''} onChange={(value) => handleDataField('onErrorAction', value)} />
+        </>
       )}
     </div>
   );
