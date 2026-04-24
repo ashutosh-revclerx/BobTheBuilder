@@ -37,7 +37,7 @@ const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
 export default function Canvas() {
   const components = useEditorStore((s) => s.components);
   const queriesConfig = useEditorStore((s) => s.queriesConfig);
-  const selectComponent = useEditorStore((s) => s.selectComponent);
+  const clearCanvasSelection = useEditorStore((s) => s.clearCanvasSelection);
   const draggingType = useEditorStore((s) => s.draggingType);
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function Canvas() {
   const handleCanvasClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.canvas-component-wrapper')) return;
     if ((e.target as HTMLElement).closest('.inline-picker')) return;
-    selectComponent(null);
+    clearCanvasSelection();
   };
 
   return (

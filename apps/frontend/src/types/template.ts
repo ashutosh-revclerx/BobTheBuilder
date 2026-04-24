@@ -7,78 +7,175 @@ export interface ComponentStyle {
   borderColor?: string;
   borderWidth?: number;
   padding?: number;
+  headerBackgroundColor?: string;
+  rowAlternateColor?: string;
+  strikethrough?: boolean;
+  strikethroughField?: string;
+  strikethroughValue?: string;
+  variant?: 'Primary' | 'Secondary' | 'Danger' | 'Ghost';
+  iconLeft?: string;
+  fullWidth?: boolean;
+  textAlign?: 'Left' | 'Center' | 'Right' | 'Justify';
+  lineHeight?: number;
+  overflow?: 'Wrap' | 'Truncate' | 'Scroll';
+  alignItems?: 'Start' | 'Center' | 'End' | 'Stretch';
+  justifyContent?: 'Start' | 'Center' | 'End' | 'Space Between' | 'Space Around';
+  tabPosition?: 'Top' | 'Bottom' | 'Left';
+  tabStyle?: 'Underline' | 'Pills' | 'Boxed';
+  metricFontSize?: number;
+  trendColorOverride?: string;
+  shape?: 'Rounded' | 'Pill' | 'Square';
+  labelPosition?: 'Top' | 'Left' | 'Hidden';
+  showStepper?: boolean;
+  barRadius?: number;
+  showDataLabels?: boolean;
+  lineWidth?: number;
+  levelColors?: Record<'INFO' | 'WARN' | 'ERROR' | 'DEBUG', string>;
 }
 
 export interface ComponentEvent {
   type: 'onClick' | 'onChange' | 'onLoad' | 'onRowClick';
   action: 'runQuery' | 'setState' | 'navigate' | 'none';
-  target?: string; // query name, state key, or URL
+  target?: string;
+}
+
+export interface TableColumn {
+  name: string;
+  fieldKey: string;
+}
+
+export interface TableConditionalRowColorRule {
+  field: string;
+  operator: '=' | '!=' | '>' | '<' | 'contains';
+  value: string;
+  color: string;
+}
+
+export interface SelectOptionItem {
+  label: string;
+  value: string;
 }
 
 export interface ComponentData {
-  // ─── Global ───
   fieldName?: string;
   mockValue?: unknown;
   dbBinding?: any;
   refreshOn?: 'manual' | 'onLoad' | 'onRowSelect';
   label?: string;
   _resolvedBindings?: Record<string, boolean>;
+  visible?: string | boolean;
+  visibleForRoles?: string[];
 
-  // ─── Container ───
   containerLayout?: 'vertical' | 'horizontal';
   gap?: number;
+  scrollable?: boolean;
+  divider?: boolean;
 
-  // ─── TabbedContainer ───
   tabs?: string[];
+  defaultTab?: string;
+  onTabChangeAction?: string;
 
-  // ─── Table ───
-  columns?: Array<{ name: string; fieldKey: string }>;
+  columns?: TableColumn[];
   rows?: Record<string, any>[];
   searchable?: boolean;
   pagination?: boolean;
+  conditionalRowColor?: TableConditionalRowColorRule[];
+  onRowSelectAction?: string;
+  columnVisibility?: Record<string, boolean>;
 
-  // ─── StatCard ───
   trend?: string;
   trendType?: 'positive' | 'negative' | 'neutral';
+  prefix?: string;
+  suffix?: string;
+  comparisonValue?: string;
+  sparklineData?: number[];
 
-  // ─── StatusBadge ───
-  mapping?: Record<string, string>; // value → color
+  mapping?: Record<string, string>;
+  defaultColor?: string;
+  showDot?: boolean;
+  size?: 'Small' | 'Medium' | 'Large';
 
-  // ─── LogsViewer ───
   levelFilter?: 'all' | 'info' | 'warn' | 'error';
   logSearchable?: boolean;
+  maxLines?: number;
+  autoScroll?: boolean;
+  timestampField?: string;
+  levelField?: string;
+  messageField?: string;
+  wrapLines?: boolean;
 
-  // ─── Charts (Bar / Line) ───
   series?: Array<{ name: string; fieldKey: string }>;
   xField?: string;
   yField?: string;
+  showLegend?: boolean;
+  showGrid?: boolean;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
+  colorScheme?: 'Blue' | 'Green' | 'Amber' | 'Multi';
+  orientation?: 'Vertical' | 'Horizontal';
+  stacked?: boolean;
+  onBarClickAction?: string;
+  smooth?: boolean;
+  showDots?: boolean;
+  fillArea?: boolean;
+  onPointClickAction?: string;
 
-  // ─── TextInput ───
   placeholder?: string;
+  type?: 'Text' | 'Email' | 'Password' | 'URL' | 'Search';
+  required?: boolean;
+  regex?: string;
+  errorMessage?: string;
+  maxLength?: number | null;
+  onChangeAction?: string;
+  onSubmitAction?: string;
 
-  // ─── NumberInput ───
   min?: number;
   max?: number;
   step?: number;
+  formatter?: 'None' | 'Currency' | 'Percentage' | 'Compact';
 
-  // ─── Select ───
   options?: string[];
+  multiSelect?: boolean;
+  optionsSource?: 'Static' | 'From query';
+  queryBinding?: string;
+  labelField?: string;
+  valueField?: string;
+  optionsList?: SelectOptionItem[];
 
-  // ─── Events (all components) ───
   events?: ComponentEvent[];
+  disabled?: string;
+  loadingState?: boolean;
+  confirmationDialog?: boolean;
+  confirmationMessage?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onSuccessAction?: string;
+  onErrorAction?: string;
+  expression?: boolean;
+  linkTo?: string;
 }
 
-export type ComponentType = 
-  | 'StatCard' | 'Table' | 'BarChart' | 'LineChart' 
-  | 'StatusBadge' | 'Button' | 'LogsViewer'
-  | 'Container' | 'TabbedContainer'
-  | 'Text' | 'TextInput' | 'NumberInput' | 'Select';
+export type ComponentType =
+  | 'StatCard'
+  | 'Table'
+  | 'BarChart'
+  | 'LineChart'
+  | 'StatusBadge'
+  | 'Button'
+  | 'LogsViewer'
+  | 'Container'
+  | 'TabbedContainer'
+  | 'Text'
+  | 'TextInput'
+  | 'NumberInput'
+  | 'Select';
 
 export interface ComponentConfig {
   id: string;
   type: ComponentType;
   label: string;
-  visible?: boolean;
+  visible?: string | boolean;
+  visibleForRoles?: string[];
   loading?: boolean;
   style: ComponentStyle;
   data: ComponentData;

@@ -1,29 +1,33 @@
-
+import { Fragment } from 'react';
 import {
-  LineChart as RechartsLineChart,
+  Area,
+  CartesianGrid,
+  LabelList,
+  Legend,
   Line,
+  LineChart as RechartsLineChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
 } from 'recharts';
 import type { ComponentConfig } from '../../types/template';
+import { runAction } from '../../engine/runtimeUtils';
 
-const LINE_COLORS = ['#2563eb', '#60a5fa', '#3b82f6', '#f59e0b', '#059669'];
-
-interface LineChartProps {
-  config: ComponentConfig;
-}
+const COLOR_SCHEMES = {
+  Blue: ['#2563eb', '#60a5fa', '#3b82f6'],
+  Green: ['#059669', '#10b981', '#6ee7b7'],
+  Amber: ['#d97706', '#f59e0b', '#fbbf24'],
+  Multi: ['#2563eb', '#059669', '#d97706', '#dc2626'],
+};
 
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="chart-custom-tooltip">
       <div className="label">{label}</div>
-      {payload.map((entry, i) => (
-        <div key={i} className="item">
+      {payload.map((entry, index) => (
+        <div key={index} className="item">
           <span className="dot" style={{ background: entry.color }} />
           {entry.name}: {entry.value.toLocaleString()}
         </div>
@@ -32,20 +36,15 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
-export default function LineChart({ config }: LineChartProps) {
+export default function LineChart({ config }: { config: ComponentConfig }) {
   const { style, data, label } = config;
-  const isBound = data._resolvedBindings?.['dbBinding'];
+  const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const chartData = Array.isArray(rawData) ? rawData : [];
-  
   const series = data.series || [{ name: 'Value', fieldKey: 'value' }];
   const activeSeries = data.yField ? [{ name: 'Value', fieldKey: data.yField }] : series;
-  const seriesKeys = new Set(activeSeries.map((s) => s.fieldKey));
-  
-  const firstRow = chartData[0] as Record<string, unknown> | undefined;
-  const xKey = data.xField || (firstRow
-    ? Object.keys(firstRow).find((k) => !seriesKeys.has(k) && typeof firstRow[k] === 'string') || 'label'
-    : 'label');
+  const palette = COLOR_SCHEMES[data.colorScheme || 'Blue'];
+  const xKey = data.xField || 'label';
 
   return (
     <div
@@ -66,36 +65,33 @@ export default function LineChart({ config }: LineChartProps) {
       <div className="chart-component-title" style={{ color: style.textColor }}>{label}</div>
       <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
         <ResponsiveContainer width="100%" height="100%">
-          <RechartsLineChart data={chartData as Record<string, unknown>[]} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-            <XAxis
-              dataKey={xKey}
-              tick={{ fill: '#9ba3af', fontSize: 10, fontFamily: 'DM Sans' }}
-              axisLine={{ stroke: 'rgba(0,0,0,0.06)' }}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fill: '#9ba3af', fontSize: 10, fontFamily: 'DM Sans' }}
-              axisLine={false}
-              tickLine={false}
-            />
+          <RechartsLineChart data={chartData as Record<string, unknown>[]}>
+            {data.showGrid !== false ? <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} /> : null}
+            <XAxis dataKey={xKey} />
+            <YAxis />
             <Tooltip content={<CustomTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: '10px', fontFamily: 'DM Sans', color: '#9ba3af' }}
-              iconType="circle"
-              iconSize={6}
-            />
-            {activeSeries.map((s, i) => (
-              <Line
-                key={s.fieldKey}
-                type="monotone"
-                dataKey={s.fieldKey}
-                name={s.name}
-                stroke={LINE_COLORS[i % LINE_COLORS.length]}
-                strokeWidth={2}
-                dot={{ fill: LINE_COLORS[i % LINE_COLORS.length], r: 3, strokeWidth: 0 }}
-                activeDot={{ r: 5, stroke: LINE_COLORS[i % LINE_COLORS.length], strokeWidth: 2, fill: '#ffffff' }}
-              />
+            {data.showLegend !== false ? <Legend /> : null}
+            {activeSeries.map((seriesItem, index) => (
+              <Fragment key={seriesItem.fieldKey}>
+                {data.fillArea ? <Area key={`${seriesItem.fieldKey}-area`} dataKey={seriesItem.fieldKey} fill={palette[index % palette.length]} stroke="none" fillOpacity={0.12} /> : null}
+                <Line
+                  type={data.smooth !== false ? 'monotone' : 'linear'}
+                  dataKey={seriesItem.fieldKey}
+                  name={seriesItem.name}
+                  stroke={palette[index % palette.length]}
+                  strokeWidth={style.lineWidth || 2}
+                  dot={data.showDots !== false}
+                  activeDot={{
+                    r: 5,
+                    stroke: palette[index % palette.length],
+                    strokeWidth: 2,
+                    fill: '#ffffff',
+                    onClick: (event) => runAction(data.onPointClickAction, event),
+                  }}
+                >
+                  {style.showDataLabels ? <LabelList dataKey={seriesItem.fieldKey} position="top" /> : null}
+                </Line>
+              </Fragment>
             ))}
           </RechartsLineChart>
         </ResponsiveContainer>

@@ -1,48 +1,61 @@
+import { useState } from 'react';
 import type { ComponentConfig } from '../../types/template';
 import { executeQuery } from '../../engine/queryEngine';
+import { evaluateBooleanExpression, parseQueryName, runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
-import { useState } from 'react';
 
 interface ButtonProps {
   config: ComponentConfig;
 }
 
+const VARIANT_STYLES = {
+  Primary: { backgroundColor: '#2563eb', color: '#ffffff', borderColor: '#2563eb' },
+  Secondary: { backgroundColor: '#f2f4f7', color: '#0f1117', borderColor: '#e3e6ec' },
+  Danger: { backgroundColor: '#dc2626', color: '#ffffff', borderColor: '#dc2626' },
+  Ghost: { backgroundColor: 'transparent', color: '#2563eb', borderColor: '#e3e6ec' },
+};
+
 export default function Button({ config }: ButtonProps) {
   const { style, data, label } = config;
   const queriesStore = useEditorStore((s) => s.queries);
-  const editorStore = useEditorStore;
-  
-  // Example dbBinding: "queries.runAgent" (the target query name)
-  const targetQueryName = typeof data.dbBinding === 'string' 
-    ? data.dbBinding.replace('queries.', '').replace('.data', '')
-    : null;
-
   const [localLoading, setLocalLoading] = useState(false);
+  const targetQueryName = parseQueryName(data.dbBinding);
   const isQueryLoading = targetQueryName ? queriesStore[targetQueryName]?.isLoading : false;
-  const loading = localLoading || isQueryLoading;
+  const loading = (data.loadingState && (localLoading || isQueryLoading)) || false;
+  const disabled = evaluateBooleanExpression(data.disabled, false) || loading;
+  const variant = VARIANT_STYLES[style.variant || 'Primary'];
 
   const handleClick = async () => {
-    if (!targetQueryName) {
-      alert('No query bound. Set a Target Query in data dbBinding.');
+    if (disabled) {
       return;
     }
-    
-    // Actually find the query config
-    const state = editorStore.getState();
-    const queryConfig = state.queriesConfig.find(q => q.name === targetQueryName);
 
+    if (data.confirmationDialog) {
+      const confirmed = window.confirm(data.confirmationMessage || 'Are you sure?');
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    if (!targetQueryName) {
+      return;
+    }
+
+    const state = useEditorStore.getState();
+    const queryConfig = state.queriesConfig.find((query) => query.name === targetQueryName);
     if (!queryConfig) {
-      alert(`Query "${targetQueryName}" not found in current template.`);
       return;
     }
 
     setLocalLoading(true);
     try {
-       await executeQuery(queryConfig);
-    } catch(err) {
-       console.error(err);
+      await executeQuery(queryConfig);
+      runAction(data.onSuccessAction, { query: targetQueryName, status: 'success' });
+    } catch (error) {
+      console.error(error);
+      runAction(data.onErrorAction, { query: targetQueryName, status: 'error' });
     } finally {
-       setLocalLoading(false);
+      setLocalLoading(false);
     }
   };
 
@@ -58,28 +71,35 @@ export default function Button({ config }: ButtonProps) {
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         border: style.borderWidth ? `${style.borderWidth}px solid ${style.borderColor || 'transparent'}` : undefined,
         height: '100%',
-        overflow: 'hidden'
+        overflow: 'hidden',
       }}
     >
       <button
         onClick={handleClick}
-        disabled={loading}
+        disabled={disabled}
         style={{
-          backgroundColor: style.textColor || '#2563eb', // Use textColor as button main color for UI config logic simplicity
-          color: '#ffffff',
+          backgroundColor: variant.backgroundColor,
+          color: variant.color,
           fontFamily: style.fontFamily,
           borderRadius: style.borderRadius ? `${style.borderRadius}px` : '6px',
-          border: 'none',
+          border: `1px solid ${variant.borderColor}`,
           padding: '10px 20px',
-          cursor: loading ? 'not-allowed' : 'pointer',
+          cursor: disabled ? 'not-allowed' : 'pointer',
           fontWeight: 600,
-          opacity: loading ? 0.7 : 1,
-          width: '100%',
+          opacity: disabled ? 0.7 : 1,
+          width: style.fullWidth ? '100%' : 'auto',
+          minWidth: style.fullWidth ? '100%' : 'unset',
           height: '100%',
           transition: 'all 0.2s',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
         }}
       >
-        {loading ? 'Executing...' : label}
+        {loading ? <span className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} /> : null}
+        {style.iconLeft ? <span>{style.iconLeft}</span> : null}
+        <span>{loading ? 'Executing...' : label}</span>
       </button>
     </div>
   );

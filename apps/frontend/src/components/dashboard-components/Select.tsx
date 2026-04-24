@@ -1,21 +1,32 @@
 import type { ComponentConfig } from '../../types/template';
+import { runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
 
 export default function Select({ config }: { config: ComponentConfig }) {
   const { style, data } = config;
   const setComponentState = useEditorStore((s) => s.setComponentState);
   const componentState = useEditorStore((s) => s.componentState);
-  
-  const options = data.options || ['Option 1'];
-  const val = componentState[config.id]?.value ?? data.mockValue ?? options[0];
+
+  const staticOptions = (data.optionsList?.length ? data.optionsList : (data.options || []).map((option) => ({ label: option, value: option })));
+  const dynamicOptions = Array.isArray(data.dbBinding)
+    ? (data.dbBinding as Record<string, unknown>[]).map((item) => ({
+        label: String(item[data.labelField || 'label'] ?? ''),
+        value: String(item[data.valueField || 'value'] ?? ''),
+      }))
+    : [];
+  const options = data.optionsSource === 'From query' ? dynamicOptions : staticOptions;
+  const val = componentState[config.id]?.value ?? data.mockValue ?? options[0]?.value ?? '';
 
   return (
-    <div className="atomic-input-wrapper" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-      {data.label && <label className="atomic-input-label" style={{ marginBottom: '4px' }}>{data.label}</label>}
+    <div className="atomic-input-wrapper" style={{ height: '100%', display: 'flex', flexDirection: style.labelPosition === 'Left' ? 'row' : 'column', justifyContent: 'center', gap: '8px' }}>
+      {data.label && style.labelPosition !== 'Hidden' ? <label className="atomic-input-label">{data.label}</label> : null}
       <select
         className="atomic-select-input"
         value={val}
-        onChange={(e) => setComponentState(config.id, { value: e.target.value })}
+        onChange={(e) => {
+          setComponentState(config.id, { value: e.target.value });
+          runAction(data.onChangeAction, e.target.value);
+        }}
         style={{
           backgroundColor: style.backgroundColor,
           color: style.textColor,
@@ -27,11 +38,15 @@ export default function Select({ config }: { config: ComponentConfig }) {
           padding: `${style.padding}px`,
           width: '100%',
           flex: 1,
-          height: '100%'
+          height: '100%',
         }}
+        multiple={data.multiSelect}
+        required={data.required}
       >
-        {options.map((opt, idx) => (
-          <option key={idx} value={opt}>{opt}</option>
+        {options.map((option, index) => (
+          <option key={`${option.value}-${index}`} value={option.value}>
+            {option.label}
+          </option>
         ))}
       </select>
     </div>

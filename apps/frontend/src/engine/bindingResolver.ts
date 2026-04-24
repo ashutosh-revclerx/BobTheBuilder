@@ -1,16 +1,13 @@
-import { useEditorStore } from '../store/editorStore';
+import { resolveStorePath } from './runtimeUtils';
 
 /**
  * Resolves a dot-notation path against the entire Zustand store.
  * E.g., `resolve("queries.getUsers.data")` reads `store.queries.getUsers.data`
  */
 export function resolve(path: string): unknown {
-  const store = useEditorStore.getState() as any;
   if (!path) return undefined;
-  
-  return path.split('.').reduce((obj: any, key) => {
-    return obj && obj[key] !== undefined ? obj[key] : undefined;
-  }, store);
+
+  return resolveStorePath(path);
 }
 
 /**
