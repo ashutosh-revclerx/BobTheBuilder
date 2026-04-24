@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import type { QueryConfig } from '@btb/shared';
 import type { ComponentConfig } from '../../types/template';
 import { executeQuery } from '../../engine/queryEngine';
-import { evaluateBooleanExpression, parseQueryName, runAction } from '../../engine/runtimeUtils';
+import { evaluateBooleanExpression, humanizeQueryError, parseQueryName, runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
 
 interface ButtonProps {
@@ -13,36 +14,22 @@ const VARIANT_STYLES = {
   Secondary: { backgroundColor: '#f2f4f7', color: '#0f1117', borderColor: '#e3e6ec' },
   Danger: { backgroundColor: '#dc2626', color: '#ffffff', borderColor: '#dc2626' },
   Ghost: { backgroundColor: 'transparent', color: '#2563eb', borderColor: '#e3e6ec' },
-};
+} as const;
 
 export default function Button({ config }: ButtonProps) {
   const { style, data, label } = config;
-  const queriesStore = useEditorStore((s) => s.queries);
+  const queryResults = useEditorStore((state) => state.queryResults);
+  const queriesConfig = useEditorStore((state) => state.queriesConfig);
   const [localLoading, setLocalLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const targetQueryName = parseQueryName(data.dbBinding);
-  const isQueryLoading = targetQueryName ? queriesStore[targetQueryName]?.isLoading : false;
-  const loading = (data.loadingState && (localLoading || isQueryLoading)) || false;
+  const queryState = targetQueryName ? queryResults[targetQueryName] : undefined;
+  const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === targetQueryName) as QueryConfig | undefined;
+  const loading = localLoading || queryState?.status === 'loading';
   const disabled = evaluateBooleanExpression(data.disabled, false) || loading;
   const variant = VARIANT_STYLES[style.variant || 'Primary'];
 
-  const handleClick = async () => {
-    if (disabled) {
-      return;
-    }
-
-    if (data.confirmationDialog) {
-      const confirmed = window.confirm(data.confirmationMessage || 'Are you sure?');
-      if (!confirmed) {
-        return;
-      }
-    }
-
-    if (!targetQueryName) {
-      return;
-    }
-
-    const state = useEditorStore.getState();
-    const queryConfig = state.queriesConfig.find((query) => query.name === targetQueryName);
+  const runQuery = async () => {
     if (!queryConfig) {
       return;
     }
@@ -51,12 +38,25 @@ export default function Button({ config }: ButtonProps) {
     try {
       await executeQuery(queryConfig);
       runAction(data.onSuccessAction, { query: targetQueryName, status: 'success' });
-    } catch (error) {
-      console.error(error);
+    } catch {
       runAction(data.onErrorAction, { query: targetQueryName, status: 'error' });
     } finally {
       setLocalLoading(false);
+      setConfirming(false);
     }
+  };
+
+  const handleClick = async () => {
+    if (disabled) {
+      return;
+    }
+
+    if (data.confirmationDialog && !confirming) {
+      setConfirming(true);
+      return;
+    }
+
+    await runQuery();
   };
 
   return (
@@ -71,12 +71,28 @@ export default function Button({ config }: ButtonProps) {
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         border: style.borderWidth ? `${style.borderWidth}px solid ${style.borderColor || 'transparent'}` : undefined,
         height: '100%',
-        overflow: 'hidden',
+        overflow: 'visible',
+        position: 'relative',
       }}
     >
+      {confirming ? (
+        <div className="dashboard-inline-confirm">
+          <div>{data.confirmationMessage || 'Are you sure?'}</div>
+          <div className="dashboard-inline-confirm-actions">
+            <button className="btn-topbar primary" onClick={() => void runQuery()} disabled={loading}>
+              {loading ? 'Running...' : data.confirmLabel || 'Confirm'}
+            </button>
+            <button className="btn-topbar" onClick={() => setConfirming(false)}>
+              {data.cancelLabel || 'Cancel'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <button
-        onClick={handleClick}
+        onClick={() => void handleClick()}
         disabled={disabled}
+        title={queryState?.status === 'error' ? humanizeQueryError(queryState.error) : undefined}
         style={{
           backgroundColor: variant.backgroundColor,
           color: variant.color,
@@ -95,9 +111,11 @@ export default function Button({ config }: ButtonProps) {
           alignItems: 'center',
           justifyContent: 'center',
           gap: '8px',
+          position: 'relative',
         }}
       >
-        {loading ? <span className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} /> : null}
+        {queryState?.status === 'error' ? <span className="dashboard-button-error-dot" /> : null}
+        {loading ? <span className="spinner dashboard-list-button-spinner" /> : null}
         {style.iconLeft ? <span>{style.iconLeft}</span> : null}
         <span>{loading ? 'Executing...' : label}</span>
       </button>

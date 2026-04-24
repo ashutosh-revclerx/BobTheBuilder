@@ -33,7 +33,7 @@ export default function NumberInput({ config }: { config: ComponentConfig }) {
           value={val}
           onChange={(e) => {
             const nextValue = Number(e.target.value);
-            setComponentState(config.id, { value: nextValue });
+            setComponentState(config.id, 'value', nextValue);
             runAction(data.onChangeAction, nextValue);
           }}
           style={{

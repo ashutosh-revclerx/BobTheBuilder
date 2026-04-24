@@ -23,11 +23,11 @@ export default function TextInput({ config }: { config: ComponentConfig }) {
   const setComponentState = useEditorStore((s) => s.setComponentState);
   const componentState = useEditorStore((s) => s.componentState);
   const queriesConfig = useEditorStore((s) => s.queriesConfig);
-  const val = componentState[config.id]?.value ?? data.mockValue ?? '';
+  const val = String(componentState[config.id]?.value ?? data.mockValue ?? '');
   const inputType = getInputType(data.type);
 
   const handleChange = (value: string) => {
-    setComponentState(config.id, { value });
+    setComponentState(config.id, 'value', value);
     runAction(data.onChangeAction, value);
   };
 

@@ -10,8 +10,13 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import type { QueryConfig } from '@btb/shared';
 import type { ComponentConfig } from '../../types/template';
+import { executeQuery } from '../../engine/queryEngine';
+import { parseQueryName } from '../../engine/runtimeUtils';
+import { useEditorStore } from '../../store/editorStore';
 import { runAction } from '../../engine/runtimeUtils';
+import QueryErrorBanner from '../ui/QueryErrorBanner';
 
 const COLOR_SCHEMES = {
   Blue: ['#2563eb', '#3b82f6', '#60a5fa'],
@@ -37,6 +42,11 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 export default function BarChart({ config }: { config: ComponentConfig }) {
   const { style, data, label } = config;
+  const queryResults = useEditorStore((state) => state.queryResults);
+  const queriesConfig = useEditorStore((state) => state.queriesConfig);
+  const queryName = parseQueryName(data.dbBinding);
+  const queryState = queryName ? queryResults[queryName] : undefined;
+  const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === queryName) as QueryConfig | undefined;
   const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const chartData = Array.isArray(rawData) ? rawData : [];
@@ -64,31 +74,37 @@ export default function BarChart({ config }: { config: ComponentConfig }) {
     >
       <div className="chart-component-title" style={{ color: style.textColor }}>{label}</div>
       <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <RechartsBarChart data={chartData as Record<string, unknown>[]} layout={isHorizontal ? 'vertical' : 'horizontal'}>
-            {data.showGrid !== false ? <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={!isHorizontal} /> : null}
-            <XAxis dataKey={isHorizontal ? undefined : xKey} type={isHorizontal ? 'number' : 'category'} />
-            <YAxis dataKey={isHorizontal ? xKey : undefined} type={isHorizontal ? 'category' : 'number'} />
-            <Tooltip content={<CustomTooltip />} />
-            {data.showLegend !== false ? <Legend /> : null}
-            {activeSeries.map((seriesItem, index) => (
-              <Bar
-                key={seriesItem.fieldKey}
-                dataKey={seriesItem.fieldKey}
-                name={seriesItem.name}
-                fill={palette[index % palette.length]}
-                radius={isHorizontal ? [0, style.barRadius || 4, style.barRadius || 4, 0] : [style.barRadius || 4, style.barRadius || 4, 0, 0]}
-                stackId={data.stacked ? 'stack' : undefined}
-                onClick={(entry) => runAction(data.onBarClickAction, entry)}
-              >
-                {style.showDataLabels ? <LabelList dataKey={seriesItem.fieldKey} position={isHorizontal ? 'right' : 'top'} /> : null}
-                {chartData.map((_, cellIndex) => (
-                  <Cell key={cellIndex} fill={palette[cellIndex % palette.length]} />
-                ))}
-              </Bar>
-            ))}
-          </RechartsBarChart>
-        </ResponsiveContainer>
+        {queryState?.status === 'error' && queryConfig ? (
+          <div className="dashboard-query-error-wrap">
+            <QueryErrorBanner queryName={queryConfig.name} error={queryState.error || ''} onRetry={() => executeQuery(queryConfig)} />
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsBarChart data={chartData as Record<string, unknown>[]} layout={isHorizontal ? 'vertical' : 'horizontal'}>
+              {data.showGrid !== false ? <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={!isHorizontal} /> : null}
+              <XAxis dataKey={isHorizontal ? undefined : xKey} type={isHorizontal ? 'number' : 'category'} />
+              <YAxis dataKey={isHorizontal ? xKey : undefined} type={isHorizontal ? 'category' : 'number'} />
+              <Tooltip content={<CustomTooltip />} />
+              {data.showLegend !== false ? <Legend /> : null}
+              {activeSeries.map((seriesItem, index) => (
+                <Bar
+                  key={seriesItem.fieldKey}
+                  dataKey={seriesItem.fieldKey}
+                  name={seriesItem.name}
+                  fill={palette[index % palette.length]}
+                  radius={isHorizontal ? [0, style.barRadius || 4, style.barRadius || 4, 0] : [style.barRadius || 4, style.barRadius || 4, 0, 0]}
+                  stackId={data.stacked ? 'stack' : undefined}
+                  onClick={(entry) => runAction(data.onBarClickAction, entry)}
+                >
+                  {style.showDataLabels ? <LabelList dataKey={seriesItem.fieldKey} position={isHorizontal ? 'right' : 'top'} /> : null}
+                  {chartData.map((_, cellIndex) => (
+                    <Cell key={cellIndex} fill={palette[cellIndex % palette.length]} />
+                  ))}
+                </Bar>
+              ))}
+            </RechartsBarChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

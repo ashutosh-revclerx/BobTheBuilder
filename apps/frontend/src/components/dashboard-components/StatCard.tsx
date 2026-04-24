@@ -1,4 +1,9 @@
 import type { ComponentConfig } from '../../types/template';
+import type { QueryConfig } from '@btb/shared';
+import { executeQuery } from '../../engine/queryEngine';
+import { parseQueryName } from '../../engine/runtimeUtils';
+import { useEditorStore } from '../../store/editorStore';
+import QueryErrorBanner from '../ui/QueryErrorBanner';
 
 interface StatCardProps {
   config: ComponentConfig;
@@ -24,6 +29,11 @@ function pickIcon(label: string): string {
 
 export default function StatCard({ config }: StatCardProps) {
   const { style, data, label } = config;
+  const queryResults = useEditorStore((state) => state.queryResults);
+  const queriesConfig = useEditorStore((state) => state.queriesConfig);
+  const queryName = parseQueryName(data.dbBinding);
+  const queryState = queryName ? queryResults[queryName] : undefined;
+  const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === queryName) as QueryConfig | undefined;
   const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const value = `${data.prefix ?? ''}${typeof rawData === 'string' ? rawData : String(rawData ?? '—')}${data.suffix ?? ''}`;
@@ -58,26 +68,32 @@ export default function StatCard({ config }: StatCardProps) {
         <div className="stat-card-icon">{pickIcon(label)}</div>
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', gap: '8px' }}>
-        <div className="stat-card-value" style={{ fontSize: `${style.metricFontSize || 28}px`, color: style.textColor }}>
-          {value}
-        </div>
-        {data.sparklineData?.length ? (
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '32px' }}>
-            {data.sparklineData.map((point, index) => (
-              <span
-                key={`${point}-${index}`}
-                style={{
-                  display: 'inline-block',
-                  width: '8px',
-                  height: `${Math.max(4, point)}px`,
-                  borderRadius: '999px',
-                  backgroundColor: trendColor,
-                  opacity: 0.6 + index / (data.sparklineData?.length || 1) * 0.4,
-                }}
-              />
-            ))}
-          </div>
-        ) : null}
+        {queryState?.status === 'error' && queryConfig ? (
+          <QueryErrorBanner compact queryName={queryConfig.name} error={queryState.error || ''} onRetry={() => executeQuery(queryConfig)} />
+        ) : (
+          <>
+            <div className="stat-card-value" style={{ fontSize: `${style.metricFontSize || 28}px`, color: style.textColor }}>
+              {value}
+            </div>
+            {data.sparklineData?.length ? (
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '32px' }}>
+                {data.sparklineData.map((point, index) => (
+                  <span
+                    key={`${point}-${index}`}
+                    style={{
+                      display: 'inline-block',
+                      width: '8px',
+                      height: `${Math.max(4, point)}px`,
+                      borderRadius: '999px',
+                      backgroundColor: trendColor,
+                      opacity: 0.6 + (index / (data.sparklineData?.length || 1)) * 0.4,
+                    }}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
       {trendValue && (
         <span className={`stat-card-delta ${isNeutral ? 'neutral' : isPositive ? 'positive' : 'negative'}`} style={{ color: trendColor }}>

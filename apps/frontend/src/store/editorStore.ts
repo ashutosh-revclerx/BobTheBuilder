@@ -476,10 +476,10 @@ const normalizeComponent = (component: ComponentConfig): ComponentConfig => {
 const normalizeComponents = (components: ComponentConfig[]) => components.map(normalizeComponent);
 
 interface QueryState {
-  data: any;
-  isLoading: boolean;
+  data: unknown;
+  status: 'idle' | 'loading' | 'success' | 'error';
   error: string | null;
-  lastRunAt: string | null;
+  lastUpdated: number | null;
 }
 
 interface EditorState {
@@ -492,8 +492,8 @@ interface EditorState {
   dirtyStyleMap: Record<string, Partial<ComponentStyle>>;
   dirtyDataMap: Record<string, Partial<ComponentData>>;
   savedTemplates: Record<string, SavedTemplate>;
-  queries: Record<string, QueryState>;
-  componentState: Record<string, any>;
+  queryResults: Record<string, QueryState>;
+  componentState: Record<string, Record<string, unknown>>;
   activeTabs: Record<string, string>;
   draggingType: string | null;
   rightPanelOpen: boolean;
@@ -527,7 +527,7 @@ interface EditorState {
   setDraggingType: (type: string | null) => void;
   closeRightPanel: () => void;
   setQueryState: (queryName: string, state: Partial<QueryState>) => void;
-  setComponentState: (componentId: string, state: any) => void;
+  setComponentState: (componentId: string, key: string, value: unknown) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -542,7 +542,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   dirtyStyleMap: {},
   dirtyDataMap: {},
   savedTemplates: {},
-  queries: {},
+  queryResults: {},
   componentState: {},
   rightPanelOpen: true,
   lastSelectedComponentId: null,
@@ -560,22 +560,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setQueryState: (queryName, stateUpdates) =>
     set((state) => ({
-      queries: {
-        ...state.queries,
+      queryResults: {
+        ...state.queryResults,
         [queryName]: {
-          ...(state.queries[queryName] || { data: null, isLoading: false, error: null, lastRunAt: null }),
+          ...(state.queryResults[queryName] || { data: null, status: 'idle', error: null, lastUpdated: null }),
           ...stateUpdates,
         },
       },
     })),
 
-  setComponentState: (componentId, stateUpdates) =>
+  setComponentState: (componentId, key, value) =>
     set((state) => ({
       componentState: {
         ...state.componentState,
         [componentId]: {
           ...(state.componentState[componentId] || {}),
-          ...stateUpdates,
+          [key]: value,
         },
       },
     })),
@@ -594,7 +594,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeTabs: {},
       dirtyStyleMap: {},
       dirtyDataMap: {},
-      queries: {},
+      queryResults: {},
       componentState: {},
     });
   },
@@ -613,7 +613,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeTabs: {},
       dirtyStyleMap: {},
       dirtyDataMap: {},
-      queries: {},
+      queryResults: {},
       componentState: {},
     });
   },

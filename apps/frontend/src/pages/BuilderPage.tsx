@@ -7,8 +7,10 @@ import RightPanel from '../components/editor/RightPanel';
 import LeftPanel from '../components/editor/LeftPanel';
 import { useKineticWidth } from '../hooks/useTextMeasure';
 
+const API_BASE = 'http://localhost:3001';
+
 export default function BuilderPage() {
-  const { templateId } = useParams<{ templateId: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const loadTemplate = useEditorStore((s) => s.loadTemplate);
   const loadSavedTemplate = useEditorStore((s) => s.loadSavedTemplate);
@@ -36,27 +38,61 @@ export default function BuilderPage() {
   }, [loadFromLocalStorage]);
 
   useEffect(() => {
-    if (!templateId) return;
+    if (!id) return;
 
-    const saved = savedTemplates[templateId];
-    if (saved) {
-      loadSavedTemplate(saved);
-      return;
-    }
+    let cancelled = false;
 
-    if (templateId === 'blank') {
-      const blank = getBlankTemplate();
-      loadTemplate(blank.id, blank.name, blank.components);
-    } else {
-      const template = getTemplateById(templateId);
+    const load = async () => {
+      const saved = savedTemplates[id];
+      if (saved) {
+        loadSavedTemplate(saved);
+        return;
+      }
+
+      if (id === 'blank') {
+        const blank = getBlankTemplate();
+        loadTemplate(blank.id, blank.name, blank.components);
+        return;
+      }
+
+      const template = getTemplateById(id);
       if (template) {
         loadTemplate(template.id, template.name, template.components);
-      } else {
-        navigate('/templates');
+        return;
       }
-    }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/dashboards/${id}`);
+        if (!response.ok) {
+          navigate('/');
+          return;
+        }
+
+        const dashboard = await response.json();
+        if (cancelled) {
+          return;
+        }
+
+        loadTemplate(
+          dashboard.id,
+          dashboard.name,
+          dashboard.config?.components ?? [],
+          dashboard.config?.queries ?? [],
+        );
+      } catch {
+        if (!cancelled) {
+          navigate('/');
+        }
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateId]);
+  }, [id]);
 
   const handleSave = () => {
     saveToLocalStorage();
@@ -92,7 +128,7 @@ export default function BuilderPage() {
         <div className="topbar-divider" />
         <button
           className="topbar-back"
-          onClick={() => navigate('/templates')}
+          onClick={() => navigate('/')}
         >
           ← Templates
         </button>

@@ -1,15 +1,7 @@
 import { useEditorStore } from '../store/editorStore';
+import { resolve } from './bindingResolver';
 
-export function resolveStorePath(path: string): unknown {
-  const store = useEditorStore.getState() as Record<string, any>;
-  if (!path) {
-    return undefined;
-  }
-
-  return path.split('.').reduce((acc: any, part) => (acc && acc[part] !== undefined ? acc[part] : undefined), store);
-}
-
-function normalizeExpression(expression: string): string {
+export function normalizeExpression(expression: string): string {
   const trimmed = expression.trim();
   if (trimmed.startsWith('{{') && trimmed.endsWith('}}')) {
     return trimmed.slice(2, -2).trim();
@@ -22,20 +14,21 @@ export function evaluateExpression(expression: string | boolean | undefined, fal
     return expression;
   }
 
-  if (!expression || !String(expression).trim().length) {
+  if (!expression || !String(expression).trim()) {
     return fallback;
   }
 
   const normalized = normalizeExpression(String(expression));
 
-  if (normalized === 'true') {
-    return true;
-  }
-  if (normalized === 'false') {
-    return false;
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+
+  if (!normalized.includes(' ') && normalized.includes('.')) {
+    const direct = resolve(normalized);
+    return direct === undefined ? fallback : direct;
   }
 
-  const state = useEditorStore.getState() as Record<string, any>;
+  const state = useEditorStore.getState() as unknown as Record<string, unknown>;
   try {
     const evaluator = new Function('store', `with (store) { return (${normalized}); }`);
     return evaluator(state);
@@ -53,24 +46,41 @@ export function parseQueryName(binding: unknown): string | null {
     return null;
   }
 
-  return binding
-    .replace('{{', '')
-    .replace('}}', '')
-    .replace('queries.', '')
-    .replace('.data', '')
+  return normalizeExpression(binding)
+    .replace(/^queries\./, '')
+    .replace(/\.data$/, '')
     .trim();
 }
 
 export function runAction(actionName: string | undefined, payload?: unknown) {
-  if (!actionName) {
-    return;
-  }
-
-  const trimmed = actionName.trim();
-  if (!trimmed) {
+  if (!actionName?.trim()) {
     return;
   }
 
   const store = useEditorStore.getState();
-  store.setComponentState(trimmed, payload);
+  store.setComponentState(actionName.trim(), 'value', payload);
+}
+
+export function humanizeQueryError(error: string | null | undefined): string {
+  const message = String(error || '').trim().toLowerCase();
+
+  if (!message) {
+    return 'Something went wrong — please retry';
+  }
+  if (message.includes('fetch failed') || message.includes('network') || message.includes('failed to fetch')) {
+    return 'Could not reach the server';
+  }
+  if (message.includes('404')) {
+    return 'The requested data was not found';
+  }
+  if (message.includes('403')) {
+    return "You don't have permission to access this";
+  }
+  if (message.includes('500')) {
+    return 'Server error — please try again';
+  }
+  if (message.includes('timeout')) {
+    return 'Request timed out — server took too long';
+  }
+  return 'Something went wrong — please retry';
 }

@@ -82,9 +82,9 @@ router.post('/', async (req, res) => {
 router.get('/', async (_req, res) => {
   try {
     const { rows } = await pool.query<DashboardSummaryRow>(
-      `SELECT id, name, slug, status, created_at
+      `SELECT id, name, slug, status, created_at, updated_at
        FROM dashboards
-       ORDER BY created_at DESC`,
+       ORDER BY updated_at DESC, created_at DESC`,
     );
     return res.json(rows);
   } catch (err) {
@@ -226,6 +226,7 @@ interface DashboardSummaryRow {
   slug:       string;
   status:     string;
   created_at: Date;
+  updated_at: Date;
 }
 
 export default router;

@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { QueryConfig } from '@btb/shared';
 import type { ComponentConfig } from '../../types/template';
+import { executeQuery } from '../../engine/queryEngine';
+import { parseQueryName } from '../../engine/runtimeUtils';
+import { useEditorStore } from '../../store/editorStore';
+import QueryErrorBanner from '../ui/QueryErrorBanner';
 
 interface LogsViewerProps {
   config: ComponentConfig;
@@ -13,6 +18,11 @@ function isLogRecord(entry: unknown): entry is LogRecord {
 
 export default function LogsViewer({ config }: LogsViewerProps) {
   const { style, data, label } = config;
+  const queryResults = useEditorStore((state) => state.queryResults);
+  const queriesConfig = useEditorStore((state) => state.queriesConfig);
+  const queryName = parseQueryName(data.dbBinding);
+  const queryState = queryName ? queryResults[queryName] : undefined;
+  const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === queryName) as QueryConfig | undefined;
   const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const [searchTerm, setSearchTerm] = useState('');
@@ -117,6 +127,9 @@ export default function LogsViewer({ config }: LogsViewerProps) {
           whiteSpace: data.wrapLines ? 'pre-wrap' : 'pre',
         }}
       >
+        {queryState?.status === 'error' && queryConfig ? (
+          <QueryErrorBanner queryName={queryConfig.name} error={queryState.error || ''} onRetry={() => executeQuery(queryConfig)} />
+        ) : null}
         {filteredLogs.length === 0 ? (
           <div style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
             {rawLogs.length === 0 ? 'Waiting for output...' : 'No matches found.'}
