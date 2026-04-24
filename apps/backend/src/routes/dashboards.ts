@@ -203,6 +203,9 @@ router.delete('/:id', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid dashboard ID' });
     }
+    if (pgCode(err) === '23503') {
+      return res.status(409).json({ error: 'Dashboard is still referenced — unassign any customers first' });
+    }
     console.error('[dashboards] delete:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
