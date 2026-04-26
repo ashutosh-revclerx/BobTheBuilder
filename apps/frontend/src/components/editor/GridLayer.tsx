@@ -65,8 +65,6 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
       h: c.layout?.h ?? 4,
       minW: c.layout?.minW,
       minH: c.layout?.minH,
-      maxW: c.layout?.maxW,
-      maxH: c.layout?.maxH,
       isResizable: !readOnly,
       isDraggable: !readOnly,
       static: readOnly,

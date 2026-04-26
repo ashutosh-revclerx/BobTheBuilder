@@ -188,8 +188,6 @@ export interface ComponentConfig {
     h: number;
     minW?: number;
     minH?: number;
-    maxW?: number;
-    maxH?: number;
   };
 }
 

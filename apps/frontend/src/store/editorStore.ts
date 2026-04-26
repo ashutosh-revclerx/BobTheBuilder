@@ -15,19 +15,19 @@ const VISIBILITY_ROLE_OPTIONS = ['admin', 'editor', 'viewer'] as const;
 type LayoutConfig = NonNullable<ComponentConfig['layout']>;
 
 const COMPONENT_LAYOUTS: Record<ComponentType, LayoutConfig> = {
-  Table: { x: 0, y: 0, w: 6, h: 12, minW: 4, minH: 6, maxW: 12, maxH: 40 },
-  Button: { x: 0, y: 0, w: 2, h: 4, minW: 1, minH: 2, maxW: 6, maxH: 4 },
-  Text: { x: 0, y: 0, w: 2, h: 2, minW: 2, minH: 1, maxW: 12, maxH: 20 },
-  Container: { x: 0, y: 0, w: 4, h: 12, minW: 3, minH: 4, maxW: 12, maxH: 40 },
-  TabbedContainer: { x: 0, y: 0, w: 6, h: 12, minW: 4, minH: 6, maxW: 12, maxH: 40 },
-  StatCard: { x: 0, y: 0, w: 4, h: 6, minW: 2, minH: 4, maxW: 6, maxH: 12 },
-  StatusBadge: { x: 0, y: 0, w: 2, h: 4, minW: 1, minH: 2, maxW: 4, maxH: 6 },
-  TextInput: { x: 0, y: 0, w: 3, h: 6, minW: 2, minH: 3, maxW: 8, maxH: 6 },
-  Select: { x: 0, y: 0, w: 3, h: 6, minW: 2, minH: 3, maxW: 8, maxH: 6 },
-  NumberInput: { x: 0, y: 0, w: 3, h: 6, minW: 2, minH: 3, maxW: 8, maxH: 6 },
-  BarChart: { x: 0, y: 0, w: 6, h: 12, minW: 3, minH: 6, maxW: 12, maxH: 24 },
-  LineChart: { x: 0, y: 0, w: 6, h: 12, minW: 3, minH: 6, maxW: 12, maxH: 24 },
-  LogsViewer: { x: 0, y: 0, w: 4, h: 12, minW: 4, minH: 4, maxW: 12, maxH: 30 },
+  Table: { x: 0, y: 0, w: 6, h: 12, minW: 4, minH: 6 },
+  Button: { x: 0, y: 0, w: 2, h: 4, minW: 1, minH: 2 },
+  Text: { x: 0, y: 0, w: 2, h: 2, minW: 2, minH: 1 },
+  Container: { x: 0, y: 0, w: 4, h: 12, minW: 3, minH: 4 },
+  TabbedContainer: { x: 0, y: 0, w: 6, h: 12, minW: 4, minH: 6 },
+  StatCard: { x: 0, y: 0, w: 4, h: 6, minW: 2, minH: 4 },
+  StatusBadge: { x: 0, y: 0, w: 2, h: 4, minW: 1, minH: 2 },
+  TextInput: { x: 0, y: 0, w: 3, h: 6, minW: 2, minH: 3 },
+  Select: { x: 0, y: 0, w: 3, h: 6, minW: 2, minH: 3 },
+  NumberInput: { x: 0, y: 0, w: 3, h: 6, minW: 2, minH: 3 },
+  BarChart: { x: 0, y: 0, w: 6, h: 12, minW: 3, minH: 6 },
+  LineChart: { x: 0, y: 0, w: 6, h: 12, minW: 3, minH: 6 },
+  LogsViewer: { x: 0, y: 0, w: 4, h: 12, minW: 4, minH: 4 },
 };
 
 const createBaseData = (): ComponentData => ({
@@ -386,7 +386,7 @@ const createDefaultConfig = (
       return {
         style: createBaseStyle(),
         data: createBaseData(),
-        layout: { x: 0, y: 0, w: 4, h: 4, minW: 1, minH: 1, maxW: 12, maxH: 40 },
+        layout: { x: 0, y: 0, w: 4, h: 4, minW: 1, minH: 1 },
       };
   }
 };
@@ -467,8 +467,6 @@ const normalizeComponent = (component: ComponentConfig): ComponentConfig => {
       ...clone(component.layout ?? {}),
       minW: component.layout?.minW ?? defaults.layout.minW,
       minH: component.layout?.minH ?? defaults.layout.minH,
-      maxW: component.layout?.maxW ?? defaults.layout.maxW,
-      maxH: component.layout?.maxH ?? defaults.layout.maxH,
     },
   };
 };
