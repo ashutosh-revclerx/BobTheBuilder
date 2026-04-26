@@ -38,6 +38,7 @@ export default function Container({ config, componentMap }: ContainerProps) {
     >
       <div
         className="container-inner-layout"
+        onMouseDown={(e) => e.stopPropagation()}
         style={{
           flex: 1,
           position: 'relative',

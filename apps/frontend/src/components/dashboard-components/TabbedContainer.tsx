@@ -70,7 +70,7 @@ export default function TabbedContainer({ config, componentMap }: TabbedContaine
         ))}
       </div>
 
-      <div className="tabbed-content" style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
+      <div className="tabbed-content" style={{ flex: 1, position: 'relative', overflow: 'auto' }} onMouseDown={(e) => e.stopPropagation()}>
         <GridLayer parentId={config.id} parentTab={currentTab} componentMap={componentMap} customGap={data.gap ?? 10} />
       </div>
 

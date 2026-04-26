@@ -146,7 +146,7 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
         isResizable={!readOnly}
         resizeHandles={['se', 'sw', 'ne', 'nw']}
         droppingItem={{ i: '__dropping-elem__', x: 0, y: 0, w: size.w, h: size.h }}
-        draggableCancel="input, button, select, textarea, .tabbed-header-btn, .inline-picker, .container-empty-dropzone, .recharts-wrapper"
+        draggableCancel="input, button, select, textarea, .tabbed-header-btn, .inline-picker, .container-empty-dropzone, .recharts-wrapper, .container-inner-layout, .tabbed-content"
         compactType={null}
         preventCollision={true}
         onDragStop={readOnly ? undefined : handleDragStop}
