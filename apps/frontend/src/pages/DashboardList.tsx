@@ -67,15 +67,25 @@ export default function DashboardList() {
           fetch(`${API_BASE}/api/customers`),
         ]);
 
-        const dashboardsJson = (await dashboardsResponse.json()) as DashboardSummary[];
-        const customersJson = (await customersResponse.json()) as CustomerSummary[];
+        if (cancelled) return;
 
-        if (cancelled) {
-          return;
+        let dashboardsJson: DashboardSummary[] = [];
+        let customersJson: CustomerSummary[] = [];
+
+        if (dashboardsResponse.ok) {
+          const json = await dashboardsResponse.json();
+          if (Array.isArray(json)) dashboardsJson = json;
+        }
+
+        if (customersResponse.ok) {
+          const json = await customersResponse.json();
+          if (Array.isArray(json)) customersJson = json;
         }
 
         setDashboards(dashboardsJson);
         setCustomers(customersJson);
+      } catch (err) {
+        console.error('Failed to load dashboard list data:', err);
       } finally {
         if (!cancelled) {
           setLoading(false);
