@@ -133,6 +133,7 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
     <div 
       className={`grid-layer-wrapper ${draggingType ? 'drop-active' : ''}`}
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       <ResponsiveGridLayout
         className="layout"
