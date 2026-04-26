@@ -330,6 +330,11 @@ body {
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-primary);
+  width: 100%;
+}
+
+.builder-layout.preview-mode {
+  gap: 0;
 }
 
 /* Top Bar */
@@ -461,31 +466,82 @@ body {
   background: rgba(255, 107, 107, 0.08);
 }
 
-/* Preview pill toggle */
-.preview-pill {
+/* Preview Toggle Button */
+.btn-preview-toggle {
   display: flex;
   align-items: center;
-  gap: 0;
-  border-radius: 20px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-.preview-pill button {
-  padding: 5px 12px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 10px;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   transition: all var(--transition-fast);
   font-family: 'DM Sans', sans-serif;
-  letter-spacing: 0.04em;
 }
-.preview-pill button.active {
-  background: var(--blue-500);
+
+.btn-preview-toggle:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.btn-preview-toggle.preview-active {
+  background: var(--blue-50);
+  border-color: var(--blue-500);
+  color: var(--blue-600);
+}
+
+.btn-preview-toggle .toggle-icon {
+  font-size: 14px;
+}
+
+/* Unsaved Changes Note */
+.unsaved-changes-note {
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  padding: 4px 12px;
+  border-radius: 12px;
+  margin-left: 12px;
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+
+/* Mock Data Chip */
+.mock-data-chip {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
   color: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  z-index: 100;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+/* Screen Reader Only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 /* Builder body */
@@ -676,12 +732,18 @@ body {
 /* ========== Canvas ========== */
 .builder-canvas-wrapper {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   background:
     radial-gradient(circle, rgba(37, 99, 235, 0.07) 1px, transparent 1px),
     var(--bg-primary);
   background-size: 24px 24px;
   padding: 28px;
+}
+.preview-mode .builder-canvas-wrapper {
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 .builder-canvas-wrapper.drop-active {
   background-image: radial-gradient(circle, rgba(37,99,235,0.12) 1px, transparent 1px);
@@ -713,6 +775,9 @@ body {
   margin: 0 auto;
   min-height: calc(100vh - 100px);
 }
+.preview-mode .builder-canvas {
+  max-width: none;
+}
 .canvas-grid-row {
   display: grid;
   gap: 16px;
@@ -743,6 +808,12 @@ body {
 }
 .canvas-component-wrapper.selected {
   box-shadow: 0 0 0 2px var(--blue-500), var(--shadow-md) !important;
+}
+.canvas-component-wrapper.read-only {
+  cursor: default;
+}
+.canvas-component-wrapper.read-only:hover {
+  box-shadow: none;
 }
 
 /* Floating label above component */

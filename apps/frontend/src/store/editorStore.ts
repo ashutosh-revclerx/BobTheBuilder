@@ -496,6 +496,8 @@ interface EditorState {
   draggingType: string | null;
   rightPanelOpen: boolean;
   lastSelectedComponentId: string | null;
+  isPreviewMode: boolean;
+  rightPanelTab: 'style' | 'data';
   loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[]) => void;
   loadSavedTemplate: (saved: SavedTemplate) => void;
   selectComponent: (id: string | null) => void;
@@ -526,6 +528,9 @@ interface EditorState {
   closeRightPanel: () => void;
   setQueryState: (queryName: string, state: Partial<QueryState>) => void;
   setComponentState: (componentId: string, key: string, value: unknown) => void;
+  setIsPreviewMode: (val: boolean) => void;
+  togglePreviewMode: () => void;
+  setRightPanelTab: (tab: 'style' | 'data') => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -544,6 +549,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   componentState: {},
   rightPanelOpen: true,
   lastSelectedComponentId: null,
+  isPreviewMode: false,
+  rightPanelTab: 'style',
 
   setDraggingType: (type) => set({ draggingType: type }),
 
@@ -856,4 +863,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return { savedTemplates: existing };
     });
   },
+
+  setIsPreviewMode: (val) => set({ isPreviewMode: val }),
+
+  setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
+
+  togglePreviewMode: () =>
+    set((state) => {
+      const nextPreview = !state.isPreviewMode;
+      if (nextPreview) {
+        // Entering preview
+        return {
+          isPreviewMode: true,
+          selectedComponentId: null,
+        };
+      } else {
+        // Exiting preview
+        return {
+          isPreviewMode: false,
+          selectedComponentId: state.rightPanelOpen ? state.lastSelectedComponentId : null,
+        };
+      }
+    }),
 }));

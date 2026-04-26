@@ -7,9 +7,10 @@ import { useEditorStore } from '../../store/editorStore';
 interface ContainerProps {
   config: ComponentConfig;
   componentMap: Record<string, React.ComponentType<any>>;
+  readOnly?: boolean;
 }
 
-export default function Container({ config, componentMap }: ContainerProps) {
+export default function Container({ config, componentMap, readOnly = false }: ContainerProps) {
   const { style, data } = config;
   const [showPicker, setShowPicker] = useState(false);
   const addComponent = useEditorStore((s) => s.addComponent);
@@ -67,13 +68,15 @@ export default function Container({ config, componentMap }: ContainerProps) {
           borderTop: data.divider ? `1px solid ${style.borderColor || '#e3e6ec'}` : undefined,
         }}
       >
-        <GridLayer parentId={config.id} componentMap={componentMap} customGap={data.gap ?? 10} />
+        <GridLayer parentId={config.id} componentMap={componentMap} customGap={data.gap ?? 10} readOnly={readOnly} />
       </div>
 
-      <button className="container-add-trigger" onClick={() => setShowPicker(true)} style={{ margin: '8px 0 0 0' }}>
-        <span className="container-add-plus">+</span>
-        <span>Add component</span>
-      </button>
+      {!readOnly && (
+        <button className="container-add-trigger" onClick={() => setShowPicker(true)} style={{ margin: '8px 0 0 0' }}>
+          <span className="container-add-plus">+</span>
+          <span>Add component</span>
+        </button>
+      )}
 
       {showPicker && <InlinePicker onClose={() => setShowPicker(false)} onSelect={handleAddInside} />}
     </div>

@@ -8,9 +8,10 @@ import { useEditorStore } from '../../store/editorStore';
 interface TabbedContainerProps {
   config: ComponentConfig;
   componentMap: Record<string, React.ComponentType<any>>;
+  readOnly?: boolean;
 }
 
-export default function TabbedContainer({ config, componentMap }: TabbedContainerProps) {
+export default function TabbedContainer({ config, componentMap, readOnly = false }: TabbedContainerProps) {
   const { style, data } = config;
   const [showPicker, setShowPicker] = useState(false);
   const activeTabs = useEditorStore((s) => s.activeTabs);
@@ -71,15 +72,17 @@ export default function TabbedContainer({ config, componentMap }: TabbedContaine
       </div>
 
       <div className="tabbed-content" style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
-        <GridLayer parentId={config.id} parentTab={currentTab} componentMap={componentMap} customGap={data.gap ?? 10} />
+        <GridLayer parentId={config.id} parentTab={currentTab} componentMap={componentMap} customGap={data.gap ?? 10} readOnly={readOnly} />
       </div>
 
-      <div style={{ padding: '0 12px 12px' }}>
-        <button className="container-add-trigger" onClick={() => setShowPicker(true)}>
-          <span className="container-add-plus">+</span>
-          <span>Add component to {currentTab}</span>
-        </button>
-      </div>
+      {!readOnly && (
+        <div style={{ padding: '0 12px 12px' }}>
+          <button className="container-add-trigger" onClick={() => setShowPicker(true)}>
+            <span className="container-add-plus">+</span>
+            <span>Add component to {currentTab}</span>
+          </button>
+        </div>
+      )}
 
       {showPicker && <InlinePicker onClose={() => setShowPicker(false)} onSelect={handleAddInside} />}
     </div>

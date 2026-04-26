@@ -489,6 +489,9 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
   - Redesigned right-panel row editor for higher data density efficiently
   - Fixed overflow clipping issues to ensure floating UI elements are never cut off
   - Resolved "rows is not defined" crash in DataTab via robust data extraction
+  - Removed arbitrary `maxW` and `maxH` component constraints.
+  - Fixed deep nested container drag & drop event isolation.
+  - Added a functional Preview Mode to the visual builder.
 - [ ] **3.11** — JSON config editor: collapsible pane, bidirectionally synced with visual builder
 - [ ] **3.12** — Mobile preview toggle: Desktop vs Mobile (375px) canvas preview
 - [ ] **3.13** — Templates: migrate Phase 0 templates into full builder; add new ones

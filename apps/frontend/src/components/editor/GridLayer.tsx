@@ -1,5 +1,5 @@
-import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
-import { useState, useMemo, useCallback } from 'react';
+import { Responsive } from 'react-grid-layout/legacy';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { resolveBindings } from '../../engine/bindingResolver';
 import { evaluateBooleanExpression } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
@@ -20,7 +20,6 @@ const DEFAULT_SIZES: Record<string, {w:number, h:number}> = {
   Select:          { w: 3, h: 6 },
 };
 
-const ResponsiveGridLayout = WidthProvider(Responsive);
 
 function FloatingLabel({ text }: { text: string }) {
   return (
@@ -48,6 +47,22 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
   const draggingType = useEditorStore((s) => s.draggingType);
   const setDraggingType = useEditorStore((s) => s.setDraggingType);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(1200);
+
+  useEffect(() => {
+    if (!wrapperRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      }
+    });
+    observer.observe(wrapperRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const filteredComponents = useMemo(() => {
     return components.filter(c => {
@@ -131,12 +146,14 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
 
   return (
     <div 
+      ref={wrapperRef}
       className={`grid-layer-wrapper ${draggingType ? 'drop-active' : ''}`}
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <ResponsiveGridLayout
+      <Responsive
         className="layout"
+        width={containerWidth}
         layouts={{ lg: layout, md: layout, sm: layout, xs: layout, xxs: layout }}
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
         cols={{ lg: 12, md: 12, sm: 12, xs: 12, xxs: 12 }}
@@ -215,12 +232,12 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
                   <div className="spinner"></div>
                 </div>
               )}
-              <Component config={resolvedComp} componentMap={componentMap} />
+              <Component config={resolvedComp} componentMap={componentMap} readOnly={readOnly} />
             </div>
           </div>
         );
       })}
-    </ResponsiveGridLayout>
+    </Responsive>
   </div>
   );
 }

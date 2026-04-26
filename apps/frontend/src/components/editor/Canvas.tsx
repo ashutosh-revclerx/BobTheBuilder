@@ -34,7 +34,7 @@ const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
   Select,
 };
 
-export default function Canvas() {
+export default function Canvas({ readOnly = false }: { readOnly?: boolean }) {
   const components = useEditorStore((s) => s.components);
   const queriesConfig = useEditorStore((s) => s.queriesConfig);
   const clearCanvasSelection = useEditorStore((s) => s.clearCanvasSelection);
@@ -56,6 +56,7 @@ export default function Canvas() {
   }, [queriesConfig]);
 
   const handleCanvasClick = (e: React.MouseEvent) => {
+    if (readOnly) return;
     if ((e.target as HTMLElement).closest('.canvas-component-wrapper')) return;
     if ((e.target as HTMLElement).closest('.inline-picker')) return;
     clearCanvasSelection();
@@ -67,12 +68,17 @@ export default function Canvas() {
       onClick={handleCanvasClick}
     >
       <div className="builder-canvas">
-        <GridLayer parentId="root" componentMap={ComponentMap} />
+        <GridLayer parentId="root" componentMap={ComponentMap} readOnly={readOnly} />
         {components.length === 0 && (
           <div className="canvas-empty">
             <div className="canvas-empty-icon">📊</div>
             <p style={{ fontSize: '14px', fontWeight: 500, marginBottom: '6px' }}>No components yet</p>
             <p style={{ fontSize: '12px' }}>Pick a component from the left sidebar to add it</p>
+          </div>
+        )}
+        {readOnly && (
+          <div className="mock-data-chip">
+            Using mock data
           </div>
         )}
       </div>

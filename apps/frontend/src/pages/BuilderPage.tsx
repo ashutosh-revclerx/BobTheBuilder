@@ -30,12 +30,31 @@ export default function BuilderPage() {
   // Left panel toggle state
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
 
+  const isPreviewMode = useEditorStore((s) => s.isPreviewMode);
+  const togglePreviewMode = useEditorStore((s) => s.togglePreviewMode);
+  const dirtyStyleMap = useEditorStore((s) => s.dirtyStyleMap);
+  const dirtyDataMap = useEditorStore((s) => s.dirtyDataMap);
+  
   // Feature C: pretext kinetic width for name input
   const nameWidth = useKineticWidth(dashboardName);
+
+  const hasUnsavedChanges = Object.keys(dirtyStyleMap).length > 0 || Object.keys(dirtyDataMap).length > 0;
 
   useEffect(() => {
     loadFromLocalStorage();
   }, [loadFromLocalStorage]);
+
+  // Keyboard shortcut: Ctrl/Cmd + Shift + P
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        togglePreviewMode();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePreviewMode]);
 
   useEffect(() => {
     if (!id) return;
@@ -118,7 +137,12 @@ export default function BuilderPage() {
   const isSaved = activeTemplateId ? !!savedTemplates[activeTemplateId] : false;
 
   return (
-    <div className="builder-layout">
+    <div className={`builder-layout ${isPreviewMode ? 'preview-mode' : ''}`}>
+      {/* ARIA Live Region */}
+      <div className="sr-only" aria-live="polite">
+        {isPreviewMode ? 'Preview mode active' : 'Edit mode active'}
+      </div>
+
       {/* Top Bar */}
       <div className="builder-topbar">
         <div className="topbar-logo">
@@ -143,8 +167,16 @@ export default function BuilderPage() {
             style={{ width: `${nameWidth}px` }}
           />
         </div>
+
+        {/* Unsaved Changes Note */}
+        {isPreviewMode && hasUnsavedChanges && (
+          <div className="unsaved-changes-note">
+            Previewing unsaved changes
+          </div>
+        )}
+
         <div className="topbar-actions">
-          {isSaved && !showResetConfirm && (
+          {isSaved && !showResetConfirm && !isPreviewMode && (
             <button
               className="btn-topbar danger-text"
               onClick={() => setShowResetConfirm(true)}
@@ -152,17 +184,34 @@ export default function BuilderPage() {
               Reset
             </button>
           )}
-          {showResetConfirm && (
+          {showResetConfirm && !isPreviewMode && (
             <div className="reset-confirm-inline">
               <span>Reset all?</span>
               <button className="confirm-yes" onClick={handleReset}>Yes</button>
               <button className="confirm-no" onClick={() => setShowResetConfirm(false)}>No</button>
             </div>
           )}
-          <div className="preview-pill">
-            <button className="active">Edit</button>
-            <button>Preview</button>
-          </div>
+          
+          <button 
+            className={`btn-preview-toggle ${isPreviewMode ? 'preview-active' : ''}`}
+            onClick={togglePreviewMode}
+            title="Toggle preview mode (Ctrl+Shift+P)"
+            aria-label="Toggle preview mode"
+            aria-pressed={isPreviewMode}
+          >
+            {isPreviewMode ? (
+              <>
+                <span className="toggle-icon">✎</span>
+                <span className="toggle-label">Edit</span>
+              </>
+            ) : (
+              <>
+                <span className="toggle-icon">👁</span>
+                <span className="toggle-label">Preview</span>
+              </>
+            )}
+          </button>
+
           <button
             className={`btn-topbar primary ${saveFlash ? 'saved' : ''}`}
             onClick={handleSave}
@@ -174,31 +223,33 @@ export default function BuilderPage() {
 
       {/* Body */}
       <div className="builder-body">
-        {/* Narrow Sidebar Toggle */}
-        <div className="builder-sidebar">
-          <div 
-            className={`sidebar-icon ${isLeftPanelOpen ? 'active' : ''}`} 
-            data-tooltip="Components"
-            onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
-          >
-            <span>⊞</span>
+        {/* Narrow Sidebar Toggle - only in edit mode */}
+        {!isPreviewMode && (
+          <div className="builder-sidebar">
+            <div 
+              className={`sidebar-icon ${isLeftPanelOpen ? 'active' : ''}`} 
+              data-tooltip="Components"
+              onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+            >
+              <span>⊞</span>
+            </div>
+            <div className="sidebar-icon" data-tooltip="Layers">
+              <span>☰</span>
+            </div>
+            <div className="sidebar-icon" data-tooltip="Settings">
+              <span>⚙</span>
+            </div>
           </div>
-          <div className="sidebar-icon" data-tooltip="Layers">
-            <span>☰</span>
-          </div>
-          <div className="sidebar-icon" data-tooltip="Settings">
-            <span>⚙</span>
-          </div>
-        </div>
+        )}
 
         {/* Left Panel */}
-        {isLeftPanelOpen && <LeftPanel />}
+        {!isPreviewMode && isLeftPanelOpen && <LeftPanel />}
 
         {/* Canvas */}
-        <Canvas />
+        <Canvas readOnly={isPreviewMode} />
 
         {/* Right Panel */}
-        {selectedComponentId && <RightPanel />}
+        {!isPreviewMode && selectedComponentId && <RightPanel />}
       </div>
     </div>
   );

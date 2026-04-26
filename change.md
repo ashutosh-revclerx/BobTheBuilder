@@ -71,3 +71,10 @@ This file documents the changes made to the BobTheBuilder (BTB) dashboard builde
     - Completely rewritten to provide type-safe editors for every component property.
     - Added specific editors for columns, series, mappings, and semantic properties.
     - Added global visibility/loading toggles.
+
+### 7. Editor & Builder Core
+- **Files**: `apps/frontend/src/components/editor/GridLayer.tsx`, `apps/frontend/src/components/editor/Canvas.tsx`, `apps/frontend/src/pages/BuilderPage.tsx`
+- **Changes**: 
+    - **Preview Mode**: Implemented a functional preview mode toggle that hides editing panels, hover labels, and interaction handles.
+    - **Nested Drag Isolation**: Fixed nested drag-and-drop conflicts by correctly scoping mouse events to specific `GridLayer` levels, allowing both parent containers and nested children to be dragged reliably.
+    - **Size Constraints**: Removed arbitrary `maxW` and `maxH` constraints from all component defaults, allowing full-width layout scaling while preserving `minW` and `minH`.
