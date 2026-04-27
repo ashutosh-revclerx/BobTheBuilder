@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE = 'http://localhost:3001';
@@ -20,41 +20,194 @@ interface CustomerSummary {
   created_at: string;
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+/* ─── Toast system ─────────────────────────────────────────────────────────── */
+type ToastType = 'info' | 'success' | 'error';
+
+interface Toast {
+  id: number;
+  message: string;
+  type: ToastType;
+  exiting: boolean;
 }
 
+let toastCounter = 0;
+
+function useToasts() {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const push = useCallback((message: string, type: ToastType = 'success') => {
+    const id = ++toastCounter;
+    setToasts((prev) => [...prev.slice(-2), { id, message, type, exiting: false }]);
+
+    // Auto-dismiss after 3s
+    setTimeout(() => {
+      setToasts((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)),
+      );
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 200);
+    }, 3000);
+  }, []);
+
+  return { toasts, push };
+}
+
+/* ─── Helpers ──────────────────────────────────────────────────────────────── */
 function formatRelativeTime(value: string) {
   const diffMs = Date.now() - new Date(value).getTime();
   const diffMinutes = Math.max(1, Math.floor(diffMs / 60000));
 
   if (diffMinutes < 60) {
-    return `Updated ${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+    return `${diffMinutes}m ago`;
   }
-
   const diffHours = Math.floor(diffMinutes / 60);
   if (diffHours < 24) {
-    return `Updated ${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    return `${diffHours}h ago`;
   }
-
   const diffDays = Math.floor(diffHours / 24);
-  return `Updated ${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  return `${diffDays}d ago`;
 }
 
+/* ─── Dashboard Card ───────────────────────────────────────────────────────── */
+function DashboardCard({
+  dashboard,
+  customer,
+  index,
+  mounted,
+  onDelete,
+  onEdit,
+}: {
+  dashboard: DashboardSummary;
+  customer: CustomerSummary | undefined;
+  index: number;
+  mounted: boolean;
+  onDelete: (id: string) => Promise<void>;
+  onEdit: (id: string) => void;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const delay = Math.min(index * 50, 400);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await onDelete(dashboard.id);
+      setRemoving(true);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <article
+      className={`dl-card ${mounted ? 'dl-card--visible' : ''} ${removing ? 'dl-card--removing' : ''}`}
+      style={{ transitionDelay: mounted ? `${delay}ms` : '0ms' }}
+    >
+      {/* Top row — name + badge */}
+      <div className="dl-card__top">
+        <h2 className="dl-card__name">{dashboard.name}</h2>
+        <span className={`dl-card__badge dl-card__badge--${dashboard.status}`}>
+          {dashboard.status}
+        </span>
+      </div>
+
+      {/* Middle — customer + time */}
+      <div className="dl-card__middle">
+        {customer ? (
+          <span className="dl-card__customer">{customer.name}</span>
+        ) : (
+          <span className="dl-card__customer dl-card__customer--empty">
+            No customer assigned
+          </span>
+        )}
+        <span className="dl-card__time">{formatRelativeTime(dashboard.updated_at)}</span>
+      </div>
+
+      {/* Bottom — actions or confirm */}
+      <div className="dl-card__bottom">
+        {confirmDelete ? (
+          <div className="dl-card__confirm">
+            <span className="dl-card__confirm-text">Remove this dashboard?</span>
+            <button
+              className="dl-card__confirm-btn dl-card__confirm-btn--danger"
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting…' : 'Confirm'}
+            </button>
+            <button
+              className="dl-card__confirm-btn"
+              onClick={() => setConfirmDelete(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="dl-card__actions">
+            <button
+              className="dl-card__action dl-card__action--edit"
+              onClick={() => onEdit(dashboard.id)}
+            >
+              Edit
+            </button>
+            <span className="dl-card__divider">|</span>
+            <button
+              className="dl-card__action dl-card__action--delete"
+              onClick={() => setConfirmDelete(true)}
+            >
+              Delete
+            </button>
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+/* ─── Skeleton Card ────────────────────────────────────────────────────────── */
+function SkeletonCard() {
+  return (
+    <div className="dl-card dl-card--skeleton dl-card--visible">
+      <div className="dl-card__top">
+        <div className="dl-skel dl-skel--name" />
+        <div className="dl-skel dl-skel--badge" />
+      </div>
+      <div className="dl-card__middle">
+        <div className="dl-skel dl-skel--customer" />
+      </div>
+      <div className="dl-card__bottom">
+        <div className="dl-skel dl-skel--action" />
+        <div className="dl-skel dl-skel--action dl-skel--action-short" />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main Page ────────────────────────────────────────────────────────────── */
 export default function DashboardList() {
   const navigate = useNavigate();
   const [dashboards, setDashboards] = useState<DashboardSummary[]>([]);
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [removingIds, setRemovingIds] = useState<string[]>([]);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  const { toasts, push: pushToast } = useToasts();
+
+  // Trigger the staggered entrance animation after mount
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!loading && !mountedRef.current) {
+      // Small delay so the DOM paints the initial state first
+      requestAnimationFrame(() => {
+        setMounted(true);
+        mountedRef.current = true;
+      });
+    }
+  }, [loading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,15 +253,6 @@ export default function DashboardList() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!toastMessage) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => setToastMessage(null), 2400);
-    return () => window.clearTimeout(timeout);
-  }, [toastMessage]);
-
   const customerByDashboardId = useMemo(
     () =>
       customers.reduce<Record<string, CustomerSummary>>((acc, customer) => {
@@ -118,6 +262,11 @@ export default function DashboardList() {
         return acc;
       }, {}),
     [customers],
+  );
+
+  const liveCount = useMemo(
+    () => dashboards.filter((d) => d.status === 'live').length,
+    [dashboards],
   );
 
   const handleCreateDashboard = async () => {
@@ -142,114 +291,122 @@ export default function DashboardList() {
   };
 
   const handleDeleteDashboard = async (dashboardId: string) => {
-    setDeletingId(dashboardId);
-    try {
-      const response = await fetch(`${API_BASE}/api/dashboards/${dashboardId}`, { method: 'DELETE' });
-      if (!response.ok) {
-        throw new Error('Delete failed');
-      }
-
-      setRemovingIds((current) => [...current, dashboardId]);
-      window.setTimeout(() => {
-        setDashboards((current) => current.filter((dashboard) => dashboard.id !== dashboardId));
-        setCustomers((current) => current.filter((customer) => customer.dashboard_id !== dashboardId));
-        setRemovingIds((current) => current.filter((id) => id !== dashboardId));
-      }, 180);
-      setToastMessage('Dashboard deleted');
-    } finally {
-      setDeletingId(null);
-      setConfirmDeleteId(null);
+    const response = await fetch(`${API_BASE}/api/dashboards/${dashboardId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      pushToast('Failed to delete dashboard', 'error');
+      throw new Error('Delete failed');
     }
+
+    // Remove after card's exit animation
+    setTimeout(() => {
+      setDashboards((current) =>
+        current.filter((dashboard) => dashboard.id !== dashboardId),
+      );
+      setCustomers((current) =>
+        current.filter((customer) => customer.dashboard_id !== dashboardId),
+      );
+    }, 200);
+    pushToast('Dashboard deleted', 'success');
   };
 
   return (
-    <div className="dashboard-list-page">
-      <header className="dashboard-list-header">
-        <div className="gallery-logo">
-          <div className="gallery-logo-icon">D</div>
-          <span className="gallery-logo-text">Dashboard Platform</span>
+    <div className="dl-page">
+      {/* ─── Header ──────────────────────────────────────────────────── */}
+      <header className="dl-header">
+        <div className="dl-header__left">
+          <span className="dl-header__wordmark">BobTheBuilder</span>
+          <span className="dl-header__tagline">
+            Build and ship customer dashboards without writing frontend code.
+          </span>
         </div>
-        <button className="btn-topbar primary" onClick={() => void handleCreateDashboard()} disabled={creating}>
-          {creating ? <span className="spinner dashboard-list-button-spinner" /> : null}
-          <span>{creating ? 'Creating...' : 'New Dashboard'}</span>
+        <button
+          className="dl-header__cta"
+          onClick={() => void handleCreateDashboard()}
+          disabled={creating}
+        >
+          {creating ? (
+            <span className="dl-header__cta-spinner" />
+          ) : (
+            '+ New Dashboard'
+          )}
         </button>
       </header>
 
-      <main className="dashboard-list-content">
+      {/* ─── Body ────────────────────────────────────────────────────── */}
+      <main className="dl-body">
+        {/* Section title row */}
+        <div className="dl-section-row">
+          <h1 className="dl-section-title">Your Dashboards</h1>
+          {!loading && dashboards.length > 0 && (
+            <div className="dl-stats">
+              <span>{dashboards.length} dashboard{dashboards.length !== 1 ? 's' : ''}</span>
+              <span className="dl-stats__dot">·</span>
+              <span>{customers.length} customer{customers.length !== 1 ? 's' : ''}</span>
+              <span className="dl-stats__dot">·</span>
+              <span>{liveCount} live</span>
+            </div>
+          )}
+        </div>
+
+        {/* Grid */}
         {loading ? (
-          <div className="dashboard-list-grid">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="dashboard-card dashboard-card-skeleton">
-                <div className="skeleton dashboard-card-skeleton-title" />
-                <div className="skeleton dashboard-card-skeleton-badge" />
-                <div className="skeleton dashboard-card-skeleton-line" />
-                <div className="skeleton dashboard-card-skeleton-line short" />
-                <div className="dashboard-card-actions">
-                  <div className="skeleton dashboard-card-skeleton-button" />
-                  <div className="skeleton dashboard-card-skeleton-button" />
-                </div>
-              </div>
+          <div className="dl-grid">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonCard key={i} />
             ))}
           </div>
         ) : dashboards.length === 0 ? (
-          <div className="dashboard-list-empty">
-            <svg viewBox="0 0 120 120" className="dashboard-list-empty-icon" aria-hidden="true">
+          <div className="dl-empty">
+            <svg viewBox="0 0 120 120" className="dl-empty__icon" aria-hidden="true">
               <rect x="20" y="26" width="80" height="68" rx="16" />
               <rect x="34" y="42" width="20" height="36" rx="6" />
               <rect x="60" y="52" width="26" height="10" rx="5" />
               <rect x="60" y="68" width="18" height="10" rx="5" />
             </svg>
-            <h1>No dashboards yet</h1>
-            <p>Create your first dashboard to get started</p>
-            <button className="btn-topbar primary dashboard-list-empty-button" onClick={() => void handleCreateDashboard()} disabled={creating}>
-              {creating ? 'Creating...' : 'Create Dashboard'}
+            <h2 className="dl-empty__title">No dashboards yet</h2>
+            <p className="dl-empty__desc">
+              Create your first dashboard to get started
+            </p>
+            <button
+              className="dl-header__cta"
+              onClick={() => void handleCreateDashboard()}
+              disabled={creating}
+            >
+              {creating ? 'Creating…' : 'Create Dashboard'}
             </button>
           </div>
         ) : (
-          <div className="dashboard-list-grid">
-            {dashboards.map((dashboard) => {
-              const assignedCustomer = customerByDashboardId[dashboard.id];
-              const isConfirming = confirmDeleteId === dashboard.id;
-              const isRemoving = removingIds.includes(dashboard.id);
-              return (
-                <article key={dashboard.id} className={`dashboard-card${isRemoving ? ' dashboard-card-removing' : ''}`}>
-                  <div className="dashboard-card-header">
-                    <h2>{dashboard.name}</h2>
-                    <span className={`dashboard-card-status ${dashboard.status}`}>{dashboard.status}</span>
-                  </div>
-                  <div className="dashboard-card-meta">Created {formatDate(dashboard.created_at)}</div>
-                  <div className="dashboard-card-meta">{formatRelativeTime(dashboard.updated_at)}</div>
-                  <div className="dashboard-card-customer">{assignedCustomer?.name || 'Unassigned'}</div>
-                  <div className="dashboard-card-actions">
-                    <button className="btn-topbar" onClick={() => navigate(`/builder/${dashboard.id}`)}>
-                      Edit
-                    </button>
-                    <div className="dashboard-card-delete">
-                      {isConfirming ? (
-                        <div className="dashboard-card-delete-confirm">
-                          <span>Sure?</span>
-                          <button className="btn-topbar" onClick={() => void handleDeleteDashboard(dashboard.id)} disabled={deletingId === dashboard.id}>
-                            {deletingId === dashboard.id ? 'Deleting...' : 'Yes'}
-                          </button>
-                          <button className="btn-topbar" onClick={() => setConfirmDeleteId(null)}>
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button className="btn-topbar danger-text" onClick={() => setConfirmDeleteId(dashboard.id)}>
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+          <div className="dl-grid">
+            {dashboards.map((dashboard, index) => (
+              <DashboardCard
+                key={dashboard.id}
+                dashboard={dashboard}
+                customer={customerByDashboardId[dashboard.id]}
+                index={index}
+                mounted={mounted}
+                onDelete={handleDeleteDashboard}
+                onEdit={(id) => navigate(`/builder/${id}`)}
+              />
+            ))}
           </div>
         )}
       </main>
 
-      {toastMessage ? <div className="dashboard-list-toast">{toastMessage}</div> : null}
+      {/* ─── Toast Stack ─────────────────────────────────────────────── */}
+      {toasts.length > 0 && (
+        <div className="dl-toast-stack">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`dl-toast dl-toast--${toast.type} ${toast.exiting ? 'dl-toast--exit' : ''}`}
+            >
+              {toast.message}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
