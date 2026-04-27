@@ -19,7 +19,7 @@ export default function BuilderPage() {
   const dashboardName = useEditorStore((s) => s.dashboardName);
   const setDashboardName = useEditorStore((s) => s.setDashboardName);
   const saveToLocalStorage = useEditorStore((s) => s.saveToLocalStorage);
-  const resetToDefault = useEditorStore((s) => s.resetToDefault);
+  const resetToTemplate = useEditorStore((s) => s.resetToTemplate);
   const selectedComponentId = useEditorStore((s) => s.selectedComponentId);
   const activeTemplateId = useEditorStore((s) => s.activeTemplateId);
   const originalTemplateId = useEditorStore((s) => s.originalTemplateId);
@@ -35,10 +35,12 @@ export default function BuilderPage() {
   const dirtyStyleMap = useEditorStore((s) => s.dirtyStyleMap);
   const dirtyDataMap = useEditorStore((s) => s.dirtyDataMap);
   
+  const isDirty = useEditorStore((s) => s.isDirty);
+  
   // Feature C: pretext kinetic width for name input
   const nameWidth = useKineticWidth(dashboardName);
 
-  const hasUnsavedChanges = Object.keys(dirtyStyleMap).length > 0 || Object.keys(dirtyDataMap).length > 0;
+  const hasUnsavedChanges = isDirty || Object.keys(dirtyStyleMap).length > 0 || Object.keys(dirtyDataMap).length > 0;
 
   useEffect(() => {
     loadFromLocalStorage();
@@ -121,14 +123,16 @@ export default function BuilderPage() {
 
   const handleReset = () => {
     if (!originalTemplateId) return;
-    resetToDefault();
+    
     if (originalTemplateId.startsWith('blank')) {
-      const blank = getBlankTemplate();
-      loadTemplate(blank.id, blank.name, blank.components);
+      resetToTemplate(originalTemplateId, 'Untitled Dashboard', []);
     } else {
       const template = getTemplateById(originalTemplateId);
       if (template) {
-        loadTemplate(template.id, template.name, template.components);
+        resetToTemplate(template.id, template.name, template.components);
+      } else {
+        // Fallback for custom dashboards: Reset to empty if template not found
+        resetToTemplate(originalTemplateId, 'Dashboard', []);
       }
     }
     setShowResetConfirm(false);
@@ -176,10 +180,11 @@ export default function BuilderPage() {
         )}
 
         <div className="topbar-actions">
-          {isSaved && !showResetConfirm && !isPreviewMode && (
+          {(isSaved || hasUnsavedChanges) && !showResetConfirm && !isPreviewMode && (
             <button
               className="btn-topbar danger-text"
               onClick={() => setShowResetConfirm(true)}
+              title="Reset dashboard to original template state"
             >
               Reset
             </button>

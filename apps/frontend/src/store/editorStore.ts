@@ -498,6 +498,7 @@ interface EditorState {
   lastSelectedComponentId: string | null;
   isPreviewMode: boolean;
   rightPanelTab: 'style' | 'data';
+  isDirty: boolean;
   loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[]) => void;
   loadSavedTemplate: (saved: SavedTemplate) => void;
   selectComponent: (id: string | null) => void;
@@ -521,6 +522,7 @@ interface EditorState {
   removeComponent: (id: string) => void;
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => void;
+  resetToTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[]) => void;
   resetToDefault: () => void;
   getResolvedComponent: (id: string) => ComponentConfig | undefined;
   deleteSavedTemplate: (templateId: string) => void;
@@ -551,6 +553,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   lastSelectedComponentId: null,
   isPreviewMode: false,
   rightPanelTab: 'style',
+  isDirty: false,
 
   setDraggingType: (type) => set({ draggingType: type }),
 
@@ -601,6 +604,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dirtyDataMap: {},
       queryResults: {},
       componentState: {},
+      isDirty: false,
     });
   },
 
@@ -620,6 +624,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dirtyDataMap: {},
       queryResults: {},
       componentState: {},
+      isDirty: false,
     });
   },
 
@@ -632,7 +637,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ selectedComponentId: null });
   },
 
-  setDashboardName: (name) => set({ dashboardName: name }),
+  setDashboardName: (name) => set({ dashboardName: name, isDirty: true }),
 
   updateStyle: (componentId, styleUpdates) => {
     set((state) => {
@@ -654,6 +659,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             ...styleUpdates,
           },
         },
+        isDirty: true,
       };
     });
   },
@@ -691,6 +697,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             ...dataUpdates,
           },
         },
+        isDirty: true,
       };
     });
   },
@@ -714,6 +721,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           },
         };
       }),
+      isDirty: true,
     }));
   },
 
@@ -780,6 +788,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedComponentId: id,
         lastSelectedComponentId: id,
         rightPanelOpen: true,
+        isDirty: true,
       };
     });
   },
@@ -801,8 +810,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         components: state.components.filter((component) => !idsToRemove.has(component.id)),
-        selectedComponentId:
-          state.selectedComponentId && idsToRemove.has(state.selectedComponentId) ? null : state.selectedComponentId,
+        selectedComponentId: idsToRemove.has(state.selectedComponentId || '') ? null : state.selectedComponentId,
+        isDirty: true,
       };
     });
   },
@@ -818,7 +827,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     };
 
     const existing = { ...state.savedTemplates, [state.activeTemplateId!]: saved };
-    set({ savedTemplates: existing });
+    set({ savedTemplates: existing, isDirty: false });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
   },
 
@@ -845,11 +854,47 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  resetToDefault: () => {
+  resetToTemplate: (templateId, name, components, queries = []) => {
     const state = get();
     const existing = { ...state.savedTemplates };
-    delete existing[state.activeTemplateId!];
-    set({ savedTemplates: existing });
+    if (state.activeTemplateId) {
+      delete existing[state.activeTemplateId];
+    }
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+    
+    const normalizedComponents = normalizeComponents(clone(components));
+    set({
+      savedTemplates: existing,
+      activeTemplateId: templateId,
+      originalTemplateId: templateId,
+      dashboardName: name,
+      components: normalizedComponents,
+      queriesConfig: clone(queries),
+      selectedComponentId: null,
+      lastSelectedComponentId: normalizedComponents[0]?.id ?? null,
+      rightPanelOpen: true,
+      activeTabs: {},
+      dirtyStyleMap: {},
+      dirtyDataMap: {},
+      queryResults: {},
+      componentState: {},
+      isDirty: false,
+    });
+  },
+
+  resetToDefault: () => {
+    const state = get();
+    if (!state.activeTemplateId) return;
+    const existing = { ...state.savedTemplates };
+    delete existing[state.activeTemplateId];
+    set({ 
+      savedTemplates: existing,
+      isDirty: false,
+      dirtyStyleMap: {},
+      dirtyDataMap: {},
+      componentState: {}
+    });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
   },
 
