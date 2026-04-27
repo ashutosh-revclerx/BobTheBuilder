@@ -69,6 +69,17 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
     return () => observer.disconnect();
   }, []);
 
+  // Safety: Clear dragging state on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && draggingType) {
+        setDraggingType(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [draggingType, setDraggingType]);
+
   const filteredComponents = useMemo(() => {
     return components.filter(c => {
       if (parentId === 'root') return !c.parentId;

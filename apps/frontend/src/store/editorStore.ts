@@ -881,6 +881,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       queryResults: {},
       componentState: {},
       isDirty: false,
+      draggingType: null,
     });
   },
 
@@ -894,7 +895,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       isDirty: false,
       dirtyStyleMap: {},
       dirtyDataMap: {},
-      componentState: {}
+      componentState: {},
+      draggingType: null,
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
   },
