@@ -78,8 +78,15 @@ export async function agentExecutor(input: AgentExecutorInput): Promise<Executor
   }
 
   // ── 2. Poll for completion ──────────────────────────────────────────────────
+  // Prefer poll_url from the kickoff response if provided (e.g. Nexus returns
+  // "/public/result/<id>"). Fallback to the convention `{base}/jobs/{jobId}`.
   const startedAt = Date.now();
-  const pollUrl   = `${base}/jobs/${encodeURIComponent(jobId)}`;
+  const pollUrlFromResponse: string | undefined = kickoffJson?.poll_url ?? kickoffJson?.pollUrl;
+  const pollUrl = pollUrlFromResponse
+    ? (pollUrlFromResponse.startsWith('http')
+        ? pollUrlFromResponse
+        : `${base}${pollUrlFromResponse.startsWith('/') ? '' : '/'}${pollUrlFromResponse}`)
+    : `${base}/jobs/${encodeURIComponent(jobId)}`;
 
   for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt++) {
     if (Date.now() - startedAt >= MAX_TOTAL_MS) {
@@ -109,15 +116,17 @@ export async function agentExecutor(input: AgentExecutorInput): Promise<Executor
       return { success: false, error: 'Agent poll returned non-JSON response' };
     }
 
-    const status = pollJson?.status;
+    const status = String(pollJson?.status ?? '').toLowerCase();
 
-    if (status === 'complete') {
-      return { success: true, data: pollJson.result };
+    if (status === 'complete' || status === 'completed' || status === 'success' || status === 'done') {
+      // Some APIs (Nexus) return the result inline; others nest it under .result.
+      // Default to the whole payload so nothing is dropped.
+      return { success: true, data: pollJson.result ?? pollJson };
     }
-    if (status === 'error') {
-      return { success: false, error: pollJson.error ?? 'Agent reported an error' };
+    if (status === 'error' || status === 'failed') {
+      return { success: false, error: pollJson.error ?? pollJson.message ?? 'Agent reported an error' };
     }
-    // Any other status (running, queued, etc.) → keep polling
+    // queued, running, processing, in_progress, etc. → keep polling
   }
 
   return { success: false, error: 'Agent timed out after 30 poll attempts' };

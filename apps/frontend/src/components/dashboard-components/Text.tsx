@@ -3,7 +3,17 @@ import { evaluateExpression } from '../../engine/runtimeUtils';
 
 export default function Text({ config }: { config: ComponentConfig }) {
   const { style, data } = config;
-  const resolvedValue = data.expression ? evaluateExpression(String(data.mockValue ?? ''), '') : data.mockValue;
+  // Prefer a resolved binding (e.g. {{queries.X.data.content}}). The binding
+  // resolver replaces the string with the live value and flips the
+  // _resolvedBindings.dbBinding flag. Fall back to mockValue otherwise so
+  // unbound text components still work for static labels.
+  const isBound = data._resolvedBindings?.dbBinding;
+  const sourceValue = isBound && data.dbBinding != null && data.dbBinding !== ''
+    ? data.dbBinding
+    : data.mockValue;
+  const resolvedValue = data.expression
+    ? evaluateExpression(String(sourceValue ?? ''), '')
+    : sourceValue;
   const content = String(resolvedValue ?? '');
 
   return (
