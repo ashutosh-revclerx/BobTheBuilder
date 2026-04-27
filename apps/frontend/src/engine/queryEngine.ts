@@ -37,6 +37,29 @@ function resolveParams(params: Record<string, unknown> | undefined): Record<stri
   );
 }
 
+// Walk a JSON-like structure and replace any "{{path}}" string with the
+// resolved store value. Lets a query.body reference componentState/queries
+// the same way endpoints do.
+function resolveJsonTemplate(value: unknown): unknown {
+  if (typeof value === 'string') {
+    if (!value.includes('{{')) return value;
+    // If the entire string is a single {{path}}, return the raw value
+    // (preserves arrays/objects/numbers). Otherwise interpolate as text.
+    const single = value.match(/^\{\{\s*([^}]+)\s*\}\}$/);
+    if (single) return resolve(single[1].trim());
+    return resolveQueryTemplate(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(resolveJsonTemplate);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, resolveJsonTemplate(v)]),
+    );
+  }
+  return value;
+}
+
 export async function executeQuery(query: QueryConfig, params: Record<string, unknown> = {}) {
   const store = useEditorStore.getState();
 
@@ -49,6 +72,11 @@ export async function executeQuery(query: QueryConfig, params: Record<string, un
   store.setQueryState(query.name, { status: 'loading', error: null });
 
   try {
+    const queryWithBody = query as typeof query & { body?: Record<string, unknown> };
+    const resolvedBody = queryWithBody.body
+      ? (resolveJsonTemplate(queryWithBody.body) as Record<string, unknown>)
+      : undefined;
+
     const response = await fetch(BACKEND_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -60,6 +88,7 @@ export async function executeQuery(query: QueryConfig, params: Record<string, un
           ...resolveParams(query.params),
           ...params,
         },
+        ...(resolvedBody ? { body: resolvedBody } : {}),
       }),
     });
 

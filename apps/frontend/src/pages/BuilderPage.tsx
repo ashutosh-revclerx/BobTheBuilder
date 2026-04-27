@@ -115,8 +115,33 @@ export default function BuilderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     saveToLocalStorage();
+
+    // Also persist back to the dashboards table so the customer view picks up
+    // edits. localStorage alone keeps changes invisible to /c/:slug.
+    if (id) {
+      const state = useEditorStore.getState();
+      try {
+        const response = await fetch(`${API_BASE}/api/dashboards/${id}`, {
+          method:  'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            name:   state.dashboardName,
+            config: {
+              components: state.components,
+              queries:    state.queriesConfig,
+            },
+          }),
+        });
+        if (!response.ok) {
+          console.error('[builder] save failed:', await response.text());
+        }
+      } catch (err) {
+        console.error('[builder] save network error:', err);
+      }
+    }
+
     setSaveFlash(true);
     setTimeout(() => setSaveFlash(false), 1200);
   };

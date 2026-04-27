@@ -533,6 +533,7 @@ interface EditorState {
   setIsPreviewMode: (val: boolean) => void;
   togglePreviewMode: () => void;
   setRightPanelTab: (tab: 'style' | 'data') => void;
+  upsertQuery: (query: Record<string, unknown> & { name: string }) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -912,6 +913,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setIsPreviewMode: (val) => set({ isPreviewMode: val }),
 
   setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
+
+  upsertQuery: (query) =>
+    set((state) => {
+      const existingIndex = state.queriesConfig.findIndex((q: any) => q?.name === query.name);
+      const next = [...state.queriesConfig];
+      if (existingIndex >= 0) {
+        next[existingIndex] = { ...next[existingIndex], ...query };
+      } else {
+        next.push(query);
+      }
+      return { queriesConfig: next, isDirty: true };
+    }),
 
   togglePreviewMode: () =>
     set((state) => {

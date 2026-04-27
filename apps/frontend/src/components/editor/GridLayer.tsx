@@ -46,6 +46,11 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
   const addComponent = useEditorStore((s) => s.addComponent);
   const draggingType = useEditorStore((s) => s.draggingType);
   const setDraggingType = useEditorStore((s) => s.setDraggingType);
+  // Subscribe to these so GridLayer re-renders when a query lands or
+  // componentState changes — otherwise resolveBindings runs once on the
+  // initial render and the table never sees fresh data.
+  useEditorStore((s) => s.queryResults);
+  useEditorStore((s) => s.componentState);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   const wrapperRef = useRef<HTMLDivElement>(null);

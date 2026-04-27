@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/client.js';
+import { parseSwaggerDoc } from '../utils/swaggerParser.js';
 
 const router = Router();
 
@@ -8,6 +9,14 @@ const router = Router();
 
 const TYPES      = ['REST', 'postgresql', 'agent'] as const;
 const AUTH_TYPES = ['none', 'bearer', 'api_key', 'basic'] as const;
+
+const ImportSwaggerSchema = z.object({
+  swaggerUrl:   z.string().url('swaggerUrl must be a valid URL'),
+  resourceName: z.string().min(1, 'resourceName is required'),
+  baseUrl:      z.string().url('baseUrl must be a valid URL'),
+  authType:     z.enum(AUTH_TYPES).default('none'),
+  secretRef:    z.string().optional(),
+});
 
 const CreateSchema = z
   .object({
@@ -104,6 +113,130 @@ router.get('/', async (_req, res) => {
     return res.json(rows);
   } catch (err) {
     console.error('[resources] list:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── POST /api/resources/import-swagger ───────────────────────────────────────
+// Static path declared before /:id so it doesn't collide with the UUID handler.
+
+router.post('/import-swagger', async (req, res) => {
+  const parsed = ImportSwaggerSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: parsed.error.flatten(),
+    });
+  }
+
+  const { swaggerUrl, resourceName, baseUrl, authType, secretRef } = parsed.data;
+
+  // 1. Fetch the swagger document
+  let docResponse: Response;
+  try {
+    docResponse = await fetch(swaggerUrl);
+  } catch {
+    return res.status(400).json({ error: 'Could not fetch Swagger docs' });
+  }
+  if (!docResponse.ok) {
+    return res.status(400).json({ error: 'Could not fetch Swagger docs' });
+  }
+
+  let doc: unknown;
+  try {
+    doc = await docResponse.json();
+  } catch {
+    return res.status(400).json({ error: 'Invalid Swagger/OpenAPI format' });
+  }
+
+  // 2. Parse — supports both Swagger 2.0 and OpenAPI 3.0
+  const endpoints = parseSwaggerDoc(doc);
+  if (endpoints.length === 0) {
+    return res.status(400).json({ error: 'No endpoints found in docs' });
+  }
+
+  // 3. Upsert the resource + replace its endpoints atomically
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Upsert by name — keeping the same id if it already exists
+    const { rows: resourceRows } = await client.query<{ id: string; name: string }>(
+      `INSERT INTO resources (name, type, base_url, auth_type, secret_ref)
+       VALUES ($1, 'REST', $2, $3, $4)
+       ON CONFLICT (name) DO UPDATE
+         SET base_url   = EXCLUDED.base_url,
+             auth_type  = EXCLUDED.auth_type,
+             secret_ref = EXCLUDED.secret_ref
+       RETURNING id, name`,
+      [resourceName, baseUrl, authType, secretRef ?? null],
+    );
+    const resource = resourceRows[0];
+
+    // Replace existing endpoints
+    await client.query('DELETE FROM resource_endpoints WHERE resource_id = $1', [resource.id]);
+
+    // Bulk insert. Build $1,$2,... in groups of 6 to keep param counts predictable.
+    const placeholders: string[] = [];
+    const values: unknown[] = [];
+    endpoints.forEach((ep, i) => {
+      const base = i * 6;
+      placeholders.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}::jsonb, $${base + 6}::jsonb)`);
+      values.push(
+        resource.id,
+        ep.method,
+        ep.path,
+        ep.summary,
+        JSON.stringify(ep.parameters),
+        JSON.stringify(ep.requestBody),
+      );
+    });
+    await client.query(
+      `INSERT INTO resource_endpoints (resource_id, method, path, summary, parameters, request_body)
+       VALUES ${placeholders.join(', ')}`,
+      values,
+    );
+
+    await client.query('COMMIT');
+
+    return res.status(200).json({
+      success: true,
+      resource: { id: resource.id, name: resource.name },
+      endpointsImported: endpoints.length,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    console.error('[resources] import-swagger:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// ─── GET /api/resources/:id/endpoints ────────────────────────────────────────
+// Also declared before /:id so the more specific route wins.
+
+router.get('/:id/endpoints', async (req, res) => {
+  try {
+    const { rows } = await pool.query<{
+      id:         string;
+      method:     string;
+      path:       string;
+      summary:    string | null;
+      parameters: unknown;
+    }>(
+      `SELECT id, method, path, summary, parameters
+       FROM resource_endpoints
+       WHERE resource_id = $1
+       ORDER BY path ASC, method ASC`,
+      [req.params.id],
+    );
+    return res.json(rows);
+  } catch (err) {
+    if (pgCode(err) === PG_INVALID_UUID) {
+      return res.status(400).json({ error: 'Invalid resource ID' });
+    }
+    console.error('[resources] endpoints:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

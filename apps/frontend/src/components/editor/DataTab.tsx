@@ -1,11 +1,128 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
+import EndpointPicker from '../ui/EndpointPicker';
 import type {
   ComponentData,
   SelectOptionItem,
   TableColumn,
   TableConditionalRowColorRule,
 } from '../../types/template';
+
+const API_BASE = 'http://localhost:3001';
+
+interface ResourceListItem {
+  id:   string;
+  name: string;
+  type: string;
+}
+
+interface QueryBinding {
+  resourceId?:   string;
+  resourceName?: string;
+  method?:       string;
+  path?:         string;
+  parameters?:   unknown[];
+  trigger?:      'onLoad' | 'manual' | 'onDependencyChange';
+  queryName?:    string;
+}
+
+function QueryBindingSection({
+  componentId,
+  binding,
+  onChange,
+}: {
+  componentId: string;
+  binding: QueryBinding;
+  onChange: (next: QueryBinding) => void;
+}) {
+  const [resources, setResources] = useState<ResourceListItem[]>([]);
+  const upsertQuery = useEditorStore((s) => s.upsertQuery);
+  const updateData  = useEditorStore((s) => s.updateData);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE}/api/resources`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: ResourceListItem[]) => {
+        if (!cancelled) setResources(Array.isArray(data) ? data : []);
+      })
+      .catch(() => { if (!cancelled) setResources([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Stable per-component query name. We use the component id so reopening the
+  // editor wires the same component back to the same query record.
+  const queryName = binding.queryName ?? `${componentId}_query`;
+
+  const syncQuery = (next: QueryBinding) => {
+    onChange(next);
+
+    // We need a resource AND a path to make a runnable query.
+    if (!next.resourceName || !next.path) return;
+
+    const trigger = next.trigger ?? (next.method === 'GET' ? 'onLoad' : 'manual');
+    upsertQuery({
+      name:     queryName,
+      resource: next.resourceName,
+      endpoint: next.path,
+      method:   next.method ?? 'GET',
+      trigger,
+    });
+
+    // Auto-bind the component so it reads from the query result. For Buttons
+    // we use the trigger path so onClick fires the query.
+    const bindingPath = trigger === 'manual'
+      ? `queries.${queryName}.trigger`
+      : `queries.${queryName}.data`;
+    updateData(componentId, { dbBinding: bindingPath } as Partial<ComponentData>);
+  };
+
+  return (
+    <div className="form-group query-binding-section">
+      <span className="form-label">Query bindings</span>
+
+      <select
+        className="form-select"
+        value={binding.resourceId ?? ''}
+        onChange={(e) => {
+          const id = e.target.value || undefined;
+          const resource = resources.find((r) => r.id === id);
+          syncQuery({ ...binding, resourceId: id, resourceName: resource?.name });
+        }}
+      >
+        <option value="">Pick a resource…</option>
+        {resources.map((r) => (
+          <option key={r.id} value={r.id}>{r.name} ({r.type})</option>
+        ))}
+      </select>
+
+      <EndpointPicker
+        resourceId={binding.resourceId ?? null}
+        selectedMethod={binding.method ?? 'GET'}
+        selectedPath={binding.path ?? ''}
+        onChange={(next) => syncQuery({ ...binding, ...next, queryName })}
+      />
+
+      {binding.path && (
+        <select
+          className="form-select"
+          value={binding.trigger ?? (binding.method === 'GET' ? 'onLoad' : 'manual')}
+          onChange={(e) => syncQuery({ ...binding, trigger: e.target.value as QueryBinding['trigger'] })}
+        >
+          <option value="onLoad">Trigger: on page load</option>
+          <option value="manual">Trigger: manual (e.g. button click)</option>
+          <option value="onDependencyChange">Trigger: on dependency change</option>
+        </select>
+      )}
+
+      {binding.path && (
+        <p className="endpoint-picker-hint">
+          Wired to query <code>{queryName}</code>
+        </p>
+      )}
+    </div>
+  );
+}
 
 const ROLE_OPTIONS = ['admin', 'editor', 'viewer'] as const;
 const CONDITION_OPERATORS: TableConditionalRowColorRule['operator'][] = ['=', '!=', '>', '<', 'contains'];
@@ -241,6 +358,12 @@ export default function DataTab() {
         value={String(data.dbBinding ?? '')}
         onChange={(value) => handleDataField('dbBinding', value)}
         placeholder="e.g. {{queries.getData.data}}"
+      />
+
+      <QueryBindingSection
+        componentId={selectedComponent.id}
+        binding={(data.queryBindingConfig as QueryBinding) ?? {}}
+        onChange={(next) => handleDataField('queryBindingConfig' as keyof ComponentData, next)}
       />
 
       <SelectField
