@@ -5,6 +5,8 @@ import { getTemplateById, getBlankTemplate } from '../templates';
 import Canvas from '../components/editor/Canvas';
 import RightPanel from '../components/editor/RightPanel';
 import LeftPanel from '../components/editor/LeftPanel';
+import PublishToggle from '../components/editor/PublishToggle';
+import AssignmentModal from '../components/editor/AssignmentModal';
 import { useKineticWidth } from '../hooks/useTextMeasure';
 
 const API_BASE = 'http://localhost:3001';
@@ -40,7 +42,28 @@ export default function BuilderPage() {
   // Feature C: pretext kinetic width for name input
   const nameWidth = useKineticWidth(dashboardName);
 
+  // Assignment state
+  const [assignedCustomers, setAssignedCustomers] = useState<any[]>([]);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+
   const hasUnsavedChanges = isDirty || Object.keys(dirtyStyleMap).length > 0 || Object.keys(dirtyDataMap).length > 0;
+
+  const fetchAssignedCustomers = async () => {
+    if (!id || id === 'blank' || id.length < 10) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/dashboards/${id}/customers`);
+      if (res.ok) {
+        const data = await res.json();
+        setAssignedCustomers(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch assigned customers:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchAssignedCustomers();
+  }, [id]);
 
   useEffect(() => {
     loadFromLocalStorage();
@@ -99,6 +122,8 @@ export default function BuilderPage() {
           dashboard.name,
           dashboard.config?.components ?? [],
           dashboard.config?.queries ?? [],
+          dashboard.status,
+          dashboard.published_at,
         );
       } catch {
         if (!cancelled) {
@@ -195,6 +220,23 @@ export default function BuilderPage() {
             placeholder="Dashboard name"
             style={{ width: `${nameWidth}px` }}
           />
+
+          {!isPreviewMode && id && id.length > 10 && (
+            <div className="assignment-tags">
+              {assignedCustomers.slice(0, 3).map(c => (
+                <span key={c.id} className="customer-tag">{c.name}</span>
+              ))}
+              {assignedCustomers.length > 3 && (
+                <span className="customer-tag">+{assignedCustomers.length - 3} more</span>
+              )}
+              <button 
+                className="btn-add-assignment" 
+                onClick={() => setIsAssignmentModalOpen(true)}
+              >
+                + Add
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Unsaved Changes Note */}
@@ -202,6 +244,11 @@ export default function BuilderPage() {
           <div className="unsaved-changes-note">
             Previewing unsaved changes
           </div>
+        )}
+
+        {/* Publish Toggle */}
+        {!isPreviewMode && id && id.length > 10 && (
+          <PublishToggle />
         )}
 
         <div className="topbar-actions">
@@ -281,6 +328,13 @@ export default function BuilderPage() {
         {/* Right Panel */}
         {!isPreviewMode && selectedComponentId && <RightPanel />}
       </div>
+
+      {isAssignmentModalOpen && (
+        <AssignmentModal 
+          onClose={() => setIsAssignmentModalOpen(false)} 
+          onUpdate={fetchAssignedCustomers}
+        />
+      )}
     </div>
   );
 }

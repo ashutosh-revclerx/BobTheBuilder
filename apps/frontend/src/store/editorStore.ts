@@ -499,7 +499,9 @@ interface EditorState {
   isPreviewMode: boolean;
   rightPanelTab: 'style' | 'data';
   isDirty: boolean;
-  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[]) => void;
+  status: 'draft' | 'live';
+  publishedAt: string | null;
+  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null) => void;
   loadSavedTemplate: (saved: SavedTemplate) => void;
   selectComponent: (id: string | null) => void;
   clearCanvasSelection: () => void;
@@ -534,6 +536,7 @@ interface EditorState {
   togglePreviewMode: () => void;
   setRightPanelTab: (tab: 'style' | 'data') => void;
   upsertQuery: (query: Record<string, unknown> & { name: string }) => void;
+  setStatus: (status: 'draft' | 'live', publishedAt: string | null) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -555,6 +558,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   isPreviewMode: false,
   rightPanelTab: 'style',
   isDirty: false,
+  status: 'draft',
+  publishedAt: null,
 
   setDraggingType: (type) => set({ draggingType: type }),
 
@@ -589,7 +594,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
     })),
 
-  loadTemplate: (templateId, name, components, queries = []) => {
+  loadTemplate: (templateId, name, components, queries = [], status = 'draft', publishedAt = null) => {
     const normalizedComponents = normalizeComponents(clone(components));
     set({
       activeTemplateId: templateId,
@@ -597,6 +602,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dashboardName: name,
       components: normalizedComponents,
       queriesConfig: clone(queries),
+      status,
+      publishedAt,
       selectedComponentId: null,
       lastSelectedComponentId: normalizedComponents[0]?.id ?? null,
       rightPanelOpen: true,
@@ -617,6 +624,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dashboardName: saved.dashboardName,
       components: normalizedComponents,
       queriesConfig: clone((saved as any).queries || []),
+      status: (saved as any).status || 'draft',
+      publishedAt: (saved as any).publishedAt || null,
       selectedComponentId: null,
       lastSelectedComponentId: normalizedComponents[0]?.id ?? null,
       rightPanelOpen: true,
@@ -918,15 +927,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   upsertQuery: (query) =>
     set((state) => {
-      const existingIndex = state.queriesConfig.findIndex((q: any) => q?.name === query.name);
-      const next = [...state.queriesConfig];
-      if (existingIndex >= 0) {
-        next[existingIndex] = { ...next[existingIndex], ...query };
-      } else {
-        next.push(query);
+      const existingIdx = state.queriesConfig.findIndex((q) => q.name === query.name);
+      if (existingIdx >= 0) {
+        const next = [...state.queriesConfig];
+        next[existingIdx] = { ...next[existingIdx], ...query };
+        return { queriesConfig: next, isDirty: true };
       }
-      return { queriesConfig: next, isDirty: true };
+      return { queriesConfig: [...state.queriesConfig, query], isDirty: true };
     }),
+
+  setStatus: (status, publishedAt) => set({ status, publishedAt }),
 
   togglePreviewMode: () =>
     set((state) => {

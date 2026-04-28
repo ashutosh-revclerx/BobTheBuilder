@@ -117,18 +117,29 @@ router.get('/:slug/dashboard', async (req, res) => {
       dashboard_name:  string | null;
       dashboard_slug:  string | null;
       dashboard_cfg:   unknown;
+      dashboard_status:string | null;
     }>(
       `SELECT
          c.id          AS customer_id,
          c.name        AS customer_name,
          c.slug        AS customer_slug,
          c.brand_config,
-         c.dashboard_id,
+         d.id          AS dashboard_id,
          d.name        AS dashboard_name,
          d.slug        AS dashboard_slug,
-         d.config      AS dashboard_cfg
+         d.config      AS dashboard_cfg,
+         d.status      AS dashboard_status
        FROM customers c
-       LEFT JOIN dashboards d ON d.id = c.dashboard_id
+       LEFT JOIN LATERAL (
+         SELECT d.id, d.name, d.slug, d.config, d.status
+         FROM dashboards d
+         WHERE (d.id = c.dashboard_id OR d.id IN (
+           SELECT dashboard_id FROM dashboard_assignments WHERE customer_id = c.id
+         ))
+         AND d.status = 'live'
+         ORDER BY (d.id = c.dashboard_id) DESC, d.published_at DESC
+         LIMIT 1
+       ) d ON TRUE
        WHERE c.slug = $1`,
       [req.params.slug],
     );
@@ -138,9 +149,10 @@ router.get('/:slug/dashboard', async (req, res) => {
     }
 
     const row = rows[0];
+    const isLive = row.dashboard_status === 'live';
 
-    if (!row.dashboard_id) {
-      return res.status(404).json({ error: 'No dashboard assigned to this customer' });
+    if (!row.dashboard_id || !isLive) {
+      return res.status(404).json({ error: 'No live dashboard assigned to this customer' });
     }
 
     return res.json({
@@ -258,6 +270,28 @@ router.delete('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid customer ID' });
     }
     console.error('[customers] delete:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── GET /api/customers/:id/dashboards ───────────────────────────────────────
+
+router.get('/:id/dashboards', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT d.id, d.name, d.slug, d.status, d.published_at
+       FROM dashboards d
+       JOIN dashboard_assignments da ON da.dashboard_id = d.id
+       WHERE da.customer_id = $1 AND d.status = 'live'
+       ORDER BY d.published_at DESC`,
+      [req.params.id]
+    );
+    return res.json(rows);
+  } catch (err) {
+    if (pgCode(err) === PG_INVALID_UUID) {
+      return res.status(400).json({ error: 'Invalid customer ID' });
+    }
+    console.error('[customers] list dashboards:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

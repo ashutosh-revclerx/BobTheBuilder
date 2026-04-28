@@ -81,10 +81,20 @@ router.post('/', async (req, res) => {
 
 router.get('/', async (_req, res) => {
   try {
-    const { rows } = await pool.query<DashboardSummaryRow>(
-      `SELECT id, name, slug, status, created_at, updated_at
-       FROM dashboards
-       ORDER BY updated_at DESC, created_at DESC`,
+    const { rows } = await pool.query<any>(
+      `SELECT 
+         d.id, d.name, d.slug, d.status, d.created_at, d.updated_at,
+         COALESCE(
+           json_agg(
+             json_build_object('id', c.id, 'name', c.name, 'slug', c.slug)
+           ) FILTER (WHERE c.id IS NOT NULL),
+           '[]'
+         ) AS assigned_customers
+       FROM dashboards d
+       LEFT JOIN dashboard_assignments da ON da.dashboard_id = d.id
+       LEFT JOIN customers c ON c.id = da.customer_id
+       GROUP BY d.id
+       ORDER BY d.updated_at DESC, d.created_at DESC`,
     );
     return res.json(rows);
   } catch (err) {
@@ -187,6 +197,132 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// ─── PATCH /api/dashboards/:id/publish ────────────────────────────────────────
+
+router.patch('/:id/publish', async (req, res) => {
+  const schema = z.object({
+    status: z.enum(['draft', 'live']),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  const { status } = parsed.data;
+  const publishedAt = status === 'live' ? 'NOW()' : 'NULL';
+
+  try {
+    const { rows } = await pool.query<DashboardRow>(
+      `UPDATE dashboards
+       SET status = $1, published_at = ${publishedAt}, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, name, slug, config, status, published_at, created_at, updated_at`,
+      [status, req.params.id],
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Dashboard not found' });
+    }
+
+    return res.json(rows[0]);
+  } catch (err) {
+    if (pgCode(err) === PG_INVALID_UUID) {
+      return res.status(400).json({ error: 'Invalid dashboard ID' });
+    }
+    console.error('[dashboards] publish:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── POST /api/dashboards/:id/assign ──────────────────────────────────────────
+
+router.post('/:id/assign', async (req, res) => {
+  const schema = z.object({
+    customer_ids: z.array(z.string().uuid()),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: parsed.error.flatten(),
+    });
+  }
+
+  const { customer_ids } = parsed.data;
+  const dashboardId = req.params.id;
+
+  try {
+    // 1. Validate dashboard exists
+    const { rows: dashRows } = await pool.query('SELECT id FROM dashboards WHERE id = $1', [dashboardId]);
+    if (dashRows.length === 0) {
+      return res.status(404).json({ error: 'Dashboard not found' });
+    }
+
+    // 2. Sync assignments (delete existing, then insert new)
+    await pool.query('BEGIN');
+    try {
+      await pool.query('DELETE FROM dashboard_assignments WHERE dashboard_id = $1', [dashboardId]);
+      
+      if (customer_ids.length > 0) {
+        // Use a single query for multiple inserts if possible, or loop for simplicity
+        for (const cid of customer_ids) {
+          await pool.query(
+            `INSERT INTO dashboard_assignments (dashboard_id, customer_id)
+             VALUES ($1, $2)`,
+            [dashboardId, cid]
+          );
+        }
+      }
+      await pool.query('COMMIT');
+    } catch (e) {
+      await pool.query('ROLLBACK');
+      throw e;
+    }
+
+    // 3. Return updated list of assigned customers
+    const { rows: assignedCustomers } = await pool.query(
+      `SELECT c.id, c.name, c.slug
+       FROM customers c
+       JOIN dashboard_assignments da ON da.customer_id = c.id
+       WHERE da.dashboard_id = $1
+       ORDER BY c.name ASC`,
+      [dashboardId]
+    );
+
+    return res.json(assignedCustomers);
+  } catch (err) {
+    if (pgCode(err) === PG_INVALID_UUID) {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+    console.error('[dashboards] assign:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── GET /api/dashboards/:id/customers ────────────────────────────────────────
+
+router.get('/:id/customers', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT c.id, c.name, c.slug
+       FROM customers c
+       JOIN dashboard_assignments da ON da.customer_id = c.id
+       WHERE da.dashboard_id = $1
+       ORDER BY c.name ASC`,
+      [req.params.id]
+    );
+    return res.json(rows);
+  } catch (err) {
+    if (pgCode(err) === PG_INVALID_UUID) {
+      return res.status(400).json({ error: 'Invalid dashboard ID' });
+    }
+    console.error('[dashboards] get assigned customers:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── DELETE /api/dashboards/:id ───────────────────────────────────────────────
 
 router.delete('/:id', async (req, res) => {
@@ -214,13 +350,14 @@ router.delete('/:id', async (req, res) => {
 // ─── Row types (for pg generic typing) ───────────────────────────────────────
 
 interface DashboardRow {
-  id:         string;
-  name:       string;
-  slug:       string;
-  config:     unknown;
-  status:     string;
-  created_at: Date;
-  updated_at: Date;
+  id:           string;
+  name:         string;
+  slug:         string;
+  config:       unknown;
+  status:       string;
+  published_at: Date | null;
+  created_at:   Date;
+  updated_at:   Date;
 }
 
 interface DashboardSummaryRow {

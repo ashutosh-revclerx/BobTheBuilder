@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AssignmentModal from '../components/editor/AssignmentModal';
+import { templates } from '../templates';
 
 const API_BASE = 'http://localhost:3001';
 
@@ -10,6 +12,7 @@ interface DashboardSummary {
   status: 'draft' | 'live';
   created_at: string;
   updated_at: string;
+  assigned_customers: { id: string; name: string; slug: string }[];
 }
 
 interface CustomerSummary {
@@ -72,23 +75,24 @@ function formatRelativeTime(value: string) {
 /* ─── Dashboard Card ───────────────────────────────────────────────────────── */
 function DashboardCard({
   dashboard,
-  customer,
   index,
   mounted,
   onDelete,
   onEdit,
+  onAssign,
 }: {
   dashboard: DashboardSummary;
-  customer: CustomerSummary | undefined;
   index: number;
   mounted: boolean;
   onDelete: (id: string) => Promise<void>;
   onEdit: (id: string) => void;
+  onAssign: (id: string) => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [removing, setRemoving] = useState(false);
 
+  const customer = dashboard.assigned_customers?.[0];
   const delay = Math.min(index * 50, 400);
 
   const handleDelete = async () => {
@@ -112,12 +116,26 @@ function DashboardCard({
         <span className={`dl-card__badge dl-card__badge--${dashboard.status}`}>
           {dashboard.status}
         </span>
+        {dashboard.status === 'live' && customer && (
+          <a 
+            href={`/c/${customer.slug}`} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="dl-card__view-link"
+            title="View Live Dashboard"
+          >
+            ↗
+          </a>
+        )}
       </div>
 
       {/* Middle — customer + time */}
       <div className="dl-card__middle">
-        {customer ? (
-          <span className="dl-card__customer">{customer.name}</span>
+        {dashboard.assigned_customers && dashboard.assigned_customers.length > 0 ? (
+          <span className="dl-card__customer" title={dashboard.assigned_customers.map(c => c.name).join(', ')}>
+            {dashboard.assigned_customers[0].name}
+            {dashboard.assigned_customers.length > 1 && ` (+${dashboard.assigned_customers.length - 1})`}
+          </span>
         ) : (
           <span className="dl-card__customer dl-card__customer--empty">
             No customer assigned
@@ -152,6 +170,13 @@ function DashboardCard({
               onClick={() => onEdit(dashboard.id)}
             >
               Edit
+            </button>
+            <span className="dl-card__divider">|</span>
+            <button
+              className="dl-card__action"
+              onClick={() => onAssign(dashboard.id)}
+            >
+              Assign
             </button>
             <span className="dl-card__divider">|</span>
             <button
@@ -194,6 +219,7 @@ export default function DashboardList() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
 
   const { toasts, push: pushToast } = useToasts();
 
@@ -253,16 +279,17 @@ export default function DashboardList() {
     };
   }, []);
 
-  const customerByDashboardId = useMemo(
-    () =>
-      customers.reduce<Record<string, CustomerSummary>>((acc, customer) => {
-        if (customer.dashboard_id) {
-          acc[customer.dashboard_id] = customer;
-        }
-        return acc;
-      }, {}),
-    [customers],
-  );
+  const refreshData = async () => {
+    try {
+      const dashboardsResponse = await fetch(`${API_BASE}/api/dashboards`);
+      if (dashboardsResponse.ok) {
+        const json = await dashboardsResponse.json();
+        if (Array.isArray(json)) setDashboards(json);
+      }
+    } catch (err) {
+      console.error('Refresh failed:', err);
+    }
+  };
 
   const liveCount = useMemo(
     () => dashboards.filter((d) => d.status === 'live').length,
@@ -304,9 +331,6 @@ export default function DashboardList() {
       setDashboards((current) =>
         current.filter((dashboard) => dashboard.id !== dashboardId),
       );
-      setCustomers((current) =>
-        current.filter((customer) => customer.dashboard_id !== dashboardId),
-      );
     }, 200);
     pushToast('Dashboard deleted', 'success');
   };
@@ -336,6 +360,35 @@ export default function DashboardList() {
 
       {/* ─── Body ────────────────────────────────────────────────────── */}
       <main className="dl-body">
+        {/* Templates section */}
+        <div className="dl-section-row">
+          <h1 className="dl-section-title">Starting Points</h1>
+          <button className="dl-link-btn" onClick={() => navigate('/templates')}>
+            View All Templates →
+          </button>
+        </div>
+        
+        <div className="dl-templates-strip">
+          <div className="dl-template-mini-card blank" onClick={() => void handleCreateDashboard()}>
+            <div className="mini-card-icon">+</div>
+            <div className="mini-card-info">
+              <span className="mini-card-name">Blank Dashboard</span>
+              <span className="mini-card-desc">Start from scratch</span>
+            </div>
+          </div>
+          {templates.slice(0, 3).map(t => (
+            <div key={t.id} className="dl-template-mini-card" onClick={() => navigate(`/builder/${t.id}`)}>
+              <div className="mini-card-icon">⊞</div>
+              <div className="mini-card-info">
+                <span className="mini-card-name">{t.name}</span>
+                <span className="mini-card-desc">{t.description || 'Pre-built template'}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="dl-divider" />
+
         {/* Section title row */}
         <div className="dl-section-row">
           <h1 className="dl-section-title">Your Dashboards</h1>
@@ -383,16 +436,24 @@ export default function DashboardList() {
               <DashboardCard
                 key={dashboard.id}
                 dashboard={dashboard}
-                customer={customerByDashboardId[dashboard.id]}
                 index={index}
                 mounted={mounted}
                 onDelete={handleDeleteDashboard}
                 onEdit={(id) => navigate(`/builder/${id}`)}
+                onAssign={(id) => setAssigningId(id)}
               />
             ))}
           </div>
         )}
       </main>
+
+      {assigningId && (
+        <AssignmentModal 
+          dashboardId={assigningId}
+          onClose={() => setAssigningId(null)}
+          onUpdate={refreshData}
+        />
+      )}
 
       {/* ─── Toast Stack ─────────────────────────────────────────────── */}
       {toasts.length > 0 && (
