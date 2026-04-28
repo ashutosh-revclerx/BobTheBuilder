@@ -4,6 +4,16 @@ import { pool } from '../db/client.js';
 
 const router = Router();
 
+const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL ?? 'http://localhost:8000';
+const LLM_TIMEOUT_MS  = 60_000;
+
+const GenerateSchema = z.object({
+  prompt:        z.string().min(3),
+  resourceIds:   z.array(z.string().uuid()).default([]),
+  docsUrls:      z.array(z.string()).default([]),
+  variantCount:  z.number().int().min(1).max(8).default(4),
+});
+
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const ConfigSchema = z
@@ -112,6 +122,109 @@ router.get('/', async (_req, res) => {
   } catch (err) {
     console.error('[dashboards] list:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── POST /api/dashboards/generate ────────────────────────────────────────────
+// Proxy to the Python LLM microservice. Loads the requested resources +
+// their imported endpoints, packs the LLM payload, and forwards. Does NOT
+// save anything to the dashboards table — caller (template-picker UI)
+// decides which variant to persist.
+
+router.post('/generate', async (req, res) => {
+  const parsed = GenerateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error:   'Validation failed',
+      details: parsed.error.flatten(),
+    });
+  }
+  const { prompt, resourceIds, docsUrls, variantCount } = parsed.data;
+
+  // Hydrate the resource IDs into the shape the LLM service expects.
+  let resourcesPayload: Array<{
+    id:        string;
+    name:      string;
+    type:      string;
+    base_url:  string | null;
+    endpoints: Array<{ method: string; path: string; summary: string | null }>;
+  }> = [];
+
+  if (resourceIds.length > 0) {
+    try {
+      const { rows } = await pool.query<{
+        id:        string;
+        name:      string;
+        type:      string;
+        base_url:  string | null;
+        endpoints: Array<{ method: string; path: string; summary: string | null }> | null;
+      }>(
+        `SELECT
+           r.id, r.name, r.type, r.base_url,
+           COALESCE(
+             jsonb_agg(
+               jsonb_build_object('method', e.method, 'path', e.path, 'summary', e.summary)
+               ORDER BY e.path, e.method
+             ) FILTER (WHERE e.id IS NOT NULL),
+             '[]'::jsonb
+           ) AS endpoints
+         FROM resources r
+         LEFT JOIN resource_endpoints e ON e.resource_id = r.id
+         WHERE r.id = ANY($1::uuid[])
+         GROUP BY r.id`,
+        [resourceIds],
+      );
+      resourcesPayload = rows.map((r) => ({
+        id:        r.id,
+        name:      r.name,
+        type:      r.type,
+        base_url:  r.base_url,
+        endpoints: r.endpoints ?? [],
+      }));
+    } catch (err) {
+      console.error('[dashboards] generate resource lookup:', err);
+      return res.status(500).json({ error: 'Could not load resources for the LLM' });
+    }
+  }
+
+  // Forward to the Python service with a hard timeout so a stuck Gemini
+  // call doesn't hang the dashboard backend.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${LLM_SERVICE_URL}/generate`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        prompt,
+        resources:    resourcesPayload,
+        docsUrls,
+        variantCount,
+      }),
+      signal: controller.signal,
+    });
+
+    const text = await response.text();
+    let json: unknown = null;
+    try { json = JSON.parse(text); } catch { /* keep raw text for error path */ }
+
+    if (!response.ok) {
+      const detail = (json && typeof json === 'object' && 'detail' in json)
+        ? String((json as Record<string, unknown>).detail)
+        : text || `LLM service returned ${response.status}`;
+      return res.status(502).json({ error: detail });
+    }
+
+    return res.json(json);
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') {
+      return res.status(504).json({ error: 'LLM service took longer than 60 seconds' });
+    }
+    console.error('[dashboards] generate proxy error:', err);
+    return res.status(502).json({ error: 'Could not reach the LLM service' });
+  } finally {
+    clearTimeout(timer);
   }
 });
 

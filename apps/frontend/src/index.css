@@ -3779,3 +3779,212 @@ body {
     font-size: 12px;
   }
 }
+
+/* ─── Generate page ─────────────────────────────────────────────────────── */
+.generate-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.08), transparent 38%),
+    linear-gradient(180deg, #f7f8fb, #ffffff);
+  color: #0f1117;
+}
+
+.generate-content {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.generate-hero h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #0f1117;
+}
+
+.generate-hero p {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.generate-prompt {
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.generate-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.generate-example-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.generate-example-chip:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.generate-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.generate-resource-card {
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.generate-resource-card:hover {
+  border-color: #c7d2fe;
+}
+
+.generate-resource-card.selected {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+
+.generate-resource-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #0f1117;
+}
+
+.generate-resource-base {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+  font-family: 'Fira Code', ui-monospace, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.generate-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.generate-variant-control {
+  max-width: 90px;
+}
+
+.generate-submit {
+  min-width: 200px;
+  font-size: 14px;
+}
+
+/* ─── Template picker ──────────────────────────────────────────────────── */
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+.picker-card {
+  border: 1px solid;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 2px rgba(15, 17, 23, 0.04), 0 8px 24px rgba(15, 17, 23, 0.04);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.picker-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(15, 17, 23, 0.06), 0 14px 32px rgba(99, 102, 241, 0.12);
+}
+
+.picker-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.picker-card-head h3 {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.picker-card-stats {
+  font-size: 11px;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.picker-card-canvas {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: 6px;
+  gap: 3px;
+  min-height: 160px;
+  border: 1px dashed currentColor;
+  border-radius: 8px;
+  padding: 6px;
+  opacity: 0.85;
+}
+
+.picker-card-block {
+  border: 1px solid;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 12px;
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 4px;
+}
+
+.picker-card-block-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+}
+
+.picker-card-pick {
+  align-self: stretch;
+  margin-top: 6px;
+}
+
+.picker-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}

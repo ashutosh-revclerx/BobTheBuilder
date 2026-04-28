@@ -9,6 +9,7 @@ const NAV_ITEMS: Array<{ to: string; label: string; end?: boolean }> = [
   { to: '/',          label: 'Dashboards', end: true },
   { to: '/templates', label: 'Templates' },
   { to: '/resources', label: 'Resources' },
+  { to: '/new',       label: '✨ Generate' },
 ];
 
 /**

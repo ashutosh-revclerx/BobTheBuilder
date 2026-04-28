@@ -56,52 +56,93 @@ Decision: skip the standalone `/customers` index page — assignment via dashboa
 
 ## Sprint 2 — the LLM intake → templates loop (≈ 1 week)
 
-The actual value-creation flow.
+**Architecture (decided with senior):** the LLM lives in a **separate Python microservice** (FastAPI), not embedded in the Node backend. **Provider: Gemini** (company API key already available).
 
-### 2.1 Backend `/api/dashboards/generate`
+```
+   Browser
+      │  POST /api/dashboards/generate
+      ▼
+   Node backend (apps/backend)
+      │   - looks up resources + their resource_endpoints
+      │   - builds the prompt context
+      │   - proxies to →
+      ▼
+   Python LLM service (services/llm)        ← NEW
+      │   - calls Gemini API
+      │   - validates response against dashboard schema
+      │   - retries on schema-invalid output
+      ▼
+   Returns N candidate configs to Node → forwarded to browser
+```
 
-- [ ] New route accepting:
+Why a separate service:
+- LLM workloads (long-lived requests, schema validation, prompt iteration) don't fit Node's single-threaded model well.
+- Python has the strongest LLM ecosystem (pydantic for schema validation, native Gemini SDK, easy prompt experimentation).
+- Independent scaling/redeploy — prompt changes don't require restarting the dashboard backend.
+- Clean boundary: Node owns "the platform," Python owns "the LLM."
+
+### 2.1 Python LLM service — `services/llm/` ← **scaffolded**
+
+- [x] Bootstrap a FastAPI app (folder `services/llm/`)
+- [x] Env: `GEMINI_API_KEY`, `GEMINI_MODEL`, `LLM_SERVICE_PORT` (default 8000)
+- [x] Endpoint `POST /generate`:
   ```json
   {
     "prompt": "I want a dashboard for tracking scrape jobs",
-    "resourceIds": ["uuid", "uuid"],
-    "docsUrls": ["https://..."],
-    "variantCount": 4
+    "resources": [
+      { "id": "...", "name": "nexus-scrape", "type": "REST", "base_url": "...",
+        "endpoints": [ { "method": "GET", "path": "/public/batches", "summary": "..." } ] }
+    ],
+    "docsUrls": [],
+    "variantCount": 1
   }
   ```
-- [ ] Loads referenced resources + their `resource_endpoints` rows
-- [ ] Builds a system prompt that includes:
-  - The full dashboard JSON schema (lift from `example.md`)
-  - List of available endpoints for each resource (method + path + summary)
-  - The binding conventions cheatsheet (`{{ }}` rules)
-  - The user's free-form prompt
-- [ ] Calls Claude API with structured output / function calling so the response is guaranteed schema-valid JSON
-- [ ] Returns N candidate `config` objects — does NOT save anything
-- [ ] Caps prompt size — reject if all-resources context exceeds N tokens
+- [x] Returns `{ success, configs: [{ name, config }] }` (variant array)
+- [x] System prompt covers dashboard schema, binding rules, layout guidance, hard constraints
+- [x] Gemini called with `response_mime_type: "application/json"`
+- [x] Pydantic post-validation + 1-shot retry with the error message attached
+- [x] `/health` endpoint
+- [x] Dockerfile + `services/llm` entry in `docker-compose.yml` (with hot-reload via volume mount)
+- [x] Prompt versioning constant (`SYSTEM_PROMPT_VERSION`) for future A/B
+- [x] Programmatic variant generator (`variants.py`) — palette swaps without extra LLM calls
 
-### 2.2 Intake page (`/new`)
+### 2.2 Node proxy route — `/api/dashboards/generate` ← **done**
 
-- [ ] Big multi-line textarea: "What dashboard do you want?"
-- [ ] Multi-select of registered resources (cards from `/api/resources`)
-- [ ] Optional: docs URL input (one or many)
-- [ ] Submit button → calls `/api/dashboards/generate`
-- [ ] Loading state with progress (LLM calls take 5-30s)
-- [ ] On error → show banner with the LLM error or retry button
+- [x] New thin route in `apps/backend/src/routes/dashboards.ts`
+- [x] Loads referenced resources from DB + their `resource_endpoints` rows (single SQL with jsonb_agg)
+- [x] Calls `POST {LLM_SERVICE_URL}/generate` with the enriched payload
+- [x] Returns candidate configs to the browser; **does NOT save** to `dashboards` table
+- [x] Reads `LLM_SERVICE_URL` from env (default `http://localhost:8000`)
+- [x] 60s AbortController timeout + clear error mapping (502 on upstream fail, 504 on timeout)
+- [ ] (Polish) Cap total prompt size in tokens — currently caps endpoints at 60 per resource in the Python service
 
-### 2.3 Template picker page
+### 2.3 Intake page (`/new`) ← **done**
 
-- [ ] Receives the N candidate configs from `/new`
-- [ ] Renders a grid of N "preview cards" — each shows name + a thumbnail-ish render of the components (or just the colour palette + layout sketch for v1)
-- [ ] Click a card → POST `/api/dashboards` with the chosen config → redirect to `/builder/<id>` for fine-tuning
-- [ ] "Regenerate" button at the top to re-call the LLM with a tweaked prompt
+- [x] Multi-line textarea + 3 example prompts as one-click chips
+- [x] Multi-select cards of registered resources (from `/api/resources`)
+- [x] Optional docs URL input (newline or comma separated)
+- [x] Variant count picker (1-4)
+- [x] Submit → calls Node's `/api/dashboards/generate`
+- [x] Loading state with "(5-30s)" hint
+- [x] On error → red banner with the LLM error
+- [x] On success → stash in sessionStorage, redirect to `/new/pick`
 
-### 2.4 Variant generation strategy (start simple)
+### 2.4 Template picker page (`/new/pick`) ← **done (v1)**
+
+- [x] Reads candidate configs from sessionStorage (kept out of URL — too big)
+- [x] Renders a grid of preview cards
+- [x] Each card shows: variant name, component+query count, and a **mini layout sketch** that renders each component as a positioned block in a 12-col grid using the variant's actual palette
+- [x] Click a card → POST `/api/dashboards` with chosen config (status: draft) → redirect to `/builder/<id>`
+- [x] "Try a different prompt" button returns to `/new`
+- [ ] (Polish v2) Inline "Regenerate" button instead of going back — call `/generate` with the same params
+
+### 2.5 Variant generation strategy (start simple)
 
 For v1, "variants" means **same components & queries, different palette + minor layout tweaks**. Rationale: getting the LLM to produce 4 *functionally* different dashboards from one prompt is unreliable; getting it to vary colours + spacing while keeping the data plumbing identical is trivial.
 
-- [ ] Step 1: LLM generates ONE config
-- [ ] Step 2: backend programmatically derives 3 variants by swapping colour palette + minor layout shuffles (no LLM needed)
-- [ ] Future: have LLM generate genuinely different layouts
+- [ ] Step 1: Python service asks Gemini for ONE config
+- [ ] Step 2: Python service programmatically derives N-1 more variants by swapping colour palette + minor layout shuffles (no extra LLM calls — saves cost + time)
+- [ ] Future: have Gemini generate genuinely different layouts via temperature variation
 
 ---
 
@@ -153,9 +194,15 @@ Then start **Sprint 2.1** (backend `/api/dashboards/generate` route — the LLM 
 
 ---
 
-## Open questions to answer before Sprint 2
+## Decisions locked in
 
-- **LLM provider** — Claude API (Anthropic SDK) or OpenAI? Rec: Claude, since you're already using Claude Code and the prompt-engineering knowledge transfers.
-- **Where does the API key live?** New env var `ANTHROPIC_API_KEY` in `apps/backend/.env`, never sent to frontend (same pattern as resource secrets).
-- **Cost ceiling per generate call** — should we cache or rate-limit?
-- **Schema enforcement** — use Anthropic's tool-use to force a schema-valid response, or post-validate with Zod and retry on failure? Rec: tool-use + Zod fallback.
+- **LLM provider:** Gemini (company API key available)
+- **Service shape:** separate Python FastAPI microservice at `services/llm/`, called by Node via HTTP
+- **API key location:** `GEMINI_API_KEY` in the **Python service's** env, never in Node's env, never in the browser
+- **Schema enforcement:** Gemini JSON mode (`response_schema`) → pydantic post-validation → 1 retry with error context if invalid
+
+## Still to decide before Sprint 2 starts
+
+- Cost ceiling per generate call — cache or rate-limit?
+- Should the LLM service be in the same docker-compose as Postgres + pgAdmin, or a sibling repo?
+- Which Gemini model — `gemini-2.0-flash` (cheap/fast, good for variants) or `gemini-2.5-pro` (smarter, better for one-shot complex configs)?
