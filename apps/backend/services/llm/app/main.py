@@ -14,6 +14,7 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 
+from .archetypes import classify_prompt
 from .gemini_client import GeminiError, generate_dashboard_config
 from .prompts import SYSTEM_PROMPT_VERSION, build_system_prompt, build_user_prompt
 from .schemas import GenerateRequest, GenerateResponse
@@ -52,8 +53,15 @@ def generate(req: GenerateRequest) -> GenerateResponse:
         req.variant_count,
     )
 
+    archetype = classify_prompt(req.prompt)
+    logger.info(
+        "archetype decision: type=%s confidence=%.2f",
+        archetype.dashboard_type,
+        archetype.confidence,
+    )
+
     system_prompt = build_system_prompt()
-    user_prompt   = build_user_prompt(req)
+    user_prompt = build_user_prompt(req, archetype.dashboard_type, archetype.confidence)
 
     try:
         base_config = generate_dashboard_config(system_prompt, user_prompt)
@@ -63,6 +71,11 @@ def generate(req: GenerateRequest) -> GenerateResponse:
 
     # Use the first 40 chars of the prompt as a friendly base name.
     base_name = req.prompt.strip().splitlines()[0][:40].strip() or "Untitled"
-    variants  = derive_variants(base_config, base_name, req.variant_count)
+    variants = derive_variants(
+        base_config,
+        base_name,
+        req.variant_count,
+        archetype.dashboard_type,
+    )
 
     return GenerateResponse(success=True, configs=variants)

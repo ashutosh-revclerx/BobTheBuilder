@@ -6,9 +6,10 @@ Versioning: bump SYSTEM_PROMPT_VERSION whenever you make a material change.
 The version is logged on each call — useful when output quality regresses.
 """
 
+from .archetypes import ARCHETYPE_RULES, DashboardType
 from .schemas import GenerateRequest, ResourceContext
 
-SYSTEM_PROMPT_VERSION = "v2"
+SYSTEM_PROMPT_VERSION = "v3"
 
 
 # ─── Schema description (human-friendly, complements response_schema) ────────
@@ -190,25 +191,41 @@ def _format_resource_block(resource: ResourceContext) -> str:
 
 def build_system_prompt() -> str:
     return (
-        "You are a dashboard generator for a Retool-style platform. "
-        "Given a user's request and a list of available backend resources, "
-        "output ONE dashboard configuration as JSON.\n\n"
+        "You are a senior product designer and frontend engineer.\n"
+        "Design a production-quality dashboard, then output ONE valid JSON config.\n\n"
         f"{SCHEMA_RULES}\n\n"
         "## Hard constraints\n"
         "- Use ONLY resources from the supplied list. Never invent a resource name.\n"
         "- Use ONLY endpoints from the supplied catalog when one exists.\n"
+        "- There must be one clear primary query path that drives the dashboard.\n"
+        "- StatCards/charts/tables should derive from related datasets, not isolated sources.\n"
+        "- Every filter/input must influence at least one query or bound output.\n"
         "- Every component referencing a query must point at a query you also define.\n"
         "- Every query.resource must match a resource.name from the supplied list.\n"
         "- Get the {{ }} binding rules right — Buttons NO braces, Tables/StatCards/Text WITH braces.\n"
         "- Use kebab-case ids that don't conflict (`stat-total`, `tbl-orders`, etc).\n"
-        "- Pick a coherent colour scheme — backgrounds, accents, borders all on one palette.\n"
+        "- Pick a coherent design system: one accent color, neutral backgrounds, subtle borders.\n"
+        "- Maintain clear visual hierarchy and consistent spacing.\n"
         "- Components must not overlap on the grid (sum of x..x+w should not collide on the same row).\n"
         "- Output a SINGLE valid JSON object matching the response schema. No prose, no markdown."
     )
 
 
-def build_user_prompt(req: GenerateRequest) -> str:
+def build_user_prompt(req: GenerateRequest, dashboard_type: DashboardType, confidence: float) -> str:
     sections = [f"## What the user wants\n{req.prompt.strip()}\n"]
+    sections.append(
+        "## Dashboard type\n"
+        f"This dashboard is classified as `{dashboard_type}` (confidence {confidence}).\n"
+        "Follow this layout structure strictly unless the prompt explicitly conflicts:\n"
+        f"{ARCHETYPE_RULES[dashboard_type]}\n"
+    )
+    sections.append(
+        "## Component relationship rules\n"
+        "- No isolated components.\n"
+        "- Every chart/table/log viewer must map to a query dataset.\n"
+        "- Every button should trigger a manual query.\n"
+        "- Prefer predictable layouts over random placement.\n"
+    )
 
     if req.resources:
         sections.append("## Available resources & endpoints")

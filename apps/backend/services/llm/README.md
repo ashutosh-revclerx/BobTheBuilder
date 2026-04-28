@@ -23,7 +23,7 @@ Should return `{"status":"ok","model":"gemini-2.5-flash","has_api_key":true}`.
 ## Run locally for prompt iteration
 
 ```
-cd services/llm
+cd apps/backend/services/llm
 python -m venv .venv
 .venv\Scripts\activate          # Windows; use source .venv/bin/activate elsewhere
 pip install -r requirements.txt

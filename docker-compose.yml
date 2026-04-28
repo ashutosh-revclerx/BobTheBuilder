@@ -1,4 +1,4 @@
-version: '3.8'
+
 services:
   postgres:
     image: postgres:16
@@ -27,16 +27,16 @@ services:
       - pgadmin_data:/var/lib/pgadmin
 
   llm:
-    build: ./services/llm
+    build: ./apps/backend/services/llm
     container_name: dashboard_llm
     env_file:
-      - ./services/llm/.env
+      - C:\Users\thaku\Desktop\BobTheBuilder\apps\backend\services\llm\.env
     ports:
       - "8000:8000"
     # Mount the source for hot-reload during development. Remove this volume
     # in production if you want the baked-in image to be authoritative.
     volumes:
-      - ./services/llm/app:/service/app
+      - ./apps/backend/services/llm/app:/service/app
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 volumes:

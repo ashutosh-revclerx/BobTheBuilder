@@ -67,7 +67,7 @@ Decision: skip the standalone `/customers` index page — assignment via dashboa
       │   - builds the prompt context
       │   - proxies to →
       ▼
-   Python LLM service (services/llm)        ← NEW
+   Python LLM service (apps/backend/services/llm)        ← NEW
       │   - calls Gemini API
       │   - validates response against dashboard schema
       │   - retries on schema-invalid output
@@ -81,9 +81,9 @@ Why a separate service:
 - Independent scaling/redeploy — prompt changes don't require restarting the dashboard backend.
 - Clean boundary: Node owns "the platform," Python owns "the LLM."
 
-### 2.1 Python LLM service — `services/llm/` ← **scaffolded**
+### 2.1 Python LLM service — `apps/backend/services/llm/` ← **done (v1)**
 
-- [x] Bootstrap a FastAPI app (folder `services/llm/`)
+- [x] Bootstrap a FastAPI app (folder `apps/backend/services/llm/`)
 - [x] Env: `GEMINI_API_KEY`, `GEMINI_MODEL`, `LLM_SERVICE_PORT` (default 8000)
 - [x] Endpoint `POST /generate`:
   ```json
@@ -102,9 +102,12 @@ Why a separate service:
 - [x] Gemini called with `response_mime_type: "application/json"`
 - [x] Pydantic post-validation + 1-shot retry with the error message attached
 - [x] `/health` endpoint
-- [x] Dockerfile + `services/llm` entry in `docker-compose.yml` (with hot-reload via volume mount)
+- [x] Dockerfile + `apps/backend/services/llm` entry in `docker-compose.yml` (with hot-reload via volume mount)
 - [x] Prompt versioning constant (`SYSTEM_PROMPT_VERSION`) for future A/B
 - [x] Programmatic variant generator (`variants.py`) — palette swaps without extra LLM calls
+- [x] Archetype classifier (`archetypes.py`) to infer dashboard type from prompt
+- [x] Archetype + confidence injected into LLM prompt before generation
+- [x] System prompt upgraded to UX-focused v3 (data flow + component relationship constraints)
 
 ### 2.2 Node proxy route — `/api/dashboards/generate` ← **done**
 
@@ -140,9 +143,17 @@ Why a separate service:
 
 For v1, "variants" means **same components & queries, different palette + minor layout tweaks**. Rationale: getting the LLM to produce 4 *functionally* different dashboards from one prompt is unreliable; getting it to vary colours + spacing while keeping the data plumbing identical is trivial.
 
-- [ ] Step 1: Python service asks Gemini for ONE config
-- [ ] Step 2: Python service programmatically derives N-1 more variants by swapping colour palette + minor layout shuffles (no extra LLM calls — saves cost + time)
+- [x] Step 1: Python service asks Gemini for ONE config
+- [x] Step 2: Python service programmatically derives N-1 more variants by swapping colour palette + minor layout shuffles (no extra LLM calls — saves cost + time)
 - [ ] Future: have Gemini generate genuinely different layouts via temperature variation
+
+### 2.6 UX generation quality hardening ← **in progress**
+
+- [x] Dashboard archetype classification step wired into /generate`r
+- [x] Archetype-specific layout guidance injected into prompt context
+- [x] Added stricter data-flow constraints in system prompt
+- [ ] Add post-generation validator for archetype layout conformance
+- [ ] Upgrade variants beyond palette-only (Overview / Detailed / Visual profiles)
 
 ---
 
@@ -190,19 +201,24 @@ Optional polish before Sprint 2 (none are blockers):
 1. **Sprint 1.3 polish** — friendly "Not published yet" placeholder on customer view when dashboard exists but is draft (~30 min)
 2. Smoke test the full demo path on a fresh DB to make sure nothing regressed during the merge
 
-Then start **Sprint 2.1** (backend `/api/dashboards/generate` route — the LLM call).
+Sprint 2 is in progress. Next up:
+1. Add post-generation validation for archetype/layout/data-flow checks
+2. Upgrade variant transforms beyond palette swaps
+3. Run prompt-quality smoke tests on representative prompts
 
 ---
 
 ## Decisions locked in
 
 - **LLM provider:** Gemini (company API key available)
-- **Service shape:** separate Python FastAPI microservice at `services/llm/`, called by Node via HTTP
+- **Service shape:** separate Python FastAPI microservice at `apps/backend/services/llm/`, called by Node via HTTP
 - **API key location:** `GEMINI_API_KEY` in the **Python service's** env, never in Node's env, never in the browser
 - **Schema enforcement:** Gemini JSON mode (`response_schema`) → pydantic post-validation → 1 retry with error context if invalid
 
-## Still to decide before Sprint 2 starts
+## Still to decide for Sprint 2 completion
 
 - Cost ceiling per generate call — cache or rate-limit?
 - Should the LLM service be in the same docker-compose as Postgres + pgAdmin, or a sibling repo?
 - Which Gemini model — `gemini-2.0-flash` (cheap/fast, good for variants) or `gemini-2.5-pro` (smarter, better for one-shot complex configs)?
+
+
