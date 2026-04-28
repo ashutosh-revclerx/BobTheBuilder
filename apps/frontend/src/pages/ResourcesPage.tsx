@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import MethodBadge from '../components/ui/MethodBadge';
+import TopNav from '../components/ui/TopNav';
 import type { ImportedEndpoint } from '../components/ui/EndpointPicker';
 
 const API_BASE = 'http://localhost:3001';
 
 type AuthType = 'none' | 'bearer' | 'api_key' | 'basic';
+type ResourceType = 'REST' | 'agent' | 'postgresql';
 
 interface Resource {
   id:         string;
@@ -42,6 +43,15 @@ export default function ResourcesPage() {
   const [importedResource, setImportedResource]  = useState<{ id: string; name: string } | null>(null);
   const [importedEndpoints, setImportedEndpoints] = useState<ImportedEndpoint[]>([]);
   const [endpointSearch, setEndpointSearch]      = useState('');
+
+  // ── Manual "Add resource" form state ───────────────────────────────────────
+  const [manualOpen, setManualOpen]               = useState(false);
+  const [manualName, setManualName]               = useState('');
+  const [manualType, setManualType]               = useState<ResourceType>('REST');
+  const [manualBaseUrl, setManualBaseUrl]         = useState('');
+  const [manualAuthType, setManualAuthType]       = useState<AuthType>('none');
+  const [manualSecretRef, setManualSecretRef]     = useState('');
+  const [manualSubmitting, setManualSubmitting]   = useState(false);
 
   // ── Existing resources list ────────────────────────────────────────────────
   const [resources, setResources]   = useState<Resource[]>([]);
@@ -122,6 +132,61 @@ export default function ResourcesPage() {
     );
   }, [importedEndpoints, endpointSearch]);
 
+  const handleManualSubmit = async () => {
+    if (!manualName.trim()) {
+      setBanner({ kind: 'error', text: 'Resource name is required.' });
+      return;
+    }
+    const needsBaseUrl = manualType === 'REST' || manualType === 'agent';
+    if (needsBaseUrl && !manualBaseUrl.trim()) {
+      setBanner({ kind: 'error', text: 'Base URL is required for REST and agent types.' });
+      return;
+    }
+    if (manualAuthType !== 'none' && !manualSecretRef.trim()) {
+      setBanner({ kind: 'error', text: 'Secret reference is required for the chosen auth type.' });
+      return;
+    }
+
+    setManualSubmitting(true);
+    try {
+      const body: Record<string, unknown> = {
+        name:      manualName.trim(),
+        type:      manualType,
+        auth_type: manualAuthType,
+      };
+      if (needsBaseUrl) body.base_url = manualBaseUrl.trim();
+      if (manualAuthType !== 'none') body.secret_ref = manualSecretRef.trim();
+      // For postgresql, secret_ref carries the connection string — accept it on any auth type
+      if (manualType === 'postgresql' && manualSecretRef.trim()) body.secret_ref = manualSecretRef.trim();
+
+      const response = await fetch(`${API_BASE}/api/resources`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await response.json();
+
+      if (!response.ok) {
+        setBanner({ kind: 'error', text: json.error || 'Could not create resource.' });
+        return;
+      }
+
+      setBanner({ kind: 'success', text: `Resource "${manualName}" created.` });
+      // Reset form
+      setManualName('');
+      setManualBaseUrl('');
+      setManualSecretRef('');
+      setManualAuthType('none');
+      setManualType('REST');
+      setManualOpen(false);
+      refreshResources();
+    } catch {
+      setBanner({ kind: 'error', text: 'Network error — could not reach backend.' });
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
+
   const handleToggleExpand = async (resource: Resource) => {
     if (expandedId === resource.id) {
       setExpandedId(null);
@@ -159,16 +224,7 @@ export default function ResourcesPage() {
 
   return (
     <div className="resources-page">
-      <header className="resources-header">
-        <div className="gallery-logo">
-          <div className="gallery-logo-icon">D</div>
-          <span className="gallery-logo-text">Dashboard Platform</span>
-        </div>
-        <nav className="resources-nav">
-          <Link to="/" className="btn-topbar">Dashboards</Link>
-          <Link to="/resources" className="btn-topbar primary">Resources</Link>
-        </nav>
-      </header>
+      <TopNav />
 
       <main className="resources-content">
         {banner && (
@@ -284,8 +340,98 @@ export default function ResourcesPage() {
         <section className="resources-card">
           <div className="resources-card-head">
             <h2>All resources</h2>
-            <p>{resources.length} registered</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <p>{resources.length} registered</p>
+              <button
+                className="btn-topbar primary"
+                onClick={() => setManualOpen((v) => !v)}
+              >
+                {manualOpen ? 'Cancel' : '+ Add resource'}
+              </button>
+            </div>
           </div>
+
+          {manualOpen && (
+            <div className="resources-form" style={{ marginBottom: 18 }}>
+              <label className="form-group">
+                <span className="form-label">Resource name</span>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="my-internal-api"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                />
+              </label>
+
+              <label className="form-group">
+                <span className="form-label">Type</span>
+                <select
+                  className="form-select"
+                  value={manualType}
+                  onChange={(e) => setManualType(e.target.value as ResourceType)}
+                >
+                  <option value="REST">REST</option>
+                  <option value="agent">Agent (async / poll)</option>
+                  <option value="postgresql">PostgreSQL (read-only)</option>
+                </select>
+              </label>
+
+              {(manualType === 'REST' || manualType === 'agent') && (
+                <label className="form-group">
+                  <span className="form-label">Base URL</span>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="https://api.example.com"
+                    value={manualBaseUrl}
+                    onChange={(e) => setManualBaseUrl(e.target.value)}
+                  />
+                </label>
+              )}
+
+              {manualType !== 'postgresql' && (
+                <label className="form-group">
+                  <span className="form-label">Auth type</span>
+                  <select
+                    className="form-select"
+                    value={manualAuthType}
+                    onChange={(e) => setManualAuthType(e.target.value as AuthType)}
+                  >
+                    <option value="none">None</option>
+                    <option value="bearer">Bearer Token</option>
+                    <option value="api_key">API Key</option>
+                    <option value="basic">Basic</option>
+                  </select>
+                </label>
+              )}
+
+              {(manualAuthType !== 'none' || manualType === 'postgresql') && (
+                <label className="form-group">
+                  <span className="form-label">
+                    {manualType === 'postgresql' ? 'Connection string (env placeholder)' : 'Secret reference'}
+                  </span>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder={manualType === 'postgresql' ? '{{env.READONLY_DB_URL}}' : '{{env.MY_API_KEY}}'}
+                    value={manualSecretRef}
+                    onChange={(e) => setManualSecretRef(e.target.value)}
+                  />
+                </label>
+              )}
+
+              <button
+                type="button"
+                className="btn-topbar primary resources-import-button"
+                disabled={manualSubmitting}
+                onClick={() => void handleManualSubmit()}
+              >
+                {manualSubmitting ? <span className="spinner dashboard-list-button-spinner" /> : null}
+                <span>{manualSubmitting ? 'Creating…' : 'Create resource'}</span>
+              </button>
+            </div>
+          )}
 
           {resources.length === 0 ? (
             <div className="resources-empty">No resources yet. Import one above to get started.</div>

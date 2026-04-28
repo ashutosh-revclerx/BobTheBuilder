@@ -81,19 +81,31 @@ router.post('/', async (req, res) => {
 
 router.get('/', async (_req, res) => {
   try {
+    // Pull assigned customers from BOTH sources:
+    //   1. The new many-to-many `dashboard_assignments` table (post-migration)
+    //   2. The legacy 1-to-1 `customers.dashboard_id` column (pre-migration data)
+    // Without the legacy union, customers created before the many-to-many work
+    // appear as "No customer assigned" on the dashboard cards.
     const { rows } = await pool.query<any>(
-      `SELECT 
+      `SELECT
          d.id, d.name, d.slug, d.status, d.created_at, d.updated_at,
          COALESCE(
-           json_agg(
-             json_build_object('id', c.id, 'name', c.name, 'slug', c.slug)
-           ) FILTER (WHERE c.id IS NOT NULL),
-           '[]'
+           (
+             SELECT jsonb_agg(jsonb_build_object('id', sub.id, 'name', sub.name, 'slug', sub.slug))
+             FROM (
+               SELECT c.id, c.name, c.slug
+               FROM customers c
+               JOIN dashboard_assignments da
+                 ON da.customer_id = c.id AND da.dashboard_id = d.id
+               UNION
+               SELECT c.id, c.name, c.slug
+               FROM customers c
+               WHERE c.dashboard_id = d.id
+             ) sub
+           ),
+           '[]'::jsonb
          ) AS assigned_customers
        FROM dashboards d
-       LEFT JOIN dashboard_assignments da ON da.dashboard_id = d.id
-       LEFT JOIN customers c ON c.id = da.customer_id
-       GROUP BY d.id
        ORDER BY d.updated_at DESC, d.created_at DESC`,
     );
     return res.json(rows);

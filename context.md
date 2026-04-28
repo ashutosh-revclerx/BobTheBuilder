@@ -9,7 +9,9 @@
 
 A **config-driven dashboard platform** — similar to Retool / ToolJet — where engineers build customer-facing dashboards visually. Each dashboard is defined by a JSON config. The platform reads that config and renders a fully working UI.
 
-**The end state:** An engineer picks a template, customises it in a visual editor, connects it to a backend resource, and hands a branded, mobile-ready dashboard URL to a customer. No custom frontend code written per customer, ever.
+**The end state (revised):** A user types what dashboard they want (with optional docs link / GitHub URL / available resources), an LLM generates 3-4 candidate configs that vary in colour scheme + layout, the user picks one, fine-tunes it in the visual builder, and publishes it to a customer URL. No custom frontend code, no hand-written JSON. See [`roadmap.md`](./roadmap.md) for the full implementation plan.
+
+**Original framing (still valid as the underlying mechanism):** An engineer picks a template, customises it in a visual editor, connects it to a backend resource, and hands a branded, mobile-ready dashboard URL to a customer. The LLM-driven flow above sits on top of this same pipeline.
 
 **Right now (Phase 0):** We are building only the frontend. No backend. No real API calls. All data is mocked. The goal is a working template gallery + visual editor that feels like ToolJet/Retool.
 
@@ -556,4 +558,6 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 ---
 
-*Current status: Phase 0, 0.5, 1, 2 — COMPLETE. Phase 3.1–3.10 — COMPLETE. Bonus: Swagger / OpenAPI import (`POST /api/resources/import-swagger`), `resource_endpoints` table + migration 007, `GET /api/resources/:id/endpoints`, ResourcesPage at `/resources` with import + endpoint browser + delete, reusable `MethodBadge` + `EndpointPicker` components, DataTab `QueryBindingSection` that auto-creates queries on endpoint pick, Save now PUTs back to dashboards table (was localStorage-only), GridLayer subscribes to queryResults+componentState so bindings re-resolve on query landings, queryEngine forwards `body` with `{{...}}` template substitution, `parseQueryName` strips `.trigger`. End-to-end demo verified with DummyJSON product browser. See `example.md` for the full how-to.*
+*Current status: Phase 0, 0.5, 1, 2 — COMPLETE. Phase 3.1–3.10 — COMPLETE. Bonus shipped: Swagger / OpenAPI import (`POST /api/resources/import-swagger`), `resource_endpoints` table + migration 007, `GET /api/resources/:id/endpoints`, ResourcesPage at `/resources` with import + endpoint browser + delete, reusable `MethodBadge` + `EndpointPicker` + `TopNav` components, DataTab `QueryBindingSection` that auto-creates queries on endpoint pick, Save now PUTs back to dashboards table (was localStorage-only), GridLayer subscribes to queryResults+componentState so bindings re-resolve on query landings, queryEngine forwards `body` with `{{...}}` template substitution, `parseQueryName` strips `.trigger`, `Text` component reads `dbBinding`, `agentExecutor` honours `poll_url` + recognises done/completed/success, "Open live" pill on dashboard cards, unified TopNav across DashboardList / ResourcesPage / TemplateGallery. End-to-end demos verified with DummyJSON product browser AND Nexus async scrape API. See `example.md` for the platform how-to.*
+
+**Direction shift:** Phase 3.11–3.16, Phase 4, Phase 5 are deprioritised. The new north star is an LLM-driven dashboard generator (intake → LLM → 3-4 template variants → builder → publish). Most of Phase 3.11+ becomes obsolete in the LLM era. **See [`roadmap.md`](./roadmap.md) for the actual next-up work — Sprint 1 (Postman replacement: Customers page, manual resource form, publish toggle), then Sprint 2 (the LLM intake → templates loop).**

@@ -34,7 +34,10 @@ export default function Text({ config }: { config: ComponentConfig }) {
         lineHeight: style.lineHeight,
         overflow: style.overflow === 'Scroll' ? 'auto' : 'hidden',
         textOverflow: style.overflow === 'Truncate' ? 'ellipsis' : undefined,
-        whiteSpace: style.overflow === 'Wrap' ? 'normal' : 'nowrap',
+        // Truncate stays single-line; everything else (Wrap, Scroll, default)
+        // wraps and respects newlines so long content uses the full box.
+        whiteSpace: style.overflow === 'Truncate' ? 'nowrap' : 'pre-wrap',
+        wordBreak: 'break-word',
         cursor: data.linkTo ? 'pointer' : 'default',
       }}
       onClick={() => {

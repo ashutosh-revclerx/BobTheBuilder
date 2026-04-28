@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AssignmentModal from '../components/editor/AssignmentModal';
 import { templates } from '../templates';
+import TopNav from '../components/ui/TopNav';
 
 const API_BASE = 'http://localhost:3001';
 
@@ -143,6 +144,20 @@ function DashboardCard({
         )}
         <span className="dl-card__time">{formatRelativeTime(dashboard.updated_at)}</span>
       </div>
+
+      {/* Live link — only when assigned + status=live */}
+      {customer && dashboard.status === 'live' && (
+        <a
+          className="dl-card__live-link"
+          href={`/c/${customer.slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={`Open ${customer.name}'s dashboard in a new tab`}
+        >
+          <span className="dl-card__live-link-url">/c/{customer.slug}</span>
+          <span className="dl-card__live-link-icon" aria-hidden="true">↗</span>
+        </a>
+      )}
 
       {/* Bottom — actions or confirm */}
       <div className="dl-card__bottom">
@@ -338,25 +353,21 @@ export default function DashboardList() {
   return (
     <div className="dl-page">
       {/* ─── Header ──────────────────────────────────────────────────── */}
-      <header className="dl-header">
-        <div className="dl-header__left">
-          <span className="dl-header__wordmark">BobTheBuilder</span>
-          <span className="dl-header__tagline">
-            Build and ship customer dashboards without writing frontend code.
-          </span>
-        </div>
-        <button
-          className="dl-header__cta"
-          onClick={() => void handleCreateDashboard()}
-          disabled={creating}
-        >
-          {creating ? (
-            <span className="dl-header__cta-spinner" />
-          ) : (
-            '+ New Dashboard'
-          )}
-        </button>
-      </header>
+      <TopNav
+        right={
+          <button
+            className="dl-header__cta"
+            onClick={() => void handleCreateDashboard()}
+            disabled={creating}
+          >
+            {creating ? (
+              <span className="dl-header__cta-spinner" />
+            ) : (
+              '+ New Dashboard'
+            )}
+          </button>
+        }
+      />
 
       {/* ─── Body ────────────────────────────────────────────────────── */}
       <main className="dl-body">
