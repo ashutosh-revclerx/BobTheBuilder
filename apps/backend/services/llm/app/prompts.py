@@ -9,7 +9,7 @@ The version is logged on each call — useful when output quality regresses.
 from .archetypes import ARCHETYPE_RULES, DashboardType
 from .schemas import GenerateRequest, ResourceContext
 
-SYSTEM_PROMPT_VERSION = "v3"
+SYSTEM_PROMPT_VERSION = "v3.2"
 
 
 # ─── Schema description (human-friendly, complements response_schema) ────────
@@ -60,6 +60,17 @@ DISPLAY COMPONENT READING DATA (with braces):
     "data": { "dbBinding": "{{queries.get-orders.data}}" }
     "data": { "dbBinding": "{{queries.get-orders.data.products}}" }    ← drill in
     "data": { "dbBinding": "{{queries.get-job.data.status}}" }         ← drill in
+
+WRONG vs RIGHT — Text/StatCard/Table dbBinding MUST be wrapped in {{ }}:
+    WRONG:  "dbBinding": "queries.run-scrape.data.content"        ← stays a literal string, panel is empty
+    RIGHT:  "dbBinding": "{{queries.run-scrape.data.content}}"    ← resolved to the live value
+
+WRONG vs RIGHT — Button dbBinding MUST NOT be wrapped:
+    WRONG:  "dbBinding": "{{queries.run-scrape.trigger}}"         ← Button looks up nothing, click does nothing
+    RIGHT:  "dbBinding": "queries.run-scrape.trigger"             ← Button parses the name and fires the query
+
+If you get nothing else right, get these brace rules right. Test the rule
+mentally before emitting each component.
 
 INPUT FEEDING INTO A QUERY (TextInput auto-writes value to componentState[id].value):
     Endpoint:  "/posts/{{componentState.url-input.value}}"
@@ -207,7 +218,44 @@ def build_system_prompt() -> str:
         "- Pick a coherent design system: one accent color, neutral backgrounds, subtle borders.\n"
         "- Maintain clear visual hierarchy and consistent spacing.\n"
         "- Components must not overlap on the grid (sum of x..x+w should not collide on the same row).\n"
-        "- Output a SINGLE valid JSON object matching the response schema. No prose, no markdown."
+        "\n"
+        "## Async / agent resources — IMPORTANT\n"
+        "If a resource has type='agent', the platform's agent executor handles\n"
+        "the full kickoff → poll → result loop automatically. For each agent\n"
+        "resource, create EXACTLY ONE query that POSTs to the kickoff endpoint\n"
+        "(e.g. /scrape, /run, /jobs). The executor will internally poll the\n"
+        "result endpoint until completion and return the FINAL result payload\n"
+        "as `queries.<name>.data`. So:\n"
+        "  - Do NOT create a second query that GETs the /result/{id} endpoint.\n"
+        "  - Do NOT chain a result-fetch query off the kickoff. It will 405.\n"
+        "  - Bind display components directly to the kickoff query's data,\n"
+        "    e.g. `{{queries.run-scrape.data.content}}` for the final result.\n"
+        "  - Status badges read `{{queries.<name>.data.status}}` (will show\n"
+        "    'done' when the executor finishes polling).\n"
+        "\n"
+        "## Common response fields — DO NOT invent field names\n"
+        "When binding display components to query data, use REAL field names\n"
+        "the API actually returns. Don't invent friendly-sounding fields.\n"
+        "If you don't know the response shape, prefer the WHOLE object:\n"
+        "    `{{queries.X.data}}`\n"
+        "and let the user drill in.\n"
+        "\n"
+        "Common conventions (use these field names, not synonyms):\n"
+        "  Async/agent results:        .content   (NOT .markdown, .scraped_text, .body)\n"
+        "                              .status    ('queued' | 'running' | 'done' | 'error')\n"
+        "                              .error     (string when status='error')\n"
+        "                              .elapsed_ms .url .output_format\n"
+        "  REST search/list:           .data | .results | .items | .products | .users\n"
+        "                              .total | .count | .meta\n"
+        "  Single-object GETs:         the response is the object itself —\n"
+        "                              bind to `{{queries.X.data}}` or drill into known fields\n"
+        "\n"
+        "If a resource's endpoint catalog (or the user's prompt) names a\n"
+        "specific field, use it. Otherwise fall back to the conventions above.\n"
+        "When in doubt, bind to the whole object — broken binding is worse than\n"
+        "a slightly-noisy display.\n"
+        "\n"
+        "Output a SINGLE valid JSON object matching the response schema. No prose, no markdown."
     )
 
 
