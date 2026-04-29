@@ -30,7 +30,7 @@ services:
     build: ./apps/backend/services/llm
     container_name: dashboard_llm
     env_file:
-      - C:\Users\thaku\Desktop\BobTheBuilder\apps\backend\services\llm\.env
+      - ./apps/backend/services/llm/.env
     ports:
       - "8000:8000"
     # Mount the source for hot-reload during development. Remove this volume

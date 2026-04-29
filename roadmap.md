@@ -104,10 +104,11 @@ Why a separate service:
 - [x] `/health` endpoint
 - [x] Dockerfile + `apps/backend/services/llm` entry in `docker-compose.yml` (with hot-reload via volume mount)
 - [x] Prompt versioning constant (`SYSTEM_PROMPT_VERSION`) for future A/B
-- [x] Programmatic variant generator (`variants.py`) — palette swaps without extra LLM calls
-- [x] Archetype classifier (`archetypes.py`) to infer dashboard type from prompt
-- [x] Archetype + confidence injected into LLM prompt before generation
+- [x] Programmatic variant generator (`variants.py`, ~333 lines) — varies on **two axes**: 4 palettes (Cobalt / Forest / + 2 others) AND layout profiles (overview / detailed / visual) with archetype-aware adjustments. No extra LLM calls.
+- [x] Archetype classifier (`archetypes.py`) — heuristic prompt scoring into one of 5 types (analytics / crud_admin / monitoring / form_workflow / logs)
+- [x] Archetype + confidence injected into the LLM prompt before generation
 - [x] System prompt upgraded to UX-focused v3 (data flow + component relationship constraints)
+- [x] Service moved into the monorepo: `services/llm/` → `apps/backend/services/llm/` (compose path updated)
 
 ### 2.2 Node proxy route — `/api/dashboards/generate` ← **done**
 
@@ -203,6 +204,10 @@ Sprint 2 is in progress. Next up:
 1. Add post-generation validation for archetype/layout/data-flow checks
 2. Upgrade variant transforms beyond palette swaps
 3. Run prompt-quality smoke tests on representative prompts
+### Reference: improvement backlog
+
+Your teammate captured a longer-term wish list in [`suggested.md`](./suggested.md) — UX-driven generation, design-system enforcement, deeper component relationships. Treat it as the source for Sprint 4+ ideas. Sprint 3 below stays focused on dependability and shipping the v1 demo cleanly.
+
 ### Sprint 3 — polish and dependability (next)
 
 In rough priority order:
