@@ -98,8 +98,8 @@ Why a separate service:
   }
   ```
 - [x] Returns `{ success, configs: [{ name, config }] }` (variant array)
-- [x] System prompt covers dashboard schema, binding rules, layout guidance, hard constraints
-- [x] Gemini called with `response_mime_type: "application/json"`
+- [x] System prompt v2: dashboard schema, per-component-type required fields, `{{ }}` binding rules with 5 examples, layout patterns, **and a complete worked example** (URL-scraper dashboard)
+- [x] Gemini called with `response_mime_type: "application/json"` — `response_schema` deliberately NOT used (incompatible with our open-ended `dict[str, Any]` style/data fields; pydantic post-validation covers it)
 - [x] Pydantic post-validation + 1-shot retry with the error message attached
 - [x] `/health` endpoint
 - [x] Dockerfile + `apps/backend/services/llm` entry in `docker-compose.yml` (with hot-reload via volume mount)
@@ -193,18 +193,28 @@ Catches LLM mistakes; makes power users productive.
 
 ## Order of operations — what to do next
 
-Sprint 1 is **complete** — zero Postman in the engineer flow. Demo path:
+**Sprint 1 + Sprint 2 are functionally complete.** Demo path now is:
 
-> Open `/` → click **+ New Dashboard** → land in builder → drag components → wire queries via Query Bindings → toggle **Publish** to live → back on `/` click **Assign** on the card → pick / create a customer → click the live `/c/<slug>` pill → see it render.
+> Open `/` → click **✨ Generate** → describe the dashboard + pick which resources the LLM can use → wait 5-30s while Gemini drafts a config → land on `/new/pick` with 4 colour-palette variants → click one → land in `/builder/<id>` → fine-tune → toggle **Publish** to live → back on `/` click **Assign** → pick a customer → click the live `/c/<slug>` pill.
 
-Optional polish before Sprint 2 (none are blockers):
-1. **Sprint 1.3 polish** — friendly "Not published yet" placeholder on customer view when dashboard exists but is draft (~30 min)
-2. Smoke test the full demo path on a fresh DB to make sure nothing regressed during the merge
+Zero Postman, zero hand-written JSON.
 
 Sprint 2 is in progress. Next up:
 1. Add post-generation validation for archetype/layout/data-flow checks
 2. Upgrade variant transforms beyond palette swaps
 3. Run prompt-quality smoke tests on representative prompts
+### Sprint 3 — polish and dependability (next)
+
+In rough priority order:
+
+1. **Sprint 3.1 inline validation in builder** — flag broken `dbBinding` references, missing query resources, dangling `{{...}}` paths. Catches bad LLM output before the user hits Save.
+2. **"Not published yet" placeholder** on the customer view (Sprint 1.3 leftover, ~30 min)
+3. **"Regenerate" on the picker page** — re-call `/generate` with the same prompt + resources, no need to retype.
+4. **Token / size cap** on the LLM prompt (Sprint 2.2 leftover) — reject prompts whose hydrated context would blow Gemini's window.
+5. **Sprint 3.2 JSON editor pane** in the builder — collapsible side pane with the live config, bidirectionally synced.
+6. **Sprint 3.3 resource secret diagnostics** — warn when `secret_ref` points to an env var that isn't set.
+
+After Sprint 3 the platform is feature-complete for v1. Beyond that, Phase 4 (white-label/mobile) and Phase 5 (auth/hardening) are deferred until paying users justify the effort.
 
 ---
 
@@ -222,3 +232,15 @@ Sprint 2 is in progress. Next up:
 - Which Gemini model — `gemini-2.0-flash` (cheap/fast, good for variants) or `gemini-2.5-pro` (smarter, better for one-shot complex configs)?
 
 
+- **LLM provider:** Gemini (company API key in `services/llm/.env`)
+- **Model:** `gemini-2.5-flash` (configurable via `GEMINI_MODEL` env)
+- **Service shape:** separate Python FastAPI microservice at `services/llm/`, called by Node via HTTP at `LLM_SERVICE_URL`
+- **API key location:** `GEMINI_API_KEY` in the **Python service's** env only
+- **Compose:** added to root `docker-compose.yml` — one `docker compose up` brings everything
+- **Schema enforcement:** prompt + `response_mime_type=application/json` + pydantic post-validation + 1 repair retry. Dropped Gemini's `response_schema` because it's incompatible with our open-ended `style`/`data` dict fields (the SDK's schema translator crashes on `dict[str, Any]`).
+
+## Still open
+
+- Cost ceiling per generate call — cache or rate-limit?
+- Token budget cap on the prompt (currently the Python service caps endpoints at 60 per resource, but no overall token check)
+- "Regenerate" button on the picker page that re-calls `/generate` with the same prompt
