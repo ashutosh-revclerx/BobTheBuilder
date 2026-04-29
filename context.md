@@ -9,7 +9,9 @@
 
 A **config-driven dashboard platform** — similar to Retool / ToolJet — where engineers build customer-facing dashboards visually. Each dashboard is defined by a JSON config. The platform reads that config and renders a fully working UI.
 
-**The end state:** An engineer picks a template, customises it in a visual editor, connects it to a backend resource, and hands a branded, mobile-ready dashboard URL to a customer. No custom frontend code written per customer, ever.
+**The end state (revised):** A user types what dashboard they want (with optional docs link / GitHub URL / available resources), an LLM generates 3-4 candidate configs that vary in colour scheme + layout, the user picks one, fine-tunes it in the visual builder, and publishes it to a customer URL. No custom frontend code, no hand-written JSON. See [`roadmap.md`](./roadmap.md) for the full implementation plan.
+
+**Original framing (still valid as the underlying mechanism):** An engineer picks a template, customises it in a visual editor, connects it to a backend resource, and hands a branded, mobile-ready dashboard URL to a customer. The LLM-driven flow above sits on top of this same pipeline.
 
 **Right now (Phase 0):** We are building only the frontend. No backend. No real API calls. All data is mocked. The goal is a working template gallery + visual editor that feels like ToolJet/Retool.
 
@@ -316,7 +318,7 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 - [x] **Phase 0** — Template Gallery & Component Editor ← DONE
 - [x] **Phase 1** — Core Engine (config → render → query → result) ← DONE
-- [ ] **Phase 2** — Persistence & Reactivity
+- [x] **Phase 2** — Persistence & Reactivity ← DONE
 - [ ] **Phase 3** — Full Visual Builder
 - [ ] **Phase 4** — White-Label & Mobile
 - [ ] **Phase 5** — Auth & Production Hardening
@@ -457,16 +459,16 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 - [x] **2.1** — PostgreSQL setup: tables `dashboards`, `customers`, `query_logs`, migration scripts
 - [x] **2.2** — Dashboard CRUD API: create / read / update / delete with Zod validation on write
-- [ ] **2.3** — Dashboard list screen: engineer-facing, name + last edited + assigned customer count
-- [ ] **2.4** — Agent executor: invocation, poll for completion, result retrieval
+- [x] **2.3** — Dashboard list screen: engineer-facing, name + last edited + assigned customer count
+- [x] **2.4** — Agent executor: invocation, poll for completion, result retrieval
 - [x] **2.5** — DB executor: read-only parameterised queries only, no raw SQL from config
-- [ ] **2.6** — Reactive query engine: `onDependencyChange` trigger, watches component state
-- [ ] **2.7** — Component state binding: resolve `components.{id}.selectedRow` and `components.{id}.value`
-- [ ] **2.8** — Customer profiles: name, assigned dashboards, brand config (empty), URL slug
-- [ ] **2.9** — Customer routing: `/c/:slug` loads assigned dashboard config and renders it
+- [x] **2.6** — Reactive query engine: `onDependencyChange` trigger, watches component state
+- [x] **2.7** — Component state binding: resolve `components.{id}.selectedRow` and `components.{id}.value`
+- [x] **2.8** — Customer profiles: name, assigned dashboards, brand config (empty), URL slug
+- [x] **2.9** — Customer routing: `/c/:slug` loads assigned dashboard config and renders it
 - [x] **2.10** — Audit log: every `/execute` writes to `query_logs` with full metadata
-- [ ] **2.11** — Query error + retry UI: readable error, no stack traces shown to user
-- [ ] **2.12** — Integration test suite: config load → render → query → result, runs in CI on every PR
+- [x] **2.11** — Query error + retry UI: readable error, no stack traces shown to user
+- [ ] **2.12** — Integration test suite: config load → render → query → result, runs in CI on every PR *(removed; reinstate if/when CI is set up)*
 
 ---
 
@@ -489,6 +491,9 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
   - Redesigned right-panel row editor for higher data density efficiently
   - Fixed overflow clipping issues to ensure floating UI elements are never cut off
   - Resolved "rows is not defined" crash in DataTab via robust data extraction
+  - Removed arbitrary `maxW` and `maxH` component constraints.
+  - Fixed deep nested container drag & drop event isolation.
+  - Added a functional Preview Mode to the visual builder.
 - [ ] **3.11** — JSON config editor: collapsible pane, bidirectionally synced with visual builder
 - [ ] **3.12** — Mobile preview toggle: Desktop vs Mobile (375px) canvas preview
 - [ ] **3.13** — Templates: migrate Phase 0 templates into full builder; add new ones
@@ -553,4 +558,16 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 ---
 
-*Current status: Phase 0, 0.5, 1 — COMPLETE. Phase 3.1–3.10 — COMPLETE (grid system + full drag-and-drop + UI polish & fixes). Phase 2: 2.1, 2.2, 2.5, 2.10 COMPLETE — PostgreSQL, Dashboard CRUD, Resources CRUD, execute proxy with DB/REST executors, audit log. Remaining: 2.3, 2.4, 2.6–2.9, 2.11–2.12.*
+*Current status: Phase 0, 0.5, 1, 2 — COMPLETE. Phase 3.1–3.10 — COMPLETE.*
+
+**Bonus platform features shipped on top of the original plan:** Swagger / OpenAPI import (`POST /api/resources/import-swagger`), `resource_endpoints` table + migration 007, `GET /api/resources/:id/endpoints`, ResourcesPage at `/resources` with Swagger import + manual "Add resource" form (REST/agent/postgresql) + endpoint browser + delete, reusable `MethodBadge` + `EndpointPicker` + `TopNav` components, DataTab `QueryBindingSection`, Save now PUTs back to dashboards table, GridLayer subscribes to queryResults+componentState so bindings re-resolve live, queryEngine forwards `body` with `{{...}}` template substitution, `parseQueryName` strips `.trigger`, `Text` component reads `dbBinding`, `agentExecutor` honours `poll_url` + recognises done/completed/success/done, dashboard list SQL unions legacy + new customer assignments, "Open live" pill on dashboard cards, unified TopNav with active-route highlighting, brand wordmark links to home. End-to-end demos verified with DummyJSON product browser AND Nexus async scrape API.
+
+**LLM-driven generator — Sprint 1 + Sprint 2 COMPLETE.** Three pieces:
+- **Python LLM microservice** at `apps/backend/services/llm/` (FastAPI + Gemini 2.5 Flash + pydantic post-validation + 1-shot repair retry). Includes a heuristic **archetype classifier** (analytics / crud_admin / monitoring / form_workflow / logs) that injects layout rules into the prompt, and a **multi-axis variant generator** that varies BOTH palette (Cobalt / Forest / etc) AND layout profile (overview / detailed / visual) — one LLM call yields N visually distinct variants without extra cost. **System prompt v3** is UX-focused (data flow + component relationships, not just schema correctness). In `docker-compose.yml` with hot-reload.
+- **Node proxy route** `POST /api/dashboards/generate` — hydrates resources + their imported endpoints from DB, calls Python service with 60s timeout, returns variants without persisting.
+- **Frontend pages** — `/new` (intake: prompt + resource multi-select + example chips + variant count) and `/new/pick` (preview cards with mini layout sketches; click → POST /api/dashboards as draft → land in builder). Generate CTA in TopNav.
+
+**End-to-end engineer flow today (zero Postman, zero hand-written JSON):**
+> ✨ Generate → describe + pick resources → 5-30s → pick a variant → builder → Publish → Assign customer → /c/&lt;slug&gt;
+
+**See [`roadmap.md`](./roadmap.md) for what's next** — Sprint 3 (inline validation, "Regenerate" button, JSON editor pane, draft placeholder). The longer-term LLM-quality wish list lives in [`suggested.md`](./suggested.md) (UX-driven generation, design-system enforcement, deeper component relationships — read for Sprint 4+ ideas). Phase 3.11–3.16, Phase 4, Phase 5 stay deferred. **See [`example.md`](./example.md) for the platform how-to + binding rules cheatsheet.**

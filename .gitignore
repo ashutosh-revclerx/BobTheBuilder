@@ -36,3 +36,10 @@ out/
 .turbo/
 coverage/
 .next/
+
+# Python (LLM service)
+apps/backend/services/llm/.venv/
+apps/backend/services/llm/__pycache__/
+apps/backend/services/llm/app/__pycache__/
+apps/backend/services/llm/.env
+*.pyc

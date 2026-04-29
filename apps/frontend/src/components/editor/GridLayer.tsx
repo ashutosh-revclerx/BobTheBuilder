@@ -1,25 +1,25 @@
-import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
-import { useState, useMemo, useCallback } from 'react';
+import { Responsive } from 'react-grid-layout/legacy';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { resolveBindings } from '../../engine/bindingResolver';
+import { evaluateBooleanExpression } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
 
 const DEFAULT_SIZES: Record<string, {w:number, h:number}> = {
-  StatCard:        { w: 3, h: 6 },
-  BarChart:        { w: 4, h: 8 },
-  LineChart:       { w: 4, h: 8 },
-  Table:           { w: 6, h: 10 },
+  StatCard:        { w: 4, h: 6 },
+  BarChart:        { w: 6, h: 12 },
+  LineChart:       { w: 6, h: 12 },
+  Table:           { w: 6, h: 12 },
   Button:          { w: 2, h: 4 },
   StatusBadge:     { w: 2, h: 4 },
-  LogsViewer:      { w: 6, h: 8 },
-  Container:       { w: 6, h: 8 },
-  TabbedContainer: { w: 6, h: 10 },
-  Text:            { w: 4, h: 4 },
-  TextInput:       { w: 2, h: 4 },
-  NumberInput:     { w: 2, h: 4 },
-  Select:          { w: 2, h: 4 },
+  LogsViewer:      { w: 4, h: 12 },
+  Container:       { w: 4, h: 12 },
+  TabbedContainer: { w: 6, h: 12 },
+  Text:            { w: 2, h: 2 },
+  TextInput:       { w: 3, h: 6 },
+  NumberInput:     { w: 3, h: 6 },
+  Select:          { w: 3, h: 6 },
 };
 
-const ResponsiveGridLayout = WidthProvider(Responsive);
 
 function FloatingLabel({ text }: { text: string }) {
   return (
@@ -34,9 +34,10 @@ interface GridLayerProps {
   parentTab?: string;
   componentMap: Record<string, React.ComponentType<any>>;
   customGap?: number;
+  readOnly?: boolean;
 }
 
-export function GridLayer({ parentId, parentTab, componentMap, customGap }: GridLayerProps) {
+export function GridLayer({ parentId, parentTab, componentMap, customGap, readOnly = false }: GridLayerProps) {
   const components = useEditorStore((s) => s.components);
   const selectedComponentId = useEditorStore((s) => s.selectedComponentId);
   const selectComponent = useEditorStore((s) => s.selectComponent);
@@ -45,7 +46,39 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
   const addComponent = useEditorStore((s) => s.addComponent);
   const draggingType = useEditorStore((s) => s.draggingType);
   const setDraggingType = useEditorStore((s) => s.setDraggingType);
+  // Subscribe to these so GridLayer re-renders when a query lands or
+  // componentState changes — otherwise resolveBindings runs once on the
+  // initial render and the table never sees fresh data.
+  useEditorStore((s) => s.queryResults);
+  useEditorStore((s) => s.componentState);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(1200);
+
+  useEffect(() => {
+    if (!wrapperRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      }
+    });
+    observer.observe(wrapperRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Safety: Clear dragging state on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && draggingType) {
+        setDraggingType(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [draggingType, setDraggingType]);
 
   const filteredComponents = useMemo(() => {
     return components.filter(c => {
@@ -63,13 +96,11 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
       h: c.layout?.h ?? 4,
       minW: c.layout?.minW,
       minH: c.layout?.minH,
-      maxW: c.layout?.maxW,
-      maxH: c.layout?.maxH,
-      isResizable: true,
-      isDraggable: true,
-      static: false
+      isResizable: !readOnly,
+      isDraggable: !readOnly,
+      static: readOnly,
     }));
-  }, [filteredComponents]);
+  }, [filteredComponents, readOnly]);
 
   // Calculate auto-expanding canvas height based on component positions
   const canvasMinHeight = useMemo(() => {
@@ -93,7 +124,7 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
   }, [filteredComponents, parentId]);
 
   // Only sync to store on user interaction (drag/resize STOP), not on every render
-  const syncLayoutToStore = useCallback((currentLayout: { i: string; x: number; y: number; w: number; h: number }[]) => {
+  const syncLayoutToStore = useCallback((currentLayout: ReadonlyArray<{ i: string; x: number; y: number; w: number; h: number }>) => {
     updateLayouts(currentLayout.map(l => ({
       id: l.i,
       x: l.x,
@@ -103,11 +134,11 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
     })));
   }, [updateLayouts]);
 
-  const handleDragStop = useCallback((_layout: any[], _oldItem: any, _newItem: any, _placeholder: any, _e: any, _node: any) => {
+  const handleDragStop = useCallback((_layout: ReadonlyArray<{ i: string; x: number; y: number; w: number; h: number }>, _oldItem: any, _newItem: any, _placeholder: any, _e: any, _node: any) => {
     syncLayoutToStore(_layout);
   }, [syncLayoutToStore]);
 
-  const handleResizeStop = useCallback((_layout: any[], _oldItem: any, _newItem: any, _placeholder: any, _e: any, _node: any) => {
+  const handleResizeStop = useCallback((_layout: ReadonlyArray<{ i: string; x: number; y: number; w: number; h: number }>, _oldItem: any, _newItem: any, _placeholder: any, _e: any, _node: any) => {
     syncLayoutToStore(_layout);
   }, [syncLayoutToStore]);
 
@@ -131,27 +162,30 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
 
   return (
     <div 
+      ref={wrapperRef}
       className={`grid-layer-wrapper ${draggingType ? 'drop-active' : ''}`}
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onMouseDown={(e) => e.stopPropagation()}
     >
-      <ResponsiveGridLayout
+      <Responsive
         className="layout"
+        width={containerWidth}
         layouts={{ lg: layout, md: layout, sm: layout, xs: layout, xxs: layout }}
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
         cols={{ lg: 12, md: 12, sm: 12, xs: 12, xxs: 12 }}
         rowHeight={30}
-        isDraggable={true}
-        isResizable={true}
+        isDraggable={!readOnly}
+        isResizable={!readOnly}
         resizeHandles={['se', 'sw', 'ne', 'nw']}
         droppingItem={{ i: '__dropping-elem__', x: 0, y: 0, w: size.w, h: size.h }}
-        draggableCancel="input, button, select, textarea, .tabbed-header-btn, .inline-picker, .container-empty-dropzone, .recharts-wrapper"
+        draggableCancel="input, button, select, textarea, .tabbed-header-btn, .inline-picker, .container-empty-dropzone, .recharts-wrapper, .container-inner-layout, .tabbed-content"
         compactType={null}
         preventCollision={true}
-        onDragStop={handleDragStop}
-        onResizeStop={handleResizeStop}
+        onDragStop={readOnly ? undefined : handleDragStop}
+        onResizeStop={readOnly ? undefined : handleResizeStop}
         margin={[customGap ?? 10, customGap ?? 10]}
         style={{ minHeight: canvasMinHeight }}
-        isDroppable={!!draggingType}
+        isDroppable={!readOnly && !!draggingType}
         onDrop={(_layout, item, e) => {
           e.preventDefault();
           if (!item) return;
@@ -179,24 +213,27 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
       >
       {filteredComponents.map(comp => {
         const Component = componentMap[comp.type];
-        if (!Component || comp.visible === false) return null;
+        const visibleExpression = comp.visible ?? comp.data.visible ?? 'true';
+        if (!Component || !evaluateBooleanExpression(visibleExpression, true)) return null;
 
         const resolvedData = resolveBindings(comp.data);
-        const resolvedComp = { ...comp, data: resolvedData };
+        const resolvedComp = { ...comp, data: resolvedData, visible: visibleExpression };
 
         return (
           <div
             key={comp.id}
-            className={`canvas-component-wrapper ${selectedComponentId === comp.id ? 'selected' : ''}`}
-            onClick={(e) => {
+            className={`canvas-component-wrapper${readOnly ? ' read-only' : ''} ${selectedComponentId === comp.id && !readOnly ? 'selected' : ''}`}
+            onClick={readOnly ? undefined : (e) => {
               e.stopPropagation();
               selectComponent(comp.id);
               if (confirmRemoveId !== comp.id) setConfirmRemoveId(null);
             }}
           >
-            <FloatingLabel text={comp.label} />
-            <button className="remove-btn" onClick={(e) => handleRemoveClick(e, comp.id)} title="Remove component">×</button>
-            {confirmRemoveId === comp.id && (
+            {!readOnly && <FloatingLabel text={comp.label} />}
+            {!readOnly && (
+              <button className="remove-btn" onClick={(e) => handleRemoveClick(e, comp.id)} title="Remove component">×</button>
+            )}
+            {!readOnly && confirmRemoveId === comp.id && (
               <div className="remove-confirm">
                 <span>Remove?</span>
                 <div className="remove-confirm-buttons">
@@ -211,12 +248,12 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap }: Grid
                   <div className="spinner"></div>
                 </div>
               )}
-              <Component config={resolvedComp} componentMap={componentMap} />
+              <Component config={resolvedComp} componentMap={componentMap} readOnly={readOnly} />
             </div>
           </div>
         );
       })}
-    </ResponsiveGridLayout>
+    </Responsive>
   </div>
   );
 }

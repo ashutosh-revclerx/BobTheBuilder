@@ -17,25 +17,26 @@ const STATUS_COLORS: Record<string, string> = {
   'in progress': '#2563eb',
   'to do': '#9ba3af',
   pending: '#9ba3af',
-  default: '#3b82f6',
 };
 
 function resolveColor(label: string, fallback: string): string {
   const lower = label.toLowerCase();
   for (const [key, color] of Object.entries(STATUS_COLORS)) {
-    if (lower.includes(key)) return color;
+    if (lower.includes(key)) {
+      return color;
+    }
   }
   return fallback;
 }
 
 export default function StatusBadge({ config }: StatusBadgeProps) {
   const { style, data, label } = config;
-  const isBound = data._resolvedBindings?.['dbBinding'];
+  const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const statusStr = typeof rawData === 'string' ? rawData : String(rawData ?? 'Unknown');
-
   const mapping = data.mapping || {};
-  const badgeColor = mapping[statusStr] || resolveColor(statusStr, style.textColor || '#3b82f6');
+  const badgeColor = mapping[statusStr] || resolveColor(statusStr, data.defaultColor || style.textColor || '#3b82f6');
+  const size = data.size || 'Medium';
 
   return (
     <div
@@ -54,7 +55,7 @@ export default function StatusBadge({ config }: StatusBadgeProps) {
         alignItems: 'center',
         justifyContent: 'center',
         gap: '12px',
-        overflow: 'hidden'
+        overflow: 'hidden',
       }}
     >
       <span
@@ -62,19 +63,15 @@ export default function StatusBadge({ config }: StatusBadgeProps) {
         style={{
           backgroundColor: `${badgeColor}18`,
           color: badgeColor,
-          flexShrink: 0
+          borderRadius: style.shape === 'Square' ? '4px' : style.shape === 'Rounded' ? '10px' : '999px',
+          fontSize: size === 'Small' ? '10px' : size === 'Large' ? '14px' : '12px',
+          padding: size === 'Small' ? '4px 10px' : size === 'Large' ? '8px 16px' : '6px 14px',
         }}
       >
-        <span
-          className="status-dot"
-          style={{ backgroundColor: badgeColor }}
-        />
+        {data.showDot !== false ? <span className="status-dot" style={{ backgroundColor: badgeColor }} /> : null}
         {statusStr}
       </span>
-      <div
-        className="status-badge-label"
-        style={{ color: `${style.textColor || '#9ba3af'}88`, flexShrink: 0 }}
-      >
+      <div className="status-badge-label" style={{ color: `${style.textColor || '#9ba3af'}88`, flexShrink: 0 }}>
         {label}
       </div>
     </div>

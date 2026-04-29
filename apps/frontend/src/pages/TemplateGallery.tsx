@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '../store/editorStore';
 import { templates } from '../templates';
+import TopNav from '../components/ui/TopNav';
 
 const TEMPLATE_ICONS: Record<string, string> = {
   'project-overview': '📊',
@@ -28,17 +29,7 @@ export default function TemplateGallery() {
 
   return (
     <div className="gallery-page">
-      {/* Header */}
-      <header className="gallery-header">
-        <div className="gallery-logo">
-          <div className="gallery-logo-icon">B</div>
-          <span className="gallery-logo-text">BoardTool</span>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn-topbar" style={{ fontSize: '12px' }}>Docs</button>
-          <button className="btn-topbar" style={{ fontSize: '12px' }}>Settings</button>
-        </div>
-      </header>
+      <TopNav />
 
       {/* Hero */}
       <div className="gallery-hero">

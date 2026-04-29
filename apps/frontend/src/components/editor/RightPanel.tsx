@@ -8,7 +8,8 @@ export default function RightPanel() {
   const lastSelectedComponentId = useEditorStore((s) => s.lastSelectedComponentId);
   const components = useEditorStore((s) => s.components);
   const closeRightPanel = useEditorStore((s) => s.closeRightPanel);
-  const [activeTab, setActiveTab] = useState<'style' | 'data'>('style');
+  const rightPanelTab = useEditorStore((s) => s.rightPanelTab);
+  const setRightPanelTab = useEditorStore((s) => s.setRightPanelTab);
   
   const hasMounted = useRef(false);
 
@@ -47,21 +48,21 @@ export default function RightPanel() {
         <>
           <div className="right-panel-tabs">
             <button
-              className={`right-panel-tab ${activeTab === 'style' ? 'active' : ''}`}
-              onClick={() => setActiveTab('style')}
+              className={`right-panel-tab ${rightPanelTab === 'style' ? 'active' : ''}`}
+              onClick={() => setRightPanelTab('style')}
             >
               Style
             </button>
             <button
-              className={`right-panel-tab ${activeTab === 'data' ? 'active' : ''}`}
-              onClick={() => setActiveTab('data')}
+              className={`right-panel-tab ${rightPanelTab === 'data' ? 'active' : ''}`}
+              onClick={() => setRightPanelTab('data')}
             >
               Data
             </button>
           </div>
 
           <div className="right-panel-content">
-            {activeTab === 'style' ? <StyleTab /> : <DataTab />}
+            {rightPanelTab === 'style' ? <StyleTab /> : <DataTab />}
           </div>
         </>
       )}

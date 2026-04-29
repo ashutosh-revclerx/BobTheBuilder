@@ -1,28 +1,37 @@
 import {
   BarChart as RechartsBarChart,
   Bar,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
 } from 'recharts';
+import type { QueryConfig } from '@btb/shared';
 import type { ComponentConfig } from '../../types/template';
+import { executeQuery } from '../../engine/queryEngine';
+import { parseQueryName } from '../../engine/runtimeUtils';
+import { useEditorStore } from '../../store/editorStore';
+import { runAction } from '../../engine/runtimeUtils';
+import QueryErrorBanner from '../ui/QueryErrorBanner';
 
-const CHART_COLORS = ['#2563eb', '#3b82f6', '#60a5fa', '#f59e0b', '#059669'];
-
-interface BarChartProps {
-  config: ComponentConfig;
-}
+const COLOR_SCHEMES = {
+  Blue: ['#2563eb', '#3b82f6', '#60a5fa'],
+  Green: ['#059669', '#10b981', '#6ee7b7'],
+  Amber: ['#d97706', '#f59e0b', '#fbbf24'],
+  Multi: ['#2563eb', '#059669', '#d97706', '#dc2626'],
+};
 
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="chart-custom-tooltip">
       <div className="label">{label}</div>
-      {payload.map((entry, i) => (
-        <div key={i} className="item">
+      {payload.map((entry, index) => (
+        <div key={index} className="item">
           <span className="dot" style={{ background: entry.color }} />
           {entry.name}: {entry.value.toLocaleString()}
         </div>
@@ -31,20 +40,21 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
-export default function BarChart({ config }: BarChartProps) {
+export default function BarChart({ config }: { config: ComponentConfig }) {
   const { style, data, label } = config;
-  const isBound = data._resolvedBindings?.['dbBinding'];
+  const queryResults = useEditorStore((state) => state.queryResults);
+  const queriesConfig = useEditorStore((state) => state.queriesConfig);
+  const queryName = parseQueryName(data.dbBinding);
+  const queryState = queryName ? queryResults[queryName] : undefined;
+  const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === queryName) as QueryConfig | undefined;
+  const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const chartData = Array.isArray(rawData) ? rawData : [];
-  
   const series = data.series || [{ name: 'Value', fieldKey: 'value' }];
   const activeSeries = data.yField ? [{ name: 'Value', fieldKey: data.yField }] : series;
-  const seriesKeys = new Set(activeSeries.map((s) => s.fieldKey));
-  
-  const firstRow = chartData[0] as Record<string, unknown> | undefined;
-  const xKey = data.xField || (firstRow
-    ? Object.keys(firstRow).find((k) => !seriesKeys.has(k) && typeof firstRow[k] === 'string') || 'label'
-    : 'label');
+  const palette = COLOR_SCHEMES[data.colorScheme || 'Blue'];
+  const xKey = data.xField || 'label';
+  const isHorizontal = data.orientation === 'Horizontal';
 
   return (
     <div
@@ -64,38 +74,37 @@ export default function BarChart({ config }: BarChartProps) {
     >
       <div className="chart-component-title" style={{ color: style.textColor }}>{label}</div>
       <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <RechartsBarChart data={chartData as Record<string, unknown>[]} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-            <XAxis
-              dataKey={xKey}
-              tick={{ fill: '#9ba3af', fontSize: 10, fontFamily: 'DM Sans' }}
-              axisLine={{ stroke: 'rgba(0,0,0,0.06)' }}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fill: '#9ba3af', fontSize: 10, fontFamily: 'DM Sans' }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.02)' }} />
-            <Legend
-              wrapperStyle={{ fontSize: '10px', fontFamily: 'DM Sans', color: '#9ba3af' }}
-              iconType="circle"
-              iconSize={6}
-            />
-            {activeSeries.map((s, i) => (
-              <Bar
-                key={s.fieldKey}
-                dataKey={s.fieldKey}
-                name={s.name}
-                fill={CHART_COLORS[i % CHART_COLORS.length]}
-                radius={[4, 4, 0, 0]}
-                maxBarSize={48}
-              />
-            ))}
-          </RechartsBarChart>
-        </ResponsiveContainer>
+        {queryState?.status === 'error' && queryConfig ? (
+          <div className="dashboard-query-error-wrap">
+            <QueryErrorBanner queryName={queryConfig.name} error={queryState.error || ''} onRetry={() => executeQuery(queryConfig)} />
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsBarChart data={chartData as Record<string, unknown>[]} layout={isHorizontal ? 'vertical' : 'horizontal'}>
+              {data.showGrid !== false ? <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={!isHorizontal} /> : null}
+              <XAxis dataKey={isHorizontal ? undefined : xKey} type={isHorizontal ? 'number' : 'category'} />
+              <YAxis dataKey={isHorizontal ? xKey : undefined} type={isHorizontal ? 'category' : 'number'} />
+              <Tooltip content={<CustomTooltip />} />
+              {data.showLegend !== false ? <Legend /> : null}
+              {activeSeries.map((seriesItem, index) => (
+                <Bar
+                  key={seriesItem.fieldKey}
+                  dataKey={seriesItem.fieldKey}
+                  name={seriesItem.name}
+                  fill={palette[index % palette.length]}
+                  radius={isHorizontal ? [0, style.barRadius || 4, style.barRadius || 4, 0] : [style.barRadius || 4, style.barRadius || 4, 0, 0]}
+                  stackId={data.stacked ? 'stack' : undefined}
+                  onClick={(entry) => runAction(data.onBarClickAction, entry)}
+                >
+                  {style.showDataLabels ? <LabelList dataKey={seriesItem.fieldKey} position={isHorizontal ? 'right' : 'top'} /> : null}
+                  {chartData.map((_, cellIndex) => (
+                    <Cell key={cellIndex} fill={palette[cellIndex % palette.length]} />
+                  ))}
+                </Bar>
+              ))}
+            </RechartsBarChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

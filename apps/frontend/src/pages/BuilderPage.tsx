@@ -5,10 +5,14 @@ import { getTemplateById, getBlankTemplate } from '../templates';
 import Canvas from '../components/editor/Canvas';
 import RightPanel from '../components/editor/RightPanel';
 import LeftPanel from '../components/editor/LeftPanel';
+import PublishToggle from '../components/editor/PublishToggle';
+import AssignmentModal from '../components/editor/AssignmentModal';
 import { useKineticWidth } from '../hooks/useTextMeasure';
 
+const API_BASE = 'http://localhost:3001';
+
 export default function BuilderPage() {
-  const { templateId } = useParams<{ templateId: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const loadTemplate = useEditorStore((s) => s.loadTemplate);
   const loadSavedTemplate = useEditorStore((s) => s.loadSavedTemplate);
@@ -17,7 +21,7 @@ export default function BuilderPage() {
   const dashboardName = useEditorStore((s) => s.dashboardName);
   const setDashboardName = useEditorStore((s) => s.setDashboardName);
   const saveToLocalStorage = useEditorStore((s) => s.saveToLocalStorage);
-  const resetToDefault = useEditorStore((s) => s.resetToDefault);
+  const resetToTemplate = useEditorStore((s) => s.resetToTemplate);
   const selectedComponentId = useEditorStore((s) => s.selectedComponentId);
   const activeTemplateId = useEditorStore((s) => s.activeTemplateId);
   const originalTemplateId = useEditorStore((s) => s.originalTemplateId);
@@ -28,52 +32,157 @@ export default function BuilderPage() {
   // Left panel toggle state
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
 
+  const isPreviewMode = useEditorStore((s) => s.isPreviewMode);
+  const togglePreviewMode = useEditorStore((s) => s.togglePreviewMode);
+  const dirtyStyleMap = useEditorStore((s) => s.dirtyStyleMap);
+  const dirtyDataMap = useEditorStore((s) => s.dirtyDataMap);
+  
+  const isDirty = useEditorStore((s) => s.isDirty);
+  
   // Feature C: pretext kinetic width for name input
   const nameWidth = useKineticWidth(dashboardName);
+
+  // Assignment state
+  const [assignedCustomers, setAssignedCustomers] = useState<any[]>([]);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+
+  const hasUnsavedChanges = isDirty || Object.keys(dirtyStyleMap).length > 0 || Object.keys(dirtyDataMap).length > 0;
+
+  const fetchAssignedCustomers = async () => {
+    if (!id || id === 'blank' || id.length < 10) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/dashboards/${id}/customers`);
+      if (res.ok) {
+        const data = await res.json();
+        setAssignedCustomers(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch assigned customers:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchAssignedCustomers();
+  }, [id]);
 
   useEffect(() => {
     loadFromLocalStorage();
   }, [loadFromLocalStorage]);
 
+  // Keyboard shortcut: Ctrl/Cmd + Shift + P
   useEffect(() => {
-    if (!templateId) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        togglePreviewMode();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePreviewMode]);
 
-    const saved = savedTemplates[templateId];
-    if (saved) {
-      loadSavedTemplate(saved);
-      return;
-    }
+  useEffect(() => {
+    if (!id) return;
 
-    if (templateId === 'blank') {
-      const blank = getBlankTemplate();
-      loadTemplate(blank.id, blank.name, blank.components);
-    } else {
-      const template = getTemplateById(templateId);
+    let cancelled = false;
+
+    const load = async () => {
+      const saved = savedTemplates[id];
+      if (saved) {
+        loadSavedTemplate(saved);
+        return;
+      }
+
+      if (id === 'blank') {
+        const blank = getBlankTemplate();
+        loadTemplate(blank.id, blank.name, blank.components);
+        return;
+      }
+
+      const template = getTemplateById(id);
       if (template) {
         loadTemplate(template.id, template.name, template.components);
-      } else {
-        navigate('/templates');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/dashboards/${id}`);
+        if (!response.ok) {
+          navigate('/');
+          return;
+        }
+
+        const dashboard = await response.json();
+        if (cancelled) {
+          return;
+        }
+
+        loadTemplate(
+          dashboard.id,
+          dashboard.name,
+          dashboard.config?.components ?? [],
+          dashboard.config?.queries ?? [],
+          dashboard.status,
+          dashboard.published_at,
+        );
+      } catch {
+        if (!cancelled) {
+          navigate('/');
+        }
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const handleSave = async () => {
+    saveToLocalStorage();
+
+    // Also persist back to the dashboards table so the customer view picks up
+    // edits. localStorage alone keeps changes invisible to /c/:slug.
+    if (id) {
+      const state = useEditorStore.getState();
+      try {
+        const response = await fetch(`${API_BASE}/api/dashboards/${id}`, {
+          method:  'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            name:   state.dashboardName,
+            config: {
+              components: state.components,
+              queries:    state.queriesConfig,
+            },
+          }),
+        });
+        if (!response.ok) {
+          console.error('[builder] save failed:', await response.text());
+        }
+      } catch (err) {
+        console.error('[builder] save network error:', err);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateId]);
 
-  const handleSave = () => {
-    saveToLocalStorage();
     setSaveFlash(true);
     setTimeout(() => setSaveFlash(false), 1200);
   };
 
   const handleReset = () => {
     if (!originalTemplateId) return;
-    resetToDefault();
+    
     if (originalTemplateId.startsWith('blank')) {
-      const blank = getBlankTemplate();
-      loadTemplate(blank.id, blank.name, blank.components);
+      resetToTemplate(originalTemplateId, 'Untitled Dashboard', []);
     } else {
       const template = getTemplateById(originalTemplateId);
       if (template) {
-        loadTemplate(template.id, template.name, template.components);
+        resetToTemplate(template.id, template.name, template.components);
+      } else {
+        // Fallback for custom dashboards: Reset to empty if template not found
+        resetToTemplate(originalTemplateId, 'Dashboard', []);
       }
     }
     setShowResetConfirm(false);
@@ -82,7 +191,12 @@ export default function BuilderPage() {
   const isSaved = activeTemplateId ? !!savedTemplates[activeTemplateId] : false;
 
   return (
-    <div className="builder-layout">
+    <div className={`builder-layout ${isPreviewMode ? 'preview-mode' : ''}`}>
+      {/* ARIA Live Region */}
+      <div className="sr-only" aria-live="polite">
+        {isPreviewMode ? 'Preview mode active' : 'Edit mode active'}
+      </div>
+
       {/* Top Bar */}
       <div className="builder-topbar">
         <div className="topbar-logo">
@@ -92,7 +206,7 @@ export default function BuilderPage() {
         <div className="topbar-divider" />
         <button
           className="topbar-back"
-          onClick={() => navigate('/templates')}
+          onClick={() => navigate('/')}
         >
           ← Templates
         </button>
@@ -106,27 +220,75 @@ export default function BuilderPage() {
             placeholder="Dashboard name"
             style={{ width: `${nameWidth}px` }}
           />
+
+          {!isPreviewMode && id && id.length > 10 && (
+            <div className="assignment-tags">
+              {assignedCustomers.slice(0, 3).map(c => (
+                <span key={c.id} className="customer-tag">{c.name}</span>
+              ))}
+              {assignedCustomers.length > 3 && (
+                <span className="customer-tag">+{assignedCustomers.length - 3} more</span>
+              )}
+              <button 
+                className="btn-add-assignment" 
+                onClick={() => setIsAssignmentModalOpen(true)}
+              >
+                + Add
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Unsaved Changes Note */}
+        {isPreviewMode && hasUnsavedChanges && (
+          <div className="unsaved-changes-note">
+            Previewing unsaved changes
+          </div>
+        )}
+
+        {/* Publish Toggle */}
+        {!isPreviewMode && id && id.length > 10 && (
+          <PublishToggle />
+        )}
+
         <div className="topbar-actions">
-          {isSaved && !showResetConfirm && (
+          {(isSaved || hasUnsavedChanges) && !showResetConfirm && !isPreviewMode && (
             <button
               className="btn-topbar danger-text"
               onClick={() => setShowResetConfirm(true)}
+              title="Reset dashboard to original template state"
             >
               Reset
             </button>
           )}
-          {showResetConfirm && (
+          {showResetConfirm && !isPreviewMode && (
             <div className="reset-confirm-inline">
               <span>Reset all?</span>
               <button className="confirm-yes" onClick={handleReset}>Yes</button>
               <button className="confirm-no" onClick={() => setShowResetConfirm(false)}>No</button>
             </div>
           )}
-          <div className="preview-pill">
-            <button className="active">Edit</button>
-            <button>Preview</button>
-          </div>
+          
+          <button 
+            className={`btn-preview-toggle ${isPreviewMode ? 'preview-active' : ''}`}
+            onClick={togglePreviewMode}
+            title="Toggle preview mode (Ctrl+Shift+P)"
+            aria-label="Toggle preview mode"
+            aria-pressed={isPreviewMode}
+          >
+            {isPreviewMode ? (
+              <>
+                <span className="toggle-icon">✎</span>
+                <span className="toggle-label">Edit</span>
+              </>
+            ) : (
+              <>
+                <span className="toggle-icon">👁</span>
+                <span className="toggle-label">Preview</span>
+              </>
+            )}
+          </button>
+
           <button
             className={`btn-topbar primary ${saveFlash ? 'saved' : ''}`}
             onClick={handleSave}
@@ -138,32 +300,41 @@ export default function BuilderPage() {
 
       {/* Body */}
       <div className="builder-body">
-        {/* Narrow Sidebar Toggle */}
-        <div className="builder-sidebar">
-          <div 
-            className={`sidebar-icon ${isLeftPanelOpen ? 'active' : ''}`} 
-            data-tooltip="Components"
-            onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
-          >
-            <span>⊞</span>
+        {/* Narrow Sidebar Toggle - only in edit mode */}
+        {!isPreviewMode && (
+          <div className="builder-sidebar">
+            <div 
+              className={`sidebar-icon ${isLeftPanelOpen ? 'active' : ''}`} 
+              data-tooltip="Components"
+              onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+            >
+              <span>⊞</span>
+            </div>
+            <div className="sidebar-icon" data-tooltip="Layers">
+              <span>☰</span>
+            </div>
+            <div className="sidebar-icon" data-tooltip="Settings">
+              <span>⚙</span>
+            </div>
           </div>
-          <div className="sidebar-icon" data-tooltip="Layers">
-            <span>☰</span>
-          </div>
-          <div className="sidebar-icon" data-tooltip="Settings">
-            <span>⚙</span>
-          </div>
-        </div>
+        )}
 
         {/* Left Panel */}
-        {isLeftPanelOpen && <LeftPanel />}
+        {!isPreviewMode && isLeftPanelOpen && <LeftPanel />}
 
         {/* Canvas */}
-        <Canvas />
+        <Canvas readOnly={isPreviewMode} />
 
         {/* Right Panel */}
-        {selectedComponentId && <RightPanel />}
+        {!isPreviewMode && selectedComponentId && <RightPanel />}
       </div>
+
+      {isAssignmentModalOpen && (
+        <AssignmentModal 
+          onClose={() => setIsAssignmentModalOpen(false)} 
+          onUpdate={fetchAssignedCustomers}
+        />
+      )}
     </div>
   );
 }

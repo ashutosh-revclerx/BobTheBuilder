@@ -1,10 +1,23 @@
 import type { ComponentConfig } from '../../types/template';
+import { evaluateExpression } from '../../engine/runtimeUtils';
 
 export default function Text({ config }: { config: ComponentConfig }) {
   const { style, data } = config;
+  // Prefer a resolved binding (e.g. {{queries.X.data.content}}). The binding
+  // resolver replaces the string with the live value and flips the
+  // _resolvedBindings.dbBinding flag. Fall back to mockValue otherwise so
+  // unbound text components still work for static labels.
+  const isBound = data._resolvedBindings?.dbBinding;
+  const sourceValue = isBound && data.dbBinding != null && data.dbBinding !== ''
+    ? data.dbBinding
+    : data.mockValue;
+  const resolvedValue = data.expression
+    ? evaluateExpression(String(sourceValue ?? ''), '')
+    : sourceValue;
+  const content = String(resolvedValue ?? '');
 
   return (
-    <div 
+    <div
       className="atomic-text-block"
       style={{
         color: style.textColor,
@@ -16,10 +29,24 @@ export default function Text({ config }: { config: ComponentConfig }) {
         border: style.borderWidth ? `${style.borderWidth}px solid ${style.borderColor || '#000000'}` : undefined,
         height: '100%',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        textAlign: style.textAlign?.toLowerCase() as any,
+        lineHeight: style.lineHeight,
+        overflow: style.overflow === 'Scroll' ? 'auto' : 'hidden',
+        textOverflow: style.overflow === 'Truncate' ? 'ellipsis' : undefined,
+        // Truncate stays single-line; everything else (Wrap, Scroll, default)
+        // wraps and respects newlines so long content uses the full box.
+        whiteSpace: style.overflow === 'Truncate' ? 'nowrap' : 'pre-wrap',
+        wordBreak: 'break-word',
+        cursor: data.linkTo ? 'pointer' : 'default',
+      }}
+      onClick={() => {
+        if (data.linkTo) {
+          window.open(data.linkTo, '_blank', 'noopener,noreferrer');
+        }
       }}
     >
-      {String(data.mockValue || '')}
+      {content}
     </div>
   );
 }

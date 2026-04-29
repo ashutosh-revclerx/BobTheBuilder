@@ -1,48 +1,76 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { QueryConfig } from '@btb/shared';
 import type { ComponentConfig } from '../../types/template';
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { executeQuery } from '../../engine/queryEngine';
+import { parseQueryName } from '../../engine/runtimeUtils';
+import { useEditorStore } from '../../store/editorStore';
+import QueryErrorBanner from '../ui/QueryErrorBanner';
 
 interface LogsViewerProps {
   config: ComponentConfig;
 }
 
+type LogRecord = Record<string, unknown>;
+
+function isLogRecord(entry: unknown): entry is LogRecord {
+  return typeof entry === 'object' && entry !== null && !Array.isArray(entry);
+}
+
 export default function LogsViewer({ config }: LogsViewerProps) {
   const { style, data, label } = config;
-  const isBound = data._resolvedBindings?.['dbBinding'];
+  const queryResults = useEditorStore((state) => state.queryResults);
+  const queriesConfig = useEditorStore((state) => state.queriesConfig);
+  const queryName = parseQueryName(data.dbBinding);
+  const queryState = queryName ? queryResults[queryName] : undefined;
+  const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === queryName) as QueryConfig | undefined;
+  const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
-  
-  const rawLogs = Array.isArray(rawData) ? rawData : (typeof rawData === 'string' ? [rawData] : []);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
+  const rawLogs = Array.isArray(rawData) ? rawData : typeof rawData === 'string' ? [rawData] : [];
+  const levelColors = style.levelColors || {
+    INFO: '#059669',
+    WARN: '#d97706',
+    ERROR: '#dc2626',
+    DEBUG: '#2563eb',
+  };
+
   const filteredLogs = useMemo(() => {
-    let result = rawLogs;
-    
-    // Level filter
+    let logs = rawLogs.slice(0, data.maxLines ?? 200);
+
     if (data.levelFilter && data.levelFilter !== 'all') {
-      const target = `[${data.levelFilter.toUpperCase()}]`;
-      result = result.filter(log => String(log).includes(target));
+      logs = logs.filter((entry) => {
+        const logLevel = isLogRecord(entry) ? String(entry[data.levelField || 'level'] ?? '').toLowerCase() : String(entry).toLowerCase();
+        return logLevel.includes(data.levelFilter || '');
+      });
     }
-    
-    // Search filter
+
     if (data.logSearchable && searchTerm) {
-      result = result.filter(log => String(log).toLowerCase().includes(searchTerm.toLowerCase()));
+      logs = logs.filter((entry) => JSON.stringify(entry).toLowerCase().includes(searchTerm.toLowerCase()));
     }
-    
-    return result;
-  }, [rawLogs, data.levelFilter, data.logSearchable, searchTerm]);
-  
+
+    return logs;
+  }, [data.levelField, data.levelFilter, data.logSearchable, data.maxLines, rawLogs, searchTerm]);
+
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (data.autoScroll !== false && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [filteredLogs]);
+  }, [data.autoScroll, filteredLogs]);
 
-  const getLogColor = (log: string) => {
-    if (log.includes('[ERROR]')) return '#dc2626';
-    if (log.includes('[WARN]')) return '#d97706';
-    if (log.includes('[INFO]')) return '#2563eb';
-    return '#5c6370';
+  const formatLog = (entry: unknown) => {
+    if (isLogRecord(entry)) {
+      const timestamp = String(entry[data.timestampField || 'timestamp'] ?? '');
+      const level = String(entry[data.levelField || 'level'] ?? 'INFO').toUpperCase();
+      const message = String(entry[data.messageField || 'message'] ?? '');
+      return { text: `${timestamp ? `[${timestamp}] ` : ''}[${level}] ${message}`, level };
+    }
+
+    const text = String(entry);
+    const match = text.match(/\[(INFO|WARN|ERROR|DEBUG)\]/i);
+    return { text, level: (match?.[1] || 'INFO').toUpperCase() };
   };
 
   return (
@@ -52,7 +80,7 @@ export default function LogsViewer({ config }: LogsViewerProps) {
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: style.backgroundColor || '#ffffff',
-        fontFamily: style.fontFamily || 'monospace',
+        fontFamily: style.fontFamily || 'Fira Code',
         fontSize: style.fontSize ? `${style.fontSize}px` : '12px',
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : '4px',
         borderColor: style.borderColor || 'var(--border)',
@@ -60,10 +88,10 @@ export default function LogsViewer({ config }: LogsViewerProps) {
         borderStyle: 'solid',
         padding: '0',
         height: '100%',
-        overflow: 'hidden'
+        overflow: 'hidden',
       }}
     >
-      <div 
+      <div
         className="logs-header"
         style={{
           padding: '8px 12px',
@@ -74,32 +102,18 @@ export default function LogsViewer({ config }: LogsViewerProps) {
           fontSize: '13px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#059669' }}></span>
+          <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#059669' }} />
           {label || 'Terminal Logs'}
         </div>
         {data.logSearchable && (
-          <input 
-            type="text"
-            placeholder="Search logs..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ 
-              backgroundColor: '#f8f9fb',
-              border: '1px solid var(--border)',
-              borderRadius: '4px', 
-              padding: '2px 8px',
-              fontSize: '11px',
-              outline: 'none',
-              width: '120px'
-            }}
-          />
+          <input type="text" className="form-input" placeholder="Search logs..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         )}
       </div>
-      <div 
+      <div
         ref={scrollRef}
         className="logs-content"
         style={{
@@ -109,17 +123,26 @@ export default function LogsViewer({ config }: LogsViewerProps) {
           display: 'flex',
           flexDirection: 'column',
           gap: '4px',
-          minHeight: 0
+          minHeight: 0,
+          whiteSpace: data.wrapLines ? 'pre-wrap' : 'pre',
         }}
       >
+        {queryState?.status === 'error' && queryConfig ? (
+          <QueryErrorBanner queryName={queryConfig.name} error={queryState.error || ''} onRetry={() => executeQuery(queryConfig)} />
+        ) : null}
         {filteredLogs.length === 0 ? (
           <div style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
             {rawLogs.length === 0 ? 'Waiting for output...' : 'No matches found.'}
           </div>
         ) : (
-          filteredLogs.map((log, i) => (
-             <div key={i} style={{ color: getLogColor(String(log)), lineHeight: 1.5, wordBreak: 'break-all' }}>{String(log)}</div>
-          ))
+          filteredLogs.map((entry, index) => {
+            const formatted = formatLog(entry);
+            return (
+              <div key={index} style={{ color: levelColors[formatted.level as keyof typeof levelColors] || '#5c6370', lineHeight: 1.5 }}>
+                {formatted.text}
+              </div>
+            );
+          })
         )}
       </div>
     </div>
