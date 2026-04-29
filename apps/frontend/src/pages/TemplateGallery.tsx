@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '../store/editorStore';
 import { templates } from '../templates';
@@ -20,12 +20,27 @@ export default function TemplateGallery() {
   const navigate = useNavigate();
   const savedTemplates = useEditorStore((s) => s.savedTemplates);
   const loadFromLocalStorage = useEditorStore((s) => s.loadFromLocalStorage);
+  const renameSavedTemplate = useEditorStore((s) => s.renameSavedTemplate);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState('');
 
   useEffect(() => {
     loadFromLocalStorage();
   }, [loadFromLocalStorage]);
 
   const savedEntries = Object.values(savedTemplates);
+
+  const beginRename = (templateId: string, currentName: string) => {
+    setEditingTemplateId(templateId);
+    setDraftName(currentName);
+  };
+
+  const commitRename = () => {
+    if (!editingTemplateId) return;
+    renameSavedTemplate(editingTemplateId, draftName);
+    setEditingTemplateId(null);
+    setDraftName('');
+  };
 
   return (
     <div className="gallery-page">
@@ -67,7 +82,37 @@ export default function TemplateGallery() {
                     </div>
                   </div>
                   <div className="template-card-body">
-                    <div className="template-card-name">{saved.dashboardName}</div>
+                    {editingTemplateId === saved.templateId ? (
+                      <input
+                        className="template-name-input"
+                        value={draftName}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setDraftName(e.target.value)}
+                        onBlur={commitRename}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitRename();
+                          if (e.key === 'Escape') {
+                            setEditingTemplateId(null);
+                            setDraftName('');
+                          }
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <div className="template-card-name-row">
+                        <div className="template-card-name">{saved.dashboardName}</div>
+                        <button
+                          type="button"
+                          className="template-rename-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            beginRename(saved.templateId, saved.dashboardName);
+                          }}
+                        >
+                          Rename
+                        </button>
+                      </div>
+                    )}
                     <div className="template-card-desc">
                       Last saved {new Date(saved.savedAt).toLocaleDateString()}
                     </div>

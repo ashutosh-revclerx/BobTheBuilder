@@ -34,6 +34,12 @@ REQUIRED FIELDS on every component:
                 "borderWidth": 1, "textColor": "#0f1117",
                 "borderRadius": 10, "padding": 16, ... }
               All colours as #hex.
+              For gradients, set backgroundGradient:
+              { "backgroundGradient": { "enabled": true, "direction": 90,
+                "stops": [
+                  { "color": "#2563eb", "position": 0 },
+                  { "color": "#7c3aed", "position": 100 }
+                ] } }
   - data      component-specific (see below)
 
 # queries[] — one object per HTTP / SQL call

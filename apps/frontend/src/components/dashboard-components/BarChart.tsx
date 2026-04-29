@@ -17,6 +17,7 @@ import { parseQueryName } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
 import { runAction } from '../../engine/runtimeUtils';
 import QueryErrorBanner from '../ui/QueryErrorBanner';
+import { resolveBackground } from '../../utils/styleUtils';
 
 const COLOR_SCHEMES = {
   Blue: ['#2563eb', '#3b82f6', '#60a5fa'],
@@ -52,7 +53,7 @@ export default function BarChart({ config }: { config: ComponentConfig }) {
   const chartData = Array.isArray(rawData) ? rawData : [];
   const series = data.series || [{ name: 'Value', fieldKey: 'value' }];
   const activeSeries = data.yField ? [{ name: 'Value', fieldKey: data.yField }] : series;
-  const palette = COLOR_SCHEMES[data.colorScheme || 'Blue'];
+  const palette = style.seriesColors?.length ? style.seriesColors : COLOR_SCHEMES[data.colorScheme || 'Blue'];
   const xKey = data.xField || 'label';
   const isHorizontal = data.orientation === 'Horizontal';
 
@@ -60,7 +61,7 @@ export default function BarChart({ config }: { config: ComponentConfig }) {
     <div
       className="chart-component"
       style={{
-        backgroundColor: style.backgroundColor,
+        background: resolveBackground(style),
         fontFamily: style.fontFamily,
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         borderColor: style.borderColor,

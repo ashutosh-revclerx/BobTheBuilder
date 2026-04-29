@@ -497,7 +497,7 @@ interface EditorState {
   rightPanelOpen: boolean;
   lastSelectedComponentId: string | null;
   isPreviewMode: boolean;
-  rightPanelTab: 'style' | 'data';
+  rightPanelTab: 'style' | 'data' | 'theme';
   isDirty: boolean;
   status: 'draft' | 'live';
   publishedAt: string | null;
@@ -527,6 +527,7 @@ interface EditorState {
   resetToTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[]) => void;
   resetToDefault: () => void;
   getResolvedComponent: (id: string) => ComponentConfig | undefined;
+  renameSavedTemplate: (templateId: string, name: string) => void;
   deleteSavedTemplate: (templateId: string) => void;
   setDraggingType: (type: string | null) => void;
   closeRightPanel: () => void;
@@ -534,9 +535,10 @@ interface EditorState {
   setComponentState: (componentId: string, key: string, value: unknown) => void;
   setIsPreviewMode: (val: boolean) => void;
   togglePreviewMode: () => void;
-  setRightPanelTab: (tab: 'style' | 'data') => void;
+  setRightPanelTab: (tab: 'style' | 'data' | 'theme') => void;
   upsertQuery: (query: Record<string, unknown> & { name: string }) => void;
   setStatus: (status: 'draft' | 'live', publishedAt: string | null) => void;
+  applyThemeToAll: (paletteName: 'Cobalt' | 'Forest' | 'Graphite' | 'Amber' | 'Obsidian') => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -912,6 +914,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   getResolvedComponent: (id) => get().components.find((component) => component.id === id),
 
+  renameSavedTemplate: (templateId, name) => {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+
+    set((state) => {
+      const saved = state.savedTemplates[templateId];
+      if (!saved) return {};
+
+      const existing = {
+        ...state.savedTemplates,
+        [templateId]: {
+          ...saved,
+          dashboardName: trimmedName,
+          savedAt: new Date().toISOString(),
+        },
+      };
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+
+      return {
+        savedTemplates: existing,
+        dashboardName: state.activeTemplateId === templateId ? trimmedName : state.dashboardName,
+      };
+    });
+  },
+
   deleteSavedTemplate: (templateId) => {
     set((state) => {
       const existing = { ...state.savedTemplates };
@@ -955,4 +983,115 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
     }),
+
+  applyThemeToAll: (paletteName) => {
+    const THEME_PALETTES: Record<'Cobalt' | 'Forest' | 'Graphite' | 'Amber' | 'Obsidian', Record<string, string>> = {
+      Cobalt: {
+        surface: '#f0f4f8',
+        panel: '#ffffff',
+        border: '#cbd5e1',
+        text: '#0f172a',
+        primary: '#2563eb',
+        card_tint: '#eff6ff',
+        chart_tint: '#dbeafe',
+        table_tint: '#f8fafc',
+        input_tint: '#ffffff',
+        success: '#16a34a',
+        warning: '#d97706',
+        error: '#dc2626',
+      },
+      Forest: {
+        surface: '#f0faf4',
+        panel: '#ffffff',
+        border: '#bbf7d0',
+        text: '#052e16',
+        primary: '#16a34a',
+        card_tint: '#f0fdf4',
+        chart_tint: '#dcfce7',
+        table_tint: '#f7fdf9',
+        input_tint: '#ffffff',
+        success: '#15803d',
+        warning: '#ca8a04',
+        error: '#b91c1c',
+      },
+      Graphite: {
+        surface: '#080e1a',
+        panel: '#0d1424',
+        border: '#1e2d42',
+        text: '#e2e8f0',
+        primary: '#22d3ee',
+        card_tint: '#0d1a2d',
+        chart_tint: '#0a1628',
+        table_tint: '#0a1220',
+        input_tint: '#0d1424',
+        success: '#34d399',
+        warning: '#fbbf24',
+        error: '#f87171',
+      },
+      Amber: {
+        surface: '#fefce8',
+        panel: '#fffef5',
+        border: '#fde68a',
+        text: '#292524',
+        primary: '#b45309',
+        card_tint: '#fefce8',
+        chart_tint: '#fef3c7',
+        table_tint: '#fffef5',
+        input_tint: '#fffef5',
+        success: '#15803d',
+        warning: '#b45309',
+        error: '#b91c1c',
+      },
+      Obsidian: {
+        surface: '#09090b',
+        panel: '#0f0f12',
+        border: '#27272a',
+        text: '#fafafa',
+        primary: '#6366f1',
+        card_tint: '#0f0f14',
+        chart_tint: '#0c0c14',
+        table_tint: '#09090b',
+        input_tint: '#0f0f12',
+        success: '#22c55e',
+        warning: '#f59e0b',
+        error: '#ef4444',
+      },
+    };
+
+    const palette = THEME_PALETTES[paletteName];
+    if (!palette) return;
+
+    set((state) => {
+      const components = state.components.map((comp) => {
+        const style = { ...comp.style };
+        const ctype = comp.type;
+
+        // Base
+        style.backgroundColor = palette.panel;
+        style.borderColor = palette.border;
+        style.textColor = palette.text;
+
+        // Component-specific
+        if (ctype === 'StatCard' || ctype === 'StatusBadge') {
+          style.backgroundColor = palette.card_tint;
+        } else if (ctype === 'BarChart' || ctype === 'LineChart') {
+          style.backgroundColor = palette.chart_tint;
+        } else if (ctype === 'Table') {
+          style.backgroundColor = palette.table_tint;
+        } else if (ctype === 'Container' || ctype === 'TabbedContainer') {
+          style.backgroundColor = palette.surface;
+        } else if (ctype === 'TextInput' || ctype === 'NumberInput' || ctype === 'Select') {
+          style.backgroundColor = palette.input_tint;
+        } else if (ctype === 'Button') {
+          style.backgroundColor = palette.primary;
+        } else if (ctype === 'Text') {
+          style.backgroundColor = 'transparent';
+        }
+
+        return { ...comp, style };
+      });
+
+      return { components, isDirty: true };
+    });
+  },
 }));

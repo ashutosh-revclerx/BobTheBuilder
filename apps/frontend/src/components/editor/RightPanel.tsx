@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import StyleTab from './StyleTab';
 import DataTab from './DataTab';
+import ThemeTab from './ThemeTab';
 
 export default function RightPanel() {
   const rightPanelOpen = useEditorStore((s) => s.rightPanelOpen);
@@ -59,10 +60,16 @@ export default function RightPanel() {
             >
               Data
             </button>
+            <button
+              className={`right-panel-tab ${rightPanelTab === 'theme' ? 'active' : ''}`}
+              onClick={() => setRightPanelTab('theme')}
+            >
+              Theme
+            </button>
           </div>
 
           <div className="right-panel-content">
-            {rightPanelTab === 'style' ? <StyleTab /> : <DataTab />}
+            {rightPanelTab === 'style' ? <StyleTab /> : rightPanelTab === 'data' ? <DataTab /> : <ThemeTab />}
           </div>
         </>
       )}

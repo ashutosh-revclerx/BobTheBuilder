@@ -4,6 +4,7 @@ import InlinePicker from '../editor/InlinePicker';
 import { GridLayer } from '../editor/GridLayer';
 import { runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
+import { resolveBackground } from '../../utils/styleUtils';
 
 interface TabbedContainerProps {
   config: ComponentConfig;
@@ -46,7 +47,7 @@ export default function TabbedContainer({ config, componentMap, readOnly = false
     <div
       className="tabbed-container-component"
       style={{
-        backgroundColor: style.backgroundColor,
+        background: resolveBackground(style),
         borderRadius: `${style.borderRadius}px`,
         borderColor: style.borderColor,
         borderWidth: `${style.borderWidth}px`,

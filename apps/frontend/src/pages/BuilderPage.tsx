@@ -140,35 +140,49 @@ export default function BuilderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  const persistDashboard = async (onlyName: boolean = false) => {
+    if (!id) return;
+
+    const state = useEditorStore.getState();
+    try {
+      const response = await fetch(`${API_BASE}/api/dashboards/${id}`, {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          name:   state.dashboardName,
+          config: onlyName ? undefined : {
+            components: state.components,
+            queries:    state.queriesConfig,
+          },
+        }),
+      });
+      if (!response.ok) {
+        console.error('[builder] persist failed:', await response.text());
+      }
+    } catch (err) {
+      console.error('[builder] persist network error:', err);
+    }
+  };
+
   const handleSave = async () => {
     saveToLocalStorage();
-
-    // Also persist back to the dashboards table so the customer view picks up
-    // edits. localStorage alone keeps changes invisible to /c/:slug.
-    if (id) {
-      const state = useEditorStore.getState();
-      try {
-        const response = await fetch(`${API_BASE}/api/dashboards/${id}`, {
-          method:  'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            name:   state.dashboardName,
-            config: {
-              components: state.components,
-              queries:    state.queriesConfig,
-            },
-          }),
-        });
-        if (!response.ok) {
-          console.error('[builder] save failed:', await response.text());
-        }
-      } catch (err) {
-        console.error('[builder] save network error:', err);
-      }
-    }
+    await persistDashboard();
 
     setSaveFlash(true);
     setTimeout(() => setSaveFlash(false), 1200);
+  };
+
+  const handleNameBlur = () => {
+    if (!dashboardName.trim()) {
+      setDashboardName('Untitled Dashboard');
+    }
+    persistDashboard(true);
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    }
   };
 
   const handleReset = () => {
@@ -217,6 +231,8 @@ export default function BuilderPage() {
             className="topbar-name-input"
             value={dashboardName}
             onChange={(e) => setDashboardName(e.target.value)}
+            onBlur={handleNameBlur}
+            onKeyDown={handleNameKeyDown}
             placeholder="Dashboard name"
             style={{ width: `${nameWidth}px` }}
           />

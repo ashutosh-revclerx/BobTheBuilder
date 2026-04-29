@@ -4,6 +4,7 @@ import type { ComponentConfig } from '../../types/template';
 import { executeQuery } from '../../engine/queryEngine';
 import { evaluateBooleanExpression, humanizeQueryError, parseQueryName, runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
+import { resolveBackground } from '../../utils/styleUtils';
 
 interface ButtonProps {
   config: ComponentConfig;
@@ -22,6 +23,7 @@ export default function Button({ config }: ButtonProps) {
   const queriesConfig = useEditorStore((state) => state.queriesConfig);
   const [localLoading, setLocalLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const targetQueryName = parseQueryName(data.dbBinding);
   const queryState = targetQueryName ? queryResults[targetQueryName] : undefined;
   const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === targetQueryName) as QueryConfig | undefined;
@@ -67,7 +69,7 @@ export default function Button({ config }: ButtonProps) {
         alignItems: 'center',
         justifyContent: 'center',
         padding: style.padding ? `${style.padding}px` : '16px',
-        backgroundColor: style.backgroundColor,
+        background: resolveBackground(style),
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         border: style.borderWidth ? `${style.borderWidth}px solid ${style.borderColor || 'transparent'}` : undefined,
         height: '100%',
@@ -93,20 +95,26 @@ export default function Button({ config }: ButtonProps) {
         onClick={() => void handleClick()}
         disabled={disabled}
         title={queryState?.status === 'error' ? humanizeQueryError(queryState.error) : undefined}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
-          backgroundColor: variant.backgroundColor,
-          color: variant.color,
+          backgroundColor:
+            hovered && style.hoverBackgroundColor
+              ? style.hoverBackgroundColor
+              : (style.backgroundColor || variant.backgroundColor),
+          color: style.textColor || variant.color,
           fontFamily: style.fontFamily,
           borderRadius: style.borderRadius ? `${style.borderRadius}px` : '6px',
-          border: `1px solid ${variant.borderColor}`,
-          padding: '10px 20px',
+          border: `${style.borderWidth ?? 1}px solid ${style.borderColor || variant.borderColor}`,
+          padding: style.padding ? `${style.padding}px` : '10px 20px',
           cursor: disabled ? 'not-allowed' : 'pointer',
-          fontWeight: 600,
+          fontWeight: style.fontWeight ?? 600,
+          textTransform: style.textTransform ?? 'none',
           opacity: disabled ? 0.7 : 1,
           width: style.fullWidth ? '100%' : 'auto',
           minWidth: style.fullWidth ? '100%' : 'unset',
           height: '100%',
-          transition: 'all 0.2s',
+          transition: 'background-color 0.15s, color 0.15s',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',

@@ -558,7 +558,7 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 
 ---
 
-*Current status: Phase 0, 0.5, 1, 2 — COMPLETE. Phase 3.1–3.10 — COMPLETE.*
+*Current status: Phase 0, 0.5, 1, 2 — COMPLETE. Phase 3.1–3.10 — COMPLETE. Sprint 3 (Security + Theme + Gradient) — PARTIALLY COMPLETE (see Sprint 3 section below).*
 
 **Bonus platform features shipped on top of the original plan:** Swagger / OpenAPI import (`POST /api/resources/import-swagger`), `resource_endpoints` table + migration 007, `GET /api/resources/:id/endpoints`, ResourcesPage at `/resources` with Swagger import + manual "Add resource" form (REST/agent/postgresql) + endpoint browser + delete, reusable `MethodBadge` + `EndpointPicker` + `TopNav` components, DataTab `QueryBindingSection`, Save now PUTs back to dashboards table, GridLayer subscribes to queryResults+componentState so bindings re-resolve live, queryEngine forwards `body` with `{{...}}` template substitution, `parseQueryName` strips `.trigger`, `Text` component reads `dbBinding`, `agentExecutor` honours `poll_url` + recognises done/completed/success/done, dashboard list SQL unions legacy + new customer assignments, "Open live" pill on dashboard cards, unified TopNav with active-route highlighting, brand wordmark links to home. End-to-end demos verified with DummyJSON product browser AND Nexus async scrape API.
 
@@ -570,4 +570,129 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 **End-to-end engineer flow today (zero Postman, zero hand-written JSON):**
 > ✨ Generate → describe + pick resources → 5-30s → pick a variant → builder → Publish → Assign customer → /c/&lt;slug&gt;
 
-**See [`roadmap.md`](./roadmap.md) for what's next** — Sprint 3 (inline validation, "Regenerate" button, JSON editor pane, draft placeholder). The longer-term LLM-quality wish list lives in [`suggested.md`](./suggested.md) (UX-driven generation, design-system enforcement, deeper component relationships — read for Sprint 4+ ideas). Phase 3.11–3.16, Phase 4, Phase 5 stay deferred. **See [`example.md`](./example.md) for the platform how-to + binding rules cheatsheet.**
+**See [`roadmap.md`](./roadmap.md) for what's next.** The longer-term LLM-quality wish list lives in [`suggested.md`](./suggested.md). Phase 3.11–3.16, Phase 4, Phase 5 stay deferred. **See [`example.md`](./example.md) for the platform how-to + binding rules cheatsheet.**
+
+---
+
+## Sprint 3 — Security, Theme, Gradient, Variant Quality
+
+### Task 1 — Secure Customer Dashboard URLs
+
+**Backend — DONE (but `customers.ts` has syntax corruption that must be fixed before the file compiles):**
+- [x] Migration `010_add_access_token_to_customers.sql` — `ALTER TABLE customers ADD COLUMN IF NOT EXISTS access_token TEXT DEFAULT NULL` + index
+- [x] `generateAccessToken()` — `randomBytes(16).toString('hex')` (32-char hex)
+- [x] `POST /api/customers/:id/rotate-token` — generates new token, saves, returns customer row
+- [x] `POST /api/customers/:id/clear-token` — sets token to NULL (opt-out)
+- [x] `GET /api/customers/:slug/dashboard` — validates `?token=` or `x-dashboard-token` header; 401 if wrong; passes if `access_token IS NULL`
+- [ ] **BUG**: `customers.ts` has merge-artifact corruption on lines 40, 80-81, 173-174, 189, 241 — orphan fragments (`} string;`, duplicate SQL params, `{access_token,`) that prevent TypeScript compilation. File must be cleaned up.
+- [ ] `POST /api/customers/` auto-generates token on create — code written but garbled by same corruption; verify after fixing file
+
+**Frontend — PARTIALLY DONE:**
+- [x] `CustomerView.tsx` reads `?token=` from URL via `useLocation`
+- [x] Token passed as query param to API fetch
+- [x] 401 response → "🔒 Access Denied / This dashboard is private" page (no slug, no stack trace)
+- [ ] **NOT DONE**: Non-401 errors (404, 500) currently show same "Access Denied" page — should show "Dashboard not found" or generic error instead
+- [ ] **NOT DONE**: Customer management UI — shareable URL display with token, one-click copy button, "Rotate Token" button, "Require token" on/off toggle (none of this exists in `AssignmentModal.tsx` or any other page)
+
+---
+
+### Task 2 — Fix Edit Name for Templates and Dashboards
+
+**Dashboard name in builder — DONE:**
+- [x] `<input>` in `BuilderPage.tsx` two-way bound to `dashboardName` Zustand state
+- [x] `onChange` → `setDashboardName()`
+- [x] `onBlur` → `handleNameBlur()` → `persistDashboard(onlyName=true)` → `PUT /api/dashboards/:id { name }`
+- [x] `onKeyDown Enter` → `e.currentTarget.blur()` → triggers save
+- [x] `persistDashboard(onlyName=true)` sends only `name`, not full config (cheap save)
+
+**Template name editing in gallery — NOT DONE:**
+- [ ] User-created templates in `/templates` gallery are not inline-editable
+- [ ] Built-in templates (3 hardcoded) do not show a lock icon
+- [ ] No `PUT /api/dashboards/:id { name }` call wired to gallery card editing
+
+---
+
+### Task 3 — Theme Editing in Component Properties Panel
+
+**Infrastructure — DONE:**
+- [x] `ThemeTab.tsx` created with 2 collapsible sections (Component Overrides + Dashboard Theme Presets)
+- [x] `RightPanel.tsx` extended to 3 tabs: Style / Data / Theme
+- [x] `applyThemeToAll(paletteName)` action in Zustand store — loops all components, applies palette colors by component type
+- [x] 5 preset buttons (Cobalt / Forest / Graphite / Amber / Obsidian) with 3-dot color swatches
+
+**Component overrides — PARTIALLY DONE:**
+- [x] Universal: background color, border color, border width, border radius, text color, padding
+- [x] StatCard: value text size (metricFontSize)
+- [x] Table: header background color, row hover color
+- [x] Charts: line width slider
+- [x] LogsViewer: line height, INFO/WARN/ERROR level colors
+
+**Missing from spec (not yet built):**
+- [ ] StatCard: accent color picker (separate `borderLeftColor` field, not `backgroundColor`)
+- [ ] StatCard: label text size (10/12/14px selector)
+- [ ] Table: selected row color picker
+- [ ] Table: stripe rows toggle
+- [ ] Button: hover background color picker, font weight (Normal/Medium/Bold), text transform (None/Uppercase/Capitalize)
+- [ ] Charts: series colors array (one color picker per series), axis text color picker (separate from grid color)
+- [ ] LogsViewer: font family picker (Fira Code / JetBrains Mono / Courier New)
+
+---
+
+### Task 4 — Gradient Property for Components
+
+**Type system + utilities — DONE:**
+- [x] `backgroundGradient` field in `ComponentStyle` in `template.ts` (`{ enabled, direction, stops[] }`)
+- [x] `resolveBackground(style)` utility in `styleUtils.ts` — renders `linear-gradient(...)` or solid color
+- [x] `GRADIENT_DIRECTIONS` array — 8 directional presets with degree values and arrow symbols
+- [x] `getDirectionName(deg)` helper
+
+**Component integration — DONE:**
+- [x] All 13 dashboard components import and use `resolveBackground` (25 occurrences across all component files)
+
+**UI — NOT DONE:**
+- [ ] Gradient toggle in ThemeTab (show/hide gradient controls)
+- [ ] Direction picker — 8 arrow buttons in ThemeTab
+- [ ] Color stop 1 + 2 pickers + position sliders
+- [ ] "+ Add stop" button (up to 4 stops)
+- [ ] Live gradient preview bar
+- [ ] Store gradient in `component.style.backgroundGradient` via `updateStyle`
+
+**AI pipeline — NOT DONE:**
+- [ ] `prompts.py` SCHEMA_RULES does not document `backgroundGradient` — LLM doesn't know it can use gradients
+
+---
+
+### Task 5 — Update variants.py Color Philosophy
+
+**DONE:**
+- [x] 5 palettes (Cobalt, Forest, Graphite, Amber, Obsidian) each with 30+ semantic fields: surface tiers, text tiers, brand tiers, semantic colors, component-specific tints
+- [x] `philosophy` field present in every palette dict
+- [x] `_repaint_component()` updated — uses richer fields (`card_tint`, `card_accent`, `chart_colors`, `table_header`, `log_info/warn/error`, `primary_hover`, `badge_bg`, `focusBorderColor`)
+- [x] `derive_variants()` uses all 5 palettes — generates up to 5 variants
+
+**NOT DONE:**
+- [ ] `philosophy` is NOT stored in `GeneratedVariant` — `schemas.py` `GeneratedVariant` only has `name` + `config`. `derive_variants` doesn't pass the philosophy string into the variant object. Frontend picker cannot show philosophy as a tooltip.
+
+---
+
+### Sprint 3 Summary
+
+| Sub-task | Status |
+|---|---|
+| T1 Backend token infrastructure | ✅ Done (fix compilation bug first) |
+| T1 customers.ts syntax corruption | ❌ Must fix |
+| T1 Frontend 401 handling | ✅ Done |
+| T1 Frontend non-401 error distinction | ⚠️ Partial |
+| T1 Customer management token UI | ❌ Not done |
+| T2 Dashboard name edit + persist | ✅ Done |
+| T2 Template gallery name editing | ❌ Not done |
+| T3 ThemeTab + 3-tab RightPanel | ✅ Done |
+| T3 applyThemeToAll store action | ✅ Done |
+| T3 Full component override controls | ⚠️ Partial (see missing list above) |
+| T4 backgroundGradient type + utility | ✅ Done |
+| T4 resolveBackground in all components | ✅ Done |
+| T4 Gradient UI controls in ThemeTab | ❌ Not done |
+| T4 prompts.py gradient schema update | ❌ Not done |
+| T5 5-palette system with philosophy | ✅ Done |
+| T5 Richer _repaint_component | ✅ Done |
+| T5 philosophy in GeneratedVariant | ❌ Not done |

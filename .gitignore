@@ -1,6 +1,7 @@
 # Logs
 logs
 *.log
+*.pid
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -36,10 +37,14 @@ out/
 .turbo/
 coverage/
 .next/
+.vite/
+*.tsbuildinfo
 
 # Python (LLM service)
 apps/backend/services/llm/.venv/
-apps/backend/services/llm/__pycache__/
-apps/backend/services/llm/app/__pycache__/
 apps/backend/services/llm/.env
+__pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

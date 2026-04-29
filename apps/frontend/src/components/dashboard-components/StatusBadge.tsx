@@ -1,4 +1,5 @@
 import type { ComponentConfig } from '../../types/template';
+import { resolveBackground } from '../../utils/styleUtils';
 
 interface StatusBadgeProps {
   config: ComponentConfig;
@@ -42,7 +43,7 @@ export default function StatusBadge({ config }: StatusBadgeProps) {
     <div
       className="status-badge-card"
       style={{
-        backgroundColor: style.backgroundColor,
+        background: resolveBackground(style),
         fontFamily: style.fontFamily,
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         borderColor: style.borderColor,

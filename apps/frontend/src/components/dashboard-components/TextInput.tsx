@@ -2,6 +2,7 @@ import type { ComponentConfig } from '../../types/template';
 import { parseQueryName, runAction } from '../../engine/runtimeUtils';
 import { executeQuery } from '../../engine/queryEngine';
 import { useEditorStore } from '../../store/editorStore';
+import { resolveBackground } from '../../utils/styleUtils';
 
 function getInputType(type: string | undefined) {
   switch (type) {
@@ -56,7 +57,7 @@ export default function TextInput({ config }: { config: ComponentConfig }) {
           }
         }}
         style={{
-          backgroundColor: style.backgroundColor,
+          background: resolveBackground(style),
           color: style.textColor,
           fontFamily: style.fontFamily,
           fontSize: `${style.fontSize}px`,
