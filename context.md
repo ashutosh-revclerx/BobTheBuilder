@@ -468,7 +468,7 @@ The backend `/execute` endpoint receives `{ resourceId, queryName, params }`, re
 - [x] **2.9** — Customer routing: `/c/:slug` loads assigned dashboard config and renders it
 - [x] **2.10** — Audit log: every `/execute` writes to `query_logs` with full metadata
 - [x] **2.11** — Query error + retry UI: readable error, no stack traces shown to user
-- [x] **2.12** — Integration test suite: config load → render → query → result, runs in CI on every PR
+- [ ] **2.12** — Integration test suite: config load → render → query → result, runs in CI on every PR *(removed; reinstate if/when CI is set up)*
 
 ---
 
