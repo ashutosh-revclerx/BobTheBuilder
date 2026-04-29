@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '../../types/template';
 import { runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
+import { resolveBackground } from '../../utils/styleUtils';
 
 export default function Select({ config }: { config: ComponentConfig }) {
   const { style, data } = config;
@@ -28,7 +29,7 @@ export default function Select({ config }: { config: ComponentConfig }) {
           runAction(data.onChangeAction, e.target.value);
         }}
         style={{
-          backgroundColor: style.backgroundColor,
+          background: resolveBackground(style),
           color: style.textColor,
           fontFamily: style.fontFamily,
           fontSize: `${style.fontSize}px`,

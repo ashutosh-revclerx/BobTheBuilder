@@ -4,6 +4,7 @@ import { executeQuery } from '../../engine/queryEngine';
 import { parseQueryName } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
 import QueryErrorBanner from '../ui/QueryErrorBanner';
+import { resolveBackground } from '../../utils/styleUtils';
 
 interface StatCardProps {
   config: ComponentConfig;
@@ -47,7 +48,7 @@ export default function StatCard({ config }: StatCardProps) {
     <div
       className="stat-card"
       style={{
-        backgroundColor: style.backgroundColor,
+        background: resolveBackground(style),
         fontFamily: style.fontFamily,
         fontSize: style.fontSize ? `${style.fontSize}px` : undefined,
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,

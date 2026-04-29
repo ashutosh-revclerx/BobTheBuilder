@@ -6,6 +6,7 @@ import { parseQueryName } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
 import type { ComponentConfig, TableConditionalRowColorRule } from '../../types/template';
 import QueryErrorBanner from '../ui/QueryErrorBanner';
+import { resolveBackground } from '../../utils/styleUtils';
 
 interface TableProps {
   config: ComponentConfig;
@@ -158,11 +159,11 @@ export default function Table({ config, id, onRowClick, selectedRowId, isEditorM
 
   const resolveRowBackground = (row: Record<string, unknown>, rowIndex: number) => {
     if (selectedRowId && String(row.id ?? row.key ?? rowIndex) === selectedRowId) {
-      return 'var(--blue-50)';
+      return style.selectedRowColor ?? 'var(--blue-50)';
     }
 
     if (selectedRow && JSON.stringify(selectedRow) === JSON.stringify(row)) {
-      return 'var(--blue-50)';
+      return style.selectedRowColor ?? 'var(--blue-50)';
     }
 
     const matchedRule = (data.conditionalRowColor ?? []).find((rule) => matchesRule(row, rule));
@@ -170,8 +171,10 @@ export default function Table({ config, id, onRowClick, selectedRowId, isEditorM
       return matchedRule.color;
     }
 
-    if (style.rowAlternateColor && style.rowAlternateColor !== 'transparent' && rowIndex % 2 === 1) {
-      return style.rowAlternateColor;
+    if (rowIndex % 2 === 1) {
+      if (style.stripeRows && style.rowAlternateColor) return style.rowAlternateColor;
+      if (style.stripeRows) return '#f8fafc';
+      if (style.rowAlternateColor && style.rowAlternateColor !== 'transparent') return style.rowAlternateColor;
     }
 
     return 'transparent';
@@ -184,7 +187,7 @@ export default function Table({ config, id, onRowClick, selectedRowId, isEditorM
     <div
       className="table-component"
       style={{
-        backgroundColor: style.backgroundColor,
+        background: resolveBackground(style),
         fontFamily: style.fontFamily,
         fontSize: style.fontSize ? `${style.fontSize}px` : undefined,
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { randomBytes } from 'crypto';
 import { pool } from '../db/client.js';
 
 const router = Router();
@@ -25,15 +26,19 @@ const UpdateSchema = z.object({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const PG_UNIQUE_VIOLATION   = '23505';
-const PG_INVALID_UUID       = '22P02';
-const PG_FOREIGN_KEY        = '23503';
+const PG_UNIQUE_VIOLATION = '23505';
+const PG_INVALID_UUID     = '22P02';
+const PG_FOREIGN_KEY      = '23503';
 
 function pgCode(err: unknown): string | undefined {
   return (err as any)?.code;
 }
 
-// ─── Row types ────────────────────────────────────────────────────────────────
+function generateAccessToken(): string {
+  return randomBytes(16).toString('hex');
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CustomerRow {
   id:           string;
@@ -41,8 +46,9 @@ interface CustomerRow {
   slug:         string;
   dashboard_id: string | null;
   brand_config: Record<string, unknown>;
+  access_token: string | null;
   created_at:   Date;
-  updated_at:   Date;
+  updated_at:   string;
 }
 
 interface CustomerSummaryRow {
@@ -50,6 +56,7 @@ interface CustomerSummaryRow {
   name:         string;
   slug:         string;
   dashboard_id: string | null;
+  access_token: string | null;
   created_at:   Date;
 }
 
@@ -65,13 +72,14 @@ router.post('/', async (req, res) => {
   }
 
   const { name, slug, dashboard_id, brand_config } = parsed.data;
+  const accessToken = generateAccessToken();
 
   try {
     const { rows } = await pool.query<CustomerRow>(
-      `INSERT INTO customers (name, slug, dashboard_id, brand_config)
-       VALUES ($1, $2, $3, $4::jsonb)
-       RETURNING id, name, slug, dashboard_id, brand_config, created_at, updated_at`,
-      [name, slug, dashboard_id ?? null, JSON.stringify(brand_config ?? {})],
+      `INSERT INTO customers (name, slug, dashboard_id, brand_config, access_token)
+       VALUES ($1, $2, $3, $4::jsonb, $5)
+       RETURNING id, name, slug, dashboard_id, brand_config, access_token, created_at, updated_at`,
+      [name, slug, dashboard_id ?? null, JSON.stringify(brand_config ?? {}), accessToken],
     );
     return res.status(201).json(rows[0]);
   } catch (err) {
@@ -91,7 +99,7 @@ router.post('/', async (req, res) => {
 router.get('/', async (_req, res) => {
   try {
     const { rows } = await pool.query<CustomerSummaryRow>(
-      `SELECT id, name, slug, dashboard_id, created_at
+      `SELECT id, name, slug, dashboard_id, access_token, created_at
        FROM customers
        ORDER BY created_at DESC`,
     );
@@ -103,21 +111,46 @@ router.get('/', async (_req, res) => {
 });
 
 // ─── GET /api/customers/:slug/dashboard ──────────────────────────────────────
-// NOTE: Must be declared *before* `/:id` so the slug route wins for paths like
-// `/acme-corp/dashboard` instead of being swallowed by the UUID handler.
+// NOTE: Must be declared *before* `/:id` so the slug route wins.
+// If customer.access_token is set, the request must supply it via
+// ?token=xyz  OR  x-dashboard-token header. Null token = open access.
 
 router.get('/:slug/dashboard', async (req, res) => {
   try {
+    const { rows: customerRows } = await pool.query<{
+      id:           string;
+      access_token: string | null;
+    }>(
+      `SELECT id, access_token FROM customers WHERE slug = $1`,
+      [req.params.slug],
+    );
+
+    if (customerRows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const customer = customerRows[0];
+
+    // Token validation: if customer has access_token set, require it
+    if (customer.access_token !== null) {
+      const providedToken =
+        (req.query.token as string | undefined) ||
+        (req.get('x-dashboard-token') as string | undefined);
+      if (!providedToken || providedToken !== customer.access_token) {
+        return res.status(401).json({ error: 'Invalid access token' });
+      }
+    }
+
     const { rows } = await pool.query<{
-      customer_id:     string;
-      customer_name:   string;
-      customer_slug:   string;
-      brand_config:    Record<string, unknown>;
-      dashboard_id:    string | null;
-      dashboard_name:  string | null;
-      dashboard_slug:  string | null;
-      dashboard_cfg:   unknown;
-      dashboard_status:string | null;
+      customer_id:      string;
+      customer_name:    string;
+      customer_slug:    string;
+      brand_config:     Record<string, unknown>;
+      dashboard_id:     string | null;
+      dashboard_name:   string | null;
+      dashboard_slug:   string | null;
+      dashboard_cfg:    unknown;
+      dashboard_status: string | null;
     }>(
       `SELECT
          c.id          AS customer_id,
@@ -140,8 +173,8 @@ router.get('/:slug/dashboard', async (req, res) => {
          ORDER BY (d.id = c.dashboard_id) DESC, d.published_at DESC
          LIMIT 1
        ) d ON TRUE
-       WHERE c.slug = $1`,
-      [req.params.slug],
+       WHERE c.id = $1`,
+      [customer.id],
     );
 
     if (rows.length === 0) {
@@ -149,9 +182,8 @@ router.get('/:slug/dashboard', async (req, res) => {
     }
 
     const row = rows[0];
-    const isLive = row.dashboard_status === 'live';
 
-    if (!row.dashboard_id || !isLive) {
+    if (!row.dashboard_id || row.dashboard_status !== 'live') {
       return res.status(404).json({ error: 'No live dashboard assigned to this customer' });
     }
 
@@ -180,7 +212,7 @@ router.get('/:slug/dashboard', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { rows } = await pool.query<CustomerRow>(
-      `SELECT id, name, slug, dashboard_id, brand_config, created_at, updated_at
+      `SELECT id, name, slug, dashboard_id, brand_config, access_token, created_at, updated_at
        FROM customers
        WHERE id = $1`,
       [req.params.id],
@@ -231,7 +263,7 @@ router.put('/:id', async (req, res) => {
       `UPDATE customers
        SET ${setClauses.join(', ')}
        WHERE id = $${i}
-       RETURNING id, name, slug, dashboard_id, brand_config, created_at, updated_at`,
+       RETURNING id, name, slug, dashboard_id, brand_config, access_token, created_at, updated_at`,
       values,
     );
     if (rows.length === 0) {
@@ -284,7 +316,7 @@ router.get('/:id/dashboards', async (req, res) => {
        JOIN dashboard_assignments da ON da.dashboard_id = d.id
        WHERE da.customer_id = $1 AND d.status = 'live'
        ORDER BY d.published_at DESC`,
-      [req.params.id]
+      [req.params.id],
     );
     return res.json(rows);
   } catch (err) {
@@ -292,6 +324,57 @@ router.get('/:id/dashboards', async (req, res) => {
       return res.status(400).json({ error: 'Invalid customer ID' });
     }
     console.error('[customers] list dashboards:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── POST /api/customers/:id/rotate-token ────────────────────────────────────
+// Generate a new access token and replace the old one.
+
+router.post('/:id/rotate-token', async (req, res) => {
+  try {
+    const newToken = generateAccessToken();
+    const { rows } = await pool.query<CustomerRow>(
+      `UPDATE customers
+       SET access_token = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, name, slug, dashboard_id, brand_config, access_token, created_at, updated_at`,
+      [newToken, req.params.id],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    return res.json(rows[0]);
+  } catch (err) {
+    if (pgCode(err) === PG_INVALID_UUID) {
+      return res.status(400).json({ error: 'Invalid customer ID' });
+    }
+    console.error('[customers] rotate-token:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── POST /api/customers/:id/clear-token ─────────────────────────────────────
+// Disable token requirement by setting access_token to NULL (backwards compatible).
+
+router.post('/:id/clear-token', async (req, res) => {
+  try {
+    const { rows } = await pool.query<CustomerRow>(
+      `UPDATE customers
+       SET access_token = NULL, updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, name, slug, dashboard_id, brand_config, access_token, created_at, updated_at`,
+      [req.params.id],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    return res.json(rows[0]);
+  } catch (err) {
+    if (pgCode(err) === PG_INVALID_UUID) {
+      return res.status(400).json({ error: 'Invalid customer ID' });
+    }
+    console.error('[customers] clear-token:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

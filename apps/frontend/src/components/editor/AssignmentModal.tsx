@@ -7,6 +7,7 @@ interface Customer {
   id: string;
   name: string;
   slug: string;
+  access_token?: string | null;
 }
 
 interface AssignmentModalProps {
@@ -29,6 +30,8 @@ export default function AssignmentModal({ dashboardId: propDashboardId, onClose,
   const [newName, setNewName] = useState('');
   const [newSlug, setNewSlug] = useState('');
   const [isCreatingLoading, setIsCreatingLoading] = useState(false);
+  const [tokenBusyId, setTokenBusyId] = useState<string | null>(null);
+  const [copiedCustomerId, setCopiedCustomerId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -117,6 +120,46 @@ export default function AssignmentModal({ dashboardId: propDashboardId, onClose,
     }
   };
 
+  const updateCustomerInList = (updated: Customer) => {
+    setCustomers(prev => prev.map(customer => customer.id === updated.id ? { ...customer, ...updated } : customer));
+  };
+
+  const handleTokenAction = async (customer: Customer, action: 'rotate' | 'clear') => {
+    setTokenBusyId(customer.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${customer.id}/${action}-token`, {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to ${action} token`);
+      }
+
+      updateCustomerInList(await res.json());
+    } catch (err: any) {
+      alert(err.message || 'Failed to update token');
+    } finally {
+      setTokenBusyId(null);
+    }
+  };
+
+  const getShareUrl = (customer: Customer) => {
+    const baseUrl = `${window.location.origin}/c/${customer.slug}`;
+    if (!customer.access_token) return baseUrl;
+    return `${baseUrl}?token=${encodeURIComponent(customer.access_token)}`;
+  };
+
+  const copyShareUrl = async (customer: Customer) => {
+    try {
+      await navigator.clipboard.writeText(getShareUrl(customer));
+      setCopiedCustomerId(customer.id);
+      window.setTimeout(() => setCopiedCustomerId(null), 1600);
+    } catch {
+      alert('Failed to copy URL');
+    }
+  };
+
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(search.toLowerCase()) || 
     c.slug.toLowerCase().includes(search.toLowerCase())
@@ -199,18 +242,48 @@ export default function AssignmentModal({ dashboardId: propDashboardId, onClose,
                 <div className="customer-list-container">
                   <div className="customer-list">
                     {filteredCustomers.map(customer => (
-                      <label key={customer.id} className={`customer-item ${assignedCustomerIds.has(customer.id) ? 'selected' : ''}`}>
+                      <div key={customer.id} className={`customer-item ${assignedCustomerIds.has(customer.id) ? 'selected' : ''}`}>
                         <input 
                           type="checkbox" 
                           checked={assignedCustomerIds.has(customer.id)}
                           onChange={() => handleToggle(customer.id)}
                         />
-                        <div className="customer-info">
+                        <div className="customer-info" onClick={() => handleToggle(customer.id)}>
                           <span className="customer-name">{customer.name}</span>
                           <span className="customer-slug">@{customer.slug}</span>
+                          <div className="customer-share-url" title={getShareUrl(customer)}>
+                            {getShareUrl(customer)}
+                          </div>
+                          <div className="customer-token-actions" onClick={e => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="btn-token-action"
+                              onClick={() => copyShareUrl(customer)}
+                            >
+                              {copiedCustomerId === customer.id ? 'Copied' : 'Copy URL'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-token-action"
+                              disabled={tokenBusyId === customer.id}
+                              onClick={() => handleTokenAction(customer, 'rotate')}
+                            >
+                              {customer.access_token ? 'Rotate Token' : 'Require Token'}
+                            </button>
+                            {customer.access_token && (
+                              <button
+                                type="button"
+                                className="btn-token-action danger"
+                                disabled={tokenBusyId === customer.id}
+                                onClick={() => handleTokenAction(customer, 'clear')}
+                              >
+                                Turn Off
+                              </button>
+                            )}
+                          </div>
                         </div>
                         {assignedCustomerIds.has(customer.id) && <span className="check-mark">✓</span>}
-                      </label>
+                      </div>
                     ))}
                     {filteredCustomers.length === 0 && (
                       <div className="empty-state">No customers matching "{search}"</div>

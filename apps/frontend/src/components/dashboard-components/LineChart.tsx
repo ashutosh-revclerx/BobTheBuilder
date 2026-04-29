@@ -17,6 +17,7 @@ import { executeQuery } from '../../engine/queryEngine';
 import { parseQueryName, runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
 import QueryErrorBanner from '../ui/QueryErrorBanner';
+import { resolveBackground } from '../../utils/styleUtils';
 
 const COLOR_SCHEMES = {
   Blue: ['#2563eb', '#60a5fa', '#3b82f6'],
@@ -52,14 +53,14 @@ export default function LineChart({ config }: { config: ComponentConfig }) {
   const chartData = Array.isArray(rawData) ? rawData : [];
   const series = data.series || [{ name: 'Value', fieldKey: 'value' }];
   const activeSeries = data.yField ? [{ name: 'Value', fieldKey: data.yField }] : series;
-  const palette = COLOR_SCHEMES[data.colorScheme || 'Blue'];
+  const palette = style.seriesColors?.length ? style.seriesColors : COLOR_SCHEMES[data.colorScheme || 'Blue'];
   const xKey = data.xField || 'label';
 
   return (
     <div
       className="chart-component"
       style={{
-        backgroundColor: style.backgroundColor,
+        background: resolveBackground(style),
         fontFamily: style.fontFamily,
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         borderColor: style.borderColor,

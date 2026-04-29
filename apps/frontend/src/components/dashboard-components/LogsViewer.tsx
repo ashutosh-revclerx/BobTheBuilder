@@ -5,6 +5,7 @@ import { executeQuery } from '../../engine/queryEngine';
 import { parseQueryName } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
 import QueryErrorBanner from '../ui/QueryErrorBanner';
+import { resolveBackground } from '../../utils/styleUtils';
 
 interface LogsViewerProps {
   config: ComponentConfig;
@@ -79,7 +80,7 @@ export default function LogsViewer({ config }: LogsViewerProps) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: style.backgroundColor || '#ffffff',
+        background: resolveBackground(style),
         fontFamily: style.fontFamily || 'Fira Code',
         fontSize: style.fontSize ? `${style.fontSize}px` : '12px',
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : '4px',

@@ -31,6 +31,29 @@ export interface ComponentStyle {
   showDataLabels?: boolean;
   lineWidth?: number;
   levelColors?: Record<'INFO' | 'WARN' | 'ERROR' | 'DEBUG', string>;
+  backgroundGradient?: {
+    enabled: boolean;
+    direction: number;
+    stops: Array<{ color: string; position: number }>;
+  };
+  // Chart-specific
+  seriesColors?: string[];
+  gridColor?: string;
+  axisColor?: string;
+  // Button-specific
+  hoverBackgroundColor?: string;
+  fontWeight?: number;
+  textTransform?: 'none' | 'uppercase' | 'capitalize';
+  // Table-specific
+  selectedRowColor?: string;
+  stripeRows?: boolean;
+  // StatCard-specific
+  labelFontSize?: number;
+  // Set by variants.py; used by components
+  mutedColor?: string;
+  focusBorderColor?: string;
+  borderLeftColor?: string;
+  borderLeftWidth?: number;
 }
 
 export interface ComponentEvent {
@@ -138,6 +161,7 @@ export interface ComponentData {
   multiSelect?: boolean;
   optionsSource?: 'Static' | 'From query';
   queryBinding?: string;
+  queryBindingConfig?: Record<string, unknown>;
   labelField?: string;
   valueField?: string;
   optionsList?: SelectOptionItem[];

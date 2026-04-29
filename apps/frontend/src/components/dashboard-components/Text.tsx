@@ -1,5 +1,6 @@
 import type { ComponentConfig } from '../../types/template';
 import { evaluateExpression } from '../../engine/runtimeUtils';
+import { resolveBackground } from '../../utils/styleUtils';
 
 export default function Text({ config }: { config: ComponentConfig }) {
   const { style, data } = config;
@@ -24,7 +25,7 @@ export default function Text({ config }: { config: ComponentConfig }) {
         fontFamily: style.fontFamily,
         fontSize: `${style.fontSize}px`,
         padding: `${style.padding}px`,
-        backgroundColor: style.backgroundColor,
+        background: resolveBackground(style),
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         border: style.borderWidth ? `${style.borderWidth}px solid ${style.borderColor || '#000000'}` : undefined,
         height: '100%',
@@ -34,8 +35,6 @@ export default function Text({ config }: { config: ComponentConfig }) {
         lineHeight: style.lineHeight,
         overflow: style.overflow === 'Scroll' ? 'auto' : 'hidden',
         textOverflow: style.overflow === 'Truncate' ? 'ellipsis' : undefined,
-        // Truncate stays single-line; everything else (Wrap, Scroll, default)
-        // wraps and respects newlines so long content uses the full box.
         whiteSpace: style.overflow === 'Truncate' ? 'nowrap' : 'pre-wrap',
         wordBreak: 'break-word',
         cursor: data.linkTo ? 'pointer' : 'default',

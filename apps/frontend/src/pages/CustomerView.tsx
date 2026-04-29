@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useEditorStore } from '../store/editorStore';
 import { executeOnLoadQueries, watchDependencies, resetReactiveState } from '../engine/queryEngine';
 import { GridLayer } from '../components/editor/GridLayer';
@@ -64,6 +64,7 @@ type FetchState =
 export default function CustomerView() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const loadTemplate = useEditorStore((s) => s.loadTemplate);
   const queriesConfig = useEditorStore((s) => s.queriesConfig);
 
@@ -75,14 +76,30 @@ export default function CustomerView() {
 
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/customers/${encodeURIComponent(slug)}/dashboard`);
+        // Extract token from query params or header
+        const params = new URLSearchParams(location.search);
+        const token = params.get('token') || '';
+
+        const url = new URL(`${API_BASE}/api/customers/${encodeURIComponent(slug)}/dashboard`);
+        if (token) {
+          url.searchParams.set('token', token);
+        }
+
+        const res = await fetch(url.toString());
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           if (!cancelled) {
-            setState({
-              status:  'error',
-              message: body?.error || 'Dashboard not found',
-            });
+            if (res.status === 401) {
+              setState({
+                status:  'error',
+                message: 'Invalid or missing access token',
+              });
+            } else {
+              setState({
+                status:  'error',
+                message: body?.error || 'Dashboard not found',
+              });
+            }
           }
           return;
         }
@@ -104,7 +121,7 @@ export default function CustomerView() {
     })();
 
     return () => { cancelled = true; };
-  }, [slug, loadTemplate]);
+  }, [slug, loadTemplate, location.search]);
 
   // Fire onLoad queries once queriesConfig has landed in the store, seed
   // dependency baselines, and subscribe for reactive re-runs.
@@ -135,9 +152,12 @@ export default function CustomerView() {
     return (
       <div className="customer-view-centered">
         <div className="customer-view-error">
-          <h2>Dashboard not found</h2>
-          <p>{state.message}</p>
-          <button className="btn-topbar" onClick={() => navigate('/templates')}>
+          <h2>🔒 Access Denied</h2>
+          <p>This dashboard is private and requires a valid access token.</p>
+          <p style={{ fontSize: '12px', color: '#666', marginTop: '12px' }}>
+            Contact the dashboard owner for access.
+          </p>
+          <button className="btn-topbar" onClick={() => navigate('/templates')} style={{ marginTop: '16px' }}>
             Back
           </button>
         </div>

@@ -1,6 +1,7 @@
 import type { ComponentConfig } from '../../types/template';
 import { runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
+import { resolveBackground } from '../../utils/styleUtils';
 
 function formatValue(value: number, formatter: string | undefined) {
   if (formatter === 'Currency') {
@@ -37,7 +38,7 @@ export default function NumberInput({ config }: { config: ComponentConfig }) {
             runAction(data.onChangeAction, nextValue);
           }}
           style={{
-            backgroundColor: style.backgroundColor,
+            background: resolveBackground(style),
             color: style.textColor,
             fontFamily: style.fontFamily,
             fontSize: `${style.fontSize}px`,

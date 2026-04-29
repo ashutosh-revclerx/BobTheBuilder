@@ -3,6 +3,7 @@ import type { ComponentConfig, ComponentType } from '../../types/template';
 import InlinePicker from '../editor/InlinePicker';
 import { GridLayer } from '../editor/GridLayer';
 import { useEditorStore } from '../../store/editorStore';
+import { resolveBackground } from '../../utils/styleUtils';
 
 interface ContainerProps {
   config: ComponentConfig;
@@ -26,7 +27,7 @@ export default function Container({ config, componentMap, readOnly = false }: Co
     <div
       className="container-component"
       style={{
-        backgroundColor: style.backgroundColor,
+        background: resolveBackground(style),
         borderRadius: `${style.borderRadius}px`,
         borderColor: style.borderColor,
         borderWidth: `${style.borderWidth}px`,

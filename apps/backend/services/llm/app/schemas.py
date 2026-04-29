@@ -82,6 +82,7 @@ class DashboardConfig(BaseModel):
 class GeneratedVariant(BaseModel):
     """One candidate dashboard. The user picks one of these in the UI."""
     name: str
+    philosophy: str | None = None
     config: DashboardConfig
 
 
