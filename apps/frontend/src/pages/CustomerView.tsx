@@ -17,6 +17,8 @@ import Text from '../components/dashboard-components/Text';
 import TextInput from '../components/dashboard-components/TextInput';
 import NumberInput from '../components/dashboard-components/NumberInput';
 import Select from '../components/dashboard-components/Select';
+import Image from '../components/dashboard-components/Image';
+import Embed from '../components/dashboard-components/Embed';
 import type { ComponentType } from '../types/template';
 
 const API_BASE = 'http://localhost:3001';
@@ -35,6 +37,8 @@ const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
   TextInput,
   NumberInput,
   Select,
+  Image,
+  Embed,
 };
 
 interface CustomerPayload {

@@ -35,14 +35,14 @@ Features that change *what* you can build. Mostly Ayushmaan — these touch rout
 
 | # | Title | Owner | Pri | Size |
 |---|---|---|---|---|
-| 8  | New components: **Image** + **About** | Ayushmaan | 🟡 | M |
-| 11 | Auto-adjust components — wrap to next row when minW is hit by viewport | Ayushmaan | 🟡 | M |
+| 8  | New component: **Image** (URL or base64 upload, 500KB cap) — *About dropped, can be built from Container + Text* | Ayushmaan | 🟡 | M |
+| 11 | Auto-adjust components — wrap to next row when minW is hit by viewport — *deferred; mobile preview (#14) gives engineers the visibility to fix layouts manually for now* | Ayushmaan | 🟢 | L |
 | 12 | Audit pass: every component reviewed for missing fields / sane defaults | Ayushmaan + Ashutosh | 🟡 | L |
 | 13 | Copy/duplicate a component on the canvas (right-click or Cmd-D) | Ashutosh | 🟡 | S |
-| 14 | Mobile preview toggle (Desktop / 375px) — same builder, narrower canvas | Ayushmaan | 🟢 | M |
+| 14 | Mobile preview toggle (Desktop / 375px) — same builder, narrower canvas | Ayushmaan | 🟢 | M | ✅ shipped |
 | 15 | Editing a pre-built template currently doesn't save — fix the template→DB path | Ayushmaan | 🔴 | M |
 | 16 | Left sidebar — Layers panel + Settings panel | Ashutosh | 🟢 | M |
-| 25 | New **Embed** component — give it a URL, it iframes/fetches it | Ayushmaan | 🟢 | M |
+| 25 | New **Embed** component — paste a URL (YouTube/Vimeo auto-convert to embed URL, anything else used as-is), sandboxed iframe | Ayushmaan | 🟢 | M |
 
 ---
 

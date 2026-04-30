@@ -200,6 +200,11 @@ export interface ComponentData {
   onErrorAction?: string;
   expression?: boolean;
   linkTo?: string;
+  // Image component
+  src?:           string;
+  uploadedSrc?:   string;  // base64 data URL when user uploads from disk
+  alt?:           string;
+  fit?:           'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
 }
 
 export type ComponentType =
@@ -215,7 +220,9 @@ export type ComponentType =
   | 'Text'
   | 'TextInput'
   | 'NumberInput'
-  | 'Select';
+  | 'Select'
+  | 'Image'
+  | 'Embed';
 
 export interface ComponentConfig {
   id: string;

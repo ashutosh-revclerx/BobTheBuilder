@@ -19,6 +19,8 @@ const DEFAULT_SIZES: Record<string, {w:number, h:number}> = {
   TextInput:       { w: 3, h: 6 },
   NumberInput:     { w: 3, h: 6 },
   Select:          { w: 3, h: 6 },
+  Image:           { w: 4, h: 8 },
+  Embed:           { w: 6, h: 10 },
 };
 
 function FloatingLabel({ text }: { text: string }) {
