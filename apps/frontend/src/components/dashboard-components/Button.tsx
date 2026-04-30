@@ -10,12 +10,8 @@ interface ButtonProps {
   config: ComponentConfig;
 }
 
-const VARIANT_STYLES = {
-  Primary: { backgroundColor: '#2563eb', color: '#ffffff', borderColor: '#2563eb' },
-  Secondary: { backgroundColor: '#f2f4f7', color: '#0f1117', borderColor: '#e3e6ec' },
-  Danger: { backgroundColor: '#dc2626', color: '#ffffff', borderColor: '#dc2626' },
-  Ghost: { backgroundColor: 'transparent', color: '#2563eb', borderColor: '#e3e6ec' },
-} as const;
+// Styles are now managed via the editor store and passed through config.style.
+// The variant property acts as a preset that updates individual style fields in the store.
 
 const Button = React.memo(function Button({ config }: ButtonProps) {
   const { style, data, label } = config;
@@ -32,7 +28,6 @@ const Button = React.memo(function Button({ config }: ButtonProps) {
   const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === targetQueryName) as QueryConfig | undefined;
   const loading = localLoading || queryState?.status === 'loading';
   const disabled = evaluateBooleanExpression(data.disabled, false) || loading;
-  const variant = VARIANT_STYLES[style.variant || 'Primary'];
 
   const runQuery = async () => {
     if (!queryConfig) {
@@ -70,8 +65,8 @@ const Button = React.memo(function Button({ config }: ButtonProps) {
       ref={el => {
         if (el) {
           el.style.setProperty('--comp-bg', bg);
-          el.style.setProperty('--comp-border', style.borderColor || variant.borderColor);
-          el.style.setProperty('--comp-text', style.textColor || variant.color);
+          el.style.setProperty('--comp-border', style.borderColor || '#2563eb');
+          el.style.setProperty('--comp-text', style.textColor || '#ffffff');
         }
       }}
       style={{
