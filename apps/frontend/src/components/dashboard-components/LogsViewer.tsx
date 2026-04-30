@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { QueryConfig } from '@btb/shared';
 import type { ComponentConfig } from '../../types/template';
 import { executeQuery } from '../../engine/queryEngine';
@@ -17,13 +17,16 @@ function isLogRecord(entry: unknown): entry is LogRecord {
   return typeof entry === 'object' && entry !== null && !Array.isArray(entry);
 }
 
-export default function LogsViewer({ config }: LogsViewerProps) {
+const LogsViewer = React.memo(function LogsViewer({ config }: LogsViewerProps) {
   const { style, data, label } = config;
   const queryResults = useEditorStore((state) => state.queryResults);
   const queriesConfig = useEditorStore((state) => state.queriesConfig);
   const queryName = parseQueryName(data.dbBinding);
   const queryState = queryName ? queryResults[queryName] : undefined;
   const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === queryName) as QueryConfig | undefined;
+  
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
+  
   const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,14 +80,21 @@ export default function LogsViewer({ config }: LogsViewerProps) {
   return (
     <div
       className="logs-viewer-component"
+      ref={el => {
+        if (el) {
+          el.style.setProperty('--comp-bg', bg);
+          el.style.setProperty('--comp-border', style.borderColor ?? '');
+          el.style.setProperty('--comp-text', style.textColor ?? '');
+        }
+      }}
       style={{
         display: 'flex',
         flexDirection: 'column',
-        background: resolveBackground(style),
+        background: 'var(--comp-bg)',
         fontFamily: style.fontFamily || 'Fira Code',
         fontSize: style.fontSize ? `${style.fontSize}px` : '12px',
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : '4px',
-        borderColor: style.borderColor || 'var(--border)',
+        borderColor: 'var(--comp-border)',
         borderWidth: style.borderWidth !== undefined ? `${style.borderWidth}px` : '1px',
         borderStyle: 'solid',
         padding: '0',
@@ -97,7 +107,7 @@ export default function LogsViewer({ config }: LogsViewerProps) {
         style={{
           padding: '8px 12px',
           borderBottom: '1px solid var(--border)',
-          color: style.textColor || 'var(--text-primary)',
+          color: 'var(--comp-text)',
           fontWeight: 600,
           fontFamily: 'Inter',
           fontSize: '13px',
@@ -111,7 +121,21 @@ export default function LogsViewer({ config }: LogsViewerProps) {
           {label || 'Terminal Logs'}
         </div>
         {data.logSearchable && (
-          <input type="text" className="form-input" placeholder="Search logs..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <input 
+            type="text" 
+            className="form-input logs-search-input" 
+            placeholder="Search logs..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            style={{
+              backgroundColor: style.searchBarBackground || 'var(--bg-primary)',
+              color: style.searchBarTextColor || 'var(--text-primary)',
+              borderColor: style.searchBarBorderColor || 'var(--border)',
+              fontSize: style.fontSize ? `${Math.max(11, style.fontSize - 2)}px` : '11px',
+              padding: '4px 8px',
+              height: 'auto',
+            }}
+          />
         )}
       </div>
       <div
@@ -126,6 +150,7 @@ export default function LogsViewer({ config }: LogsViewerProps) {
           gap: '4px',
           minHeight: 0,
           whiteSpace: data.wrapLines ? 'pre-wrap' : 'pre',
+          lineHeight: style.lineHeight || 1.5,
         }}
       >
         {queryState?.status === 'error' && queryConfig ? (
@@ -148,4 +173,6 @@ export default function LogsViewer({ config }: LogsViewerProps) {
       </div>
     </div>
   );
-}
+});
+
+export default LogsViewer;

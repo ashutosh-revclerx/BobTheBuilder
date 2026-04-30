@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { QueryConfig } from '@btb/shared';
 import { truncateTexts } from '../../hooks/useTextMeasure';
 import { executeQuery } from '../../engine/queryEngine';
@@ -32,7 +32,9 @@ function TruncatedCell({
   const [hover, setHover] = useState(false);
   const str = String(text ?? '');
   const availableWidth = colWidth - 32;
-  const result = availableWidth > 0 ? truncateTexts([str], availableWidth)[0] : { display: str, full: str, isTruncated: false };
+  const result = useMemo(() => {
+    return availableWidth > 0 ? truncateTexts([str], availableWidth)[0] : { display: str, full: str, isTruncated: false };
+  }, [availableWidth, str]);
 
   if (isEditorMode) {
     return (
@@ -83,7 +85,7 @@ function matchesRule(row: Record<string, unknown>, rule: TableConditionalRowColo
   }
 }
 
-export default function Table({ config, id, onRowClick, selectedRowId, isEditorMode = true }: TableProps) {
+const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId, isEditorMode = true }: TableProps) {
   const componentId = id || config.id;
   const { style, data, label } = config;
   const updateData = useEditorStore((state) => state.updateData);
@@ -95,6 +97,8 @@ export default function Table({ config, id, onRowClick, selectedRowId, isEditorM
   const queryState = boundQueryName ? queryResults[boundQueryName] : undefined;
   const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === boundQueryName) as QueryConfig | undefined;
   const selectedRow = componentState[componentId]?.selectedRow as Record<string, unknown> | null | undefined;
+
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
 
   const columns = data.columns || [];
   const visibleColumns = columns.filter((column) => data.columnVisibility?.[column.fieldKey] !== false);
@@ -186,24 +190,46 @@ export default function Table({ config, id, onRowClick, selectedRowId, isEditorM
   return (
     <div
       className="table-component"
+      ref={el => {
+        if (el) {
+          el.style.setProperty('--comp-bg', bg);
+          el.style.setProperty('--comp-border', style.borderColor ?? '');
+          el.style.setProperty('--comp-text', style.textColor ?? '');
+        }
+      }}
       style={{
-        background: resolveBackground(style),
+        background: 'var(--comp-bg)',
         fontFamily: style.fontFamily,
         fontSize: style.fontSize ? `${style.fontSize}px` : undefined,
-        borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
-        borderColor: style.borderColor,
+        borderColor: 'var(--comp-border)',
         borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
         borderStyle: 'solid',
+        borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        padding: 0,
       }}
     >
       <div className="table-component-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div className="table-component-title" style={{ color: style.textColor }}>{label}</div>
+        <div className="table-component-title" style={{ color: 'var(--comp-text)' }}>{label}</div>
         {data.searchable ? (
-          <input className="form-input" type="text" placeholder="Search..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
+          <input 
+            className="form-input table-search-input" 
+            type="text" 
+            placeholder="Search..." 
+            value={searchTerm} 
+            onChange={(event) => setSearchTerm(event.target.value)} 
+            style={{
+              backgroundColor: style.searchBarBackground || 'var(--bg-primary)',
+              color: style.searchBarTextColor || 'var(--text-primary)',
+              borderColor: style.searchBarBorderColor || 'var(--border)',
+              fontSize: style.fontSize ? `${Math.max(11, style.fontSize - 2)}px` : '12px',
+              padding: '4px 8px',
+              height: 'auto',
+            }}
+          />
         ) : null}
       </div>
 
@@ -270,4 +296,6 @@ export default function Table({ config, id, onRowClick, selectedRowId, isEditorM
       ) : null}
     </div>
   );
-}
+});
+
+export default Table;

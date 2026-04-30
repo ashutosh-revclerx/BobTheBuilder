@@ -782,8 +782,11 @@ body {
 }
 .preview-mode .builder-canvas-wrapper {
   width: 100%;
-  margin: 0;
+  max-width: 1200px;
+  margin: 0 auto;
   padding: 0;
+  box-shadow: 0 0 40px rgba(0,0,0,0.05);
+  background-color: var(--bg-primary);
 }
 .builder-canvas-wrapper.drop-active {
   background-image: radial-gradient(circle, rgba(37,99,235,0.12) 1px, transparent 1px);
@@ -4250,4 +4253,153 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   line-height: 1;
+}
+
+/* Context Menu */
+.canvas-context-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  min-width: 160px;
+  animation: contextMenuFade 150ms ease-out;
+}
+
+@keyframes contextMenuFade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 150ms ease;
+  font-family: inherit;
+}
+
+.menu-item:hover {
+  background: var(--bg-surface);
+}
+
+.menu-item.danger {
+  color: var(--danger);
+}
+
+.menu-item.danger:hover {
+  background: rgba(255, 71, 87, 0.08);
+}
+
+.menu-icon {
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* ─── Image upload control (DataTab) ─────────────────────────────────────── */
+.image-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.image-upload-input {
+  font-size: 12px;
+  flex: 1;
+  min-width: 160px;
+}
+
+.image-component {
+  background: var(--bg-surface, #fff);
+}
+
+.image-component img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* ─── Embed component ────────────────────────────────────────────────────── */
+.embed-component {
+  position: relative;
+}
+
+.embed-component__editor-hint {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #ffffff;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 2;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Device toggle (Desktop / Mobile) in builder topbar ─────────────────── */
+.device-toggle {
+  display: inline-flex;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 2px;
+  margin-right: 4px;
+}
+
+.device-toggle__btn {
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 120ms ease, color 120ms ease;
+  color: #6b7280;
+}
+
+.device-toggle__btn:hover {
+  color: #0f1117;
+}
+
+.device-toggle__btn--active {
+  background: #ffffff;
+  color: #1d4ed8;
+  box-shadow: 0 1px 2px rgba(15, 17, 23, 0.06);
+}
+
+/* When the user picks Mobile, constrain the canvas to a phone-sized column,
+   centred. Components that don't fit will visibly overflow — that's the
+   feedback the engineer needs to fix their layout. */
+.builder-layout.device-mobile .builder-canvas-wrapper {
+  max-width: 375px;
+  margin: 0 auto;
+  border-left: 2px dashed #2563eb;
+  border-right: 2px dashed #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.18);
+}
+
+.builder-layout.device-mobile .builder-canvas {
+  max-width: 375px;
 }

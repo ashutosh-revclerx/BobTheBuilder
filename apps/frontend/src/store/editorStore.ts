@@ -28,6 +28,8 @@ const COMPONENT_LAYOUTS: Record<ComponentType, LayoutConfig> = {
   BarChart: { x: 0, y: 0, w: 6, h: 12, minW: 3, minH: 6 },
   LineChart: { x: 0, y: 0, w: 6, h: 12, minW: 3, minH: 6 },
   LogsViewer: { x: 0, y: 0, w: 4, h: 12, minW: 4, minH: 4 },
+  Image: { x: 0, y: 0, w: 4, h: 8, minW: 2, minH: 3 },
+  Embed: { x: 0, y: 0, w: 6, h: 10, minW: 3, minH: 4 },
 };
 
 const createBaseData = (): ComponentData => ({
@@ -93,7 +95,9 @@ const createDefaultConfig = (
       return {
         style: {
           ...createBaseStyle(),
-          textColor: '#2563eb',
+          backgroundColor: '#2563eb',
+          textColor: '#ffffff',
+          borderColor: '#2563eb',
           variant: 'Primary',
           iconLeft: '',
           fullWidth: false,
@@ -316,6 +320,8 @@ const createDefaultConfig = (
           showGrid: true,
           xAxisLabel: '',
           yAxisLabel: '',
+          showXAxis: true,
+          showYAxis: true,
           colorScheme: 'Blue',
           onBarClickAction: '',
         },
@@ -347,6 +353,8 @@ const createDefaultConfig = (
           showGrid: true,
           xAxisLabel: '',
           yAxisLabel: '',
+          showXAxis: true,
+          showYAxis: true,
           colorScheme: 'Blue',
           fillArea: false,
           onPointClickAction: '',
@@ -382,6 +390,38 @@ const createDefaultConfig = (
         },
         layout: { ...COMPONENT_LAYOUTS[type] },
       };
+    case 'Image':
+      return {
+        style: {
+          ...createBaseStyle(),
+          backgroundColor: '#f9fafb',
+          padding: 0,
+          borderRadius: 10,
+        },
+        data: {
+          ...createBaseData(),
+          src: '',
+          uploadedSrc: '',
+          alt: '',
+          fit: 'contain',
+          linkTo: '',
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
+    case 'Embed':
+      return {
+        style: {
+          ...createBaseStyle(),
+          backgroundColor: '#000000',
+          padding: 0,
+          borderRadius: 10,
+        },
+        data: {
+          ...createBaseData(),
+          src: '',
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
     default:
       return {
         style: createBaseStyle(),
@@ -405,6 +445,8 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
   TextInput: createDefaultConfig('TextInput'),
   NumberInput: createDefaultConfig('NumberInput'),
   Select: createDefaultConfig('Select'),
+  Image: createDefaultConfig('Image'),
+  Embed: createDefaultConfig('Embed'),
 };
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -450,7 +492,7 @@ const normalizeComponent = (component: ComponentConfig): ComponentConfig => {
 
   return {
     ...component,
-    label: component.label || component.data?.label || `New ${component.type}`,
+    label: component.label ?? component.data?.label ?? `New ${component.type}`,
     visible: typeof visibleValue === 'boolean' ? String(visibleValue) : visibleValue,
     visibleForRoles: normalizeVisibleForRoles(component.visibleForRoles ?? data.visibleForRoles),
     style: {
@@ -497,6 +539,7 @@ interface EditorState {
   rightPanelOpen: boolean;
   lastSelectedComponentId: string | null;
   isPreviewMode: boolean;
+  previewDevice: 'desktop' | 'mobile';
   rightPanelTab: 'style' | 'data' | 'theme';
   isDirty: boolean;
   status: 'draft' | 'live';
@@ -509,6 +552,7 @@ interface EditorState {
   setDashboardName: (name: string) => void;
   updateStyle: (componentId: string, style: Partial<ComponentStyle>) => void;
   updateData: (componentId: string, data: Partial<ComponentData>) => void;
+  updateLabel: (componentId: string, label: string) => void;
   updateLayouts: (layouts: { id: string; x: number; y: number; w: number; h: number }[]) => void;
   addComponent: (
     type: ComponentType,
@@ -534,11 +578,13 @@ interface EditorState {
   setQueryState: (queryName: string, state: Partial<QueryState>) => void;
   setComponentState: (componentId: string, key: string, value: unknown) => void;
   setIsPreviewMode: (val: boolean) => void;
+  setPreviewDevice: (device: 'desktop' | 'mobile') => void;
   togglePreviewMode: () => void;
   setRightPanelTab: (tab: 'style' | 'data' | 'theme') => void;
   upsertQuery: (query: Record<string, unknown> & { name: string }) => void;
   setStatus: (status: 'draft' | 'live', publishedAt: string | null) => void;
   applyThemeToAll: (paletteName: 'Cobalt' | 'Forest' | 'Graphite' | 'Amber' | 'Obsidian') => void;
+  duplicateComponent: (id?: string) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -558,6 +604,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   rightPanelOpen: true,
   lastSelectedComponentId: null,
   isPreviewMode: false,
+  previewDevice: 'desktop',
   rightPanelTab: 'style',
   isDirty: false,
   status: 'draft',
@@ -714,6 +761,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
+  updateLabel: (componentId, label) => {
+    set((state) => ({
+      components: state.components.map((c) => 
+        c.id === componentId ? normalizeComponent({ ...c, label }) : c
+      ),
+      isDirty: true,
+    }));
+  },
+
   updateLayouts: (newLayouts) => {
     set((state) => ({
       components: state.components.map((component) => {
@@ -823,6 +879,76 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         components: state.components.filter((component) => !idsToRemove.has(component.id)),
         selectedComponentId: idsToRemove.has(state.selectedComponentId || '') ? null : state.selectedComponentId,
+        isDirty: true,
+      };
+    });
+  },
+
+  duplicateComponent: (id) => {
+    set((state) => {
+      const targetId = id || state.selectedComponentId;
+      if (!targetId) return state;
+
+      const source = state.components.find((c) => c.id === targetId);
+      if (!source) return state;
+
+      const newIdMap: Record<string, string> = {};
+      const componentsToDuplicate: ComponentConfig[] = [];
+
+      const collect = (cid: string) => {
+        const comp = state.components.find((c) => c.id === cid);
+        if (!comp) return;
+
+        const newCid = `${comp.type.toLowerCase()}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        newIdMap[cid] = newCid;
+        componentsToDuplicate.push(comp);
+
+        state.components
+          .filter((c) => c.parentId === cid)
+          .forEach((child) => collect(child.id));
+      };
+
+      collect(targetId);
+
+      const duplicated = componentsToDuplicate.map((comp) => {
+        const newCid = newIdMap[comp.id];
+        const newParentId = comp.parentId ? newIdMap[comp.parentId] : undefined;
+
+        const layout = clone(comp.layout);
+        if (comp.id === targetId) {
+          layout.y = (layout.y ?? 0) + (layout.h ?? 2);
+          
+          // Collision check: if the new position overlaps with any existing component at the same level
+          const levelSiblings = state.components.filter(s => 
+            newParentId !== undefined ? s.parentId === newParentId : !s.parentId
+          );
+          
+          let collision = levelSiblings.some(s => 
+            layout.x < (s.layout.x + s.layout.w) && 
+            (layout.x + layout.w) > s.layout.x && 
+            layout.y < (s.layout.y + s.layout.h) && 
+            (layout.y + layout.h) > s.layout.y
+          );
+
+          // If collision, push to bottom
+          if (collision) {
+             layout.y = levelSiblings.reduce((max, s) => Math.max(max, (s.layout?.y ?? 0) + (s.layout?.h ?? 2)), 0);
+          }
+        }
+
+        return {
+          ...clone(comp),
+          id: newCid,
+          parentId: newParentId,
+          layout,
+          label: `${comp.label} (Copy)`,
+        };
+      });
+
+      return {
+        components: [...state.components, ...duplicated],
+        selectedComponentId: newIdMap[targetId],
+        lastSelectedComponentId: newIdMap[targetId],
         isDirty: true,
       };
     });
@@ -950,6 +1076,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   setIsPreviewMode: (val) => set({ isPreviewMode: val }),
+
+  setPreviewDevice: (device) => set({ previewDevice: device }),
 
   setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
 

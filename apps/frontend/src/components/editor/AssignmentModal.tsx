@@ -144,6 +144,34 @@ export default function AssignmentModal({ dashboardId: propDashboardId, onClose,
     }
   };
 
+  const handleDeleteCustomer = async (customer: Customer) => {
+    if (!window.confirm(`Are you sure you want to completely delete the customer "${customer.name}"? This cannot be undone.`)) {
+      return;
+    }
+    
+    setTokenBusyId(customer.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/customers/${customer.id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to delete customer');
+      }
+      
+      setCustomers(prev => prev.filter(c => c.id !== customer.id));
+      setAssignedCustomerIds(prev => {
+        const next = new Set(prev);
+        next.delete(customer.id);
+        return next;
+      });
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete customer');
+    } finally {
+      setTokenBusyId(null);
+    }
+  };
+
   const getShareUrl = (customer: Customer) => {
     const baseUrl = `${window.location.origin}/c/${customer.slug}`;
     if (!customer.access_token) return baseUrl;
@@ -280,6 +308,15 @@ export default function AssignmentModal({ dashboardId: propDashboardId, onClose,
                                 Turn Off
                               </button>
                             )}
+                            <button
+                              type="button"
+                              className="btn-token-action danger"
+                              disabled={tokenBusyId === customer.id}
+                              onClick={() => handleDeleteCustomer(customer)}
+                              title="Delete Customer"
+                            >
+                              Delete
+                            </button>
                           </div>
                         </div>
                         {assignedCustomerIds.has(customer.id) && <span className="check-mark">✓</span>}

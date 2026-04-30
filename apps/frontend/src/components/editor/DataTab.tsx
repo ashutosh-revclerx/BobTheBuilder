@@ -747,6 +747,94 @@ export default function DataTab() {
         </>
       )}
 
+      {type === 'Embed' && (
+        <>
+          <TextField
+            label="URL to embed"
+            value={data.src ?? ''}
+            onChange={(value) => handleDataField('src', value)}
+            placeholder="https://www.youtube.com/watch?v=…"
+          />
+          <FormField label="">
+            <p className="endpoint-picker-hint" style={{ marginTop: -4 }}>
+              YouTube and Vimeo "watch" URLs are auto-converted to embed URLs.
+              For other sites, paste a URL that allows iframing (most public
+              pages do; some block it via X-Frame-Options).
+            </p>
+          </FormField>
+        </>
+      )}
+
+      {type === 'Image' && (
+        <>
+          <TextField
+            label="Image URL"
+            value={data.src ?? ''}
+            onChange={(value) => {
+              handleDataField('src', value);
+              // Picking a URL clears any prior upload so they don't fight.
+              if (value && data.uploadedSrc) handleDataField('uploadedSrc', '');
+            }}
+            placeholder="https://example.com/image.png"
+          />
+          <FormField label="Or upload a file (max 500 KB)">
+            <div className="image-upload-row">
+              <input
+                type="file"
+                accept="image/*"
+                className="image-upload-input"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 500 * 1024) {
+                    alert('Image is larger than 500 KB. Please pick a smaller file or use a URL instead.');
+                    e.currentTarget.value = '';
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    if (typeof reader.result === 'string') {
+                      handleDataField('uploadedSrc', reader.result);
+                      // Uploads take precedence over URL — but keep the URL
+                      // around so the user can revert by clearing the upload.
+                    }
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+              {data.uploadedSrc && (
+                <button
+                  type="button"
+                  className="mini-editor-delete"
+                  onClick={() => handleDataField('uploadedSrc', '')}
+                  title="Remove uploaded image"
+                >
+                  Clear upload
+                </button>
+              )}
+            </div>
+          </FormField>
+          <TextField
+            label="Alt text"
+            value={data.alt ?? ''}
+            onChange={(value) => handleDataField('alt', value)}
+            placeholder="Describe the image (accessibility)"
+          />
+          <SelectField
+            label="Fit"
+            value={data.fit || 'contain'}
+            onChange={(value) => handleDataField('fit', value)}
+            options={['contain', 'cover', 'fill', 'none', 'scale-down']}
+          />
+          <TextField
+            label="Link URL (optional)"
+            value={data.linkTo ?? ''}
+            onChange={(value) => handleDataField('linkTo', value)}
+            placeholder="Open this URL on click"
+          />
+        </>
+      )}
+
       {type === 'TextInput' && (
         <>
           <TextField label="Placeholder" value={data.placeholder ?? ''} onChange={(value) => handleDataField('placeholder', value)} />

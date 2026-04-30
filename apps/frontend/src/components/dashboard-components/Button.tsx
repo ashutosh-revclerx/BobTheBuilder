@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { QueryConfig } from '@btb/shared';
 import type { ComponentConfig } from '../../types/template';
 import { executeQuery } from '../../engine/queryEngine';
@@ -17,13 +17,16 @@ const VARIANT_STYLES = {
   Ghost: { backgroundColor: 'transparent', color: '#2563eb', borderColor: '#e3e6ec' },
 } as const;
 
-export default function Button({ config }: ButtonProps) {
+const Button = React.memo(function Button({ config }: ButtonProps) {
   const { style, data, label } = config;
   const queryResults = useEditorStore((state) => state.queryResults);
   const queriesConfig = useEditorStore((state) => state.queriesConfig);
   const [localLoading, setLocalLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [hovered, setHovered] = useState(false);
+  
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
+  
   const targetQueryName = parseQueryName(data.dbBinding);
   const queryState = targetQueryName ? queryResults[targetQueryName] : undefined;
   const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === targetQueryName) as QueryConfig | undefined;
@@ -64,14 +67,18 @@ export default function Button({ config }: ButtonProps) {
   return (
     <div
       className="button-component"
+      ref={el => {
+        if (el) {
+          el.style.setProperty('--comp-bg', bg);
+          el.style.setProperty('--comp-border', style.borderColor || variant.borderColor);
+          el.style.setProperty('--comp-text', style.textColor || variant.color);
+        }
+      }}
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: style.padding ? `${style.padding}px` : '16px',
-        background: resolveBackground(style),
-        borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
-        border: style.borderWidth ? `${style.borderWidth}px solid ${style.borderColor || 'transparent'}` : undefined,
+        padding: style.padding ? `${style.padding}px` : '0',
         height: '100%',
         overflow: 'visible',
         position: 'relative',
@@ -101,11 +108,13 @@ export default function Button({ config }: ButtonProps) {
           backgroundColor:
             hovered && style.hoverBackgroundColor
               ? style.hoverBackgroundColor
-              : (style.backgroundColor || variant.backgroundColor),
-          color: style.textColor || variant.color,
+              : 'var(--comp-bg)',
+          color: 'var(--comp-text)',
           fontFamily: style.fontFamily,
+          fontStyle: style.fontStyle || 'normal',
+          letterSpacing: style.letterSpacing ? `${style.letterSpacing}px` : 'normal',
           borderRadius: style.borderRadius ? `${style.borderRadius}px` : '6px',
-          border: `${style.borderWidth ?? 1}px solid ${style.borderColor || variant.borderColor}`,
+          border: `${style.borderWidth ?? 1}px solid var(--comp-border)`,
           padding: style.padding ? `${style.padding}px` : '10px 20px',
           cursor: disabled ? 'not-allowed' : 'pointer',
           fontWeight: style.fontWeight ?? 600,
@@ -114,7 +123,7 @@ export default function Button({ config }: ButtonProps) {
           width: style.fullWidth ? '100%' : 'auto',
           minWidth: style.fullWidth ? '100%' : 'unset',
           height: '100%',
-          transition: 'background-color 0.15s, color 0.15s',
+          transition: 'background-color 0.15s, color 0.15s, border-color 0.15s',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -129,4 +138,6 @@ export default function Button({ config }: ButtonProps) {
       </button>
     </div>
   );
-}
+});
+
+export default Button;

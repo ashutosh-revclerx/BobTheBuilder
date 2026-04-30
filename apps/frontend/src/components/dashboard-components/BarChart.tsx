@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import {
   BarChart as RechartsBarChart,
   Bar,
@@ -41,13 +42,16 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
-export default function BarChart({ config }: { config: ComponentConfig }) {
+const BarChart = React.memo(function BarChart({ config }: { config: ComponentConfig }) {
   const { style, data, label } = config;
   const queryResults = useEditorStore((state) => state.queryResults);
   const queriesConfig = useEditorStore((state) => state.queriesConfig);
   const queryName = parseQueryName(data.dbBinding);
   const queryState = queryName ? queryResults[queryName] : undefined;
   const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === queryName) as QueryConfig | undefined;
+  
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
+  
   const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const chartData = Array.isArray(rawData) ? rawData : [];
@@ -60,11 +64,18 @@ export default function BarChart({ config }: { config: ComponentConfig }) {
   return (
     <div
       className="chart-component"
+      ref={el => {
+        if (el) {
+          el.style.setProperty('--comp-bg', bg);
+          el.style.setProperty('--comp-border', style.borderColor ?? '');
+          el.style.setProperty('--comp-text', style.textColor ?? '');
+        }
+      }}
       style={{
-        background: resolveBackground(style),
+        background: 'var(--comp-bg)',
         fontFamily: style.fontFamily,
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
-        borderColor: style.borderColor,
+        borderColor: 'var(--comp-border)',
         borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
         borderStyle: 'solid',
         padding: style.padding ? `${style.padding}px` : undefined,
@@ -73,20 +84,43 @@ export default function BarChart({ config }: { config: ComponentConfig }) {
         flexDirection: 'column',
       }}
     >
-      <div className="chart-component-title" style={{ color: style.textColor }}>{label}</div>
+      <div className="chart-component-title" style={{ color: 'var(--comp-text)' }}>{label}</div>
       <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
         {queryState?.status === 'error' && queryConfig ? (
           <div className="dashboard-query-error-wrap">
             <QueryErrorBanner queryName={queryConfig.name} error={queryState.error || ''} onRetry={() => executeQuery(queryConfig)} />
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={100}>
             <RechartsBarChart data={chartData as Record<string, unknown>[]} layout={isHorizontal ? 'vertical' : 'horizontal'}>
-              {data.showGrid !== false ? <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={!isHorizontal} /> : null}
-              <XAxis dataKey={isHorizontal ? undefined : xKey} type={isHorizontal ? 'number' : 'category'} />
-              <YAxis dataKey={isHorizontal ? xKey : undefined} type={isHorizontal ? 'category' : 'number'} />
-              <Tooltip content={<CustomTooltip />} />
-              {data.showLegend !== false ? <Legend /> : null}
+              {data.showGrid !== false ? (
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke={style.gridColor || "rgba(0,0,0,0.06)"} 
+                  vertical={!isHorizontal} 
+                />
+              ) : null}
+              <XAxis 
+                dataKey={isHorizontal ? undefined : xKey} 
+                type={isHorizontal ? 'number' : 'category'} 
+                hide={data.showXAxis === false}
+                tick={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#94a3b8' }}
+                stroke={style.xAxisColor || style.axisColor || '#e5e7eb'}
+              />
+              <YAxis 
+                dataKey={isHorizontal ? xKey : undefined} 
+                type={isHorizontal ? 'category' : 'number'} 
+                hide={data.showYAxis === false}
+                tick={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#94a3b8' }}
+                stroke={style.yAxisColor || style.axisColor || '#e5e7eb'}
+              />
+              <Tooltip 
+                content={<CustomTooltip />} 
+                contentStyle={{ fontSize: style.fontSize || 12 }}
+              />
+              {data.showLegend !== false ? (
+                <Legend wrapperStyle={{ fontSize: style.fontSize || 12 }} />
+              ) : null}
               {activeSeries.map((seriesItem, index) => (
                 <Bar
                   key={seriesItem.fieldKey}
@@ -97,7 +131,13 @@ export default function BarChart({ config }: { config: ComponentConfig }) {
                   stackId={data.stacked ? 'stack' : undefined}
                   onClick={(entry) => runAction(data.onBarClickAction, entry)}
                 >
-                  {style.showDataLabels ? <LabelList dataKey={seriesItem.fieldKey} position={isHorizontal ? 'right' : 'top'} /> : null}
+                  {style.showDataLabels ? (
+                    <LabelList 
+                      dataKey={seriesItem.fieldKey} 
+                      position={isHorizontal ? 'right' : 'top'} 
+                      style={{ fontSize: style.fontSize || 11, fill: style.textColor || '#666' }}
+                    />
+                  ) : null}
                   {chartData.map((_, cellIndex) => (
                     <Cell key={cellIndex} fill={palette[cellIndex % palette.length]} />
                   ))}
@@ -109,4 +149,6 @@ export default function BarChart({ config }: { config: ComponentConfig }) {
       </div>
     </div>
   );
-}
+});
+
+export default BarChart;

@@ -164,16 +164,6 @@ export default function StyleTab() {
 
       {component.type === 'Table' && (
         <>
-          <ColorField
-            label="Header Background Color"
-            value={style.headerBackgroundColor || '#f2f4f7'}
-            onChange={(value) => handleChange('headerBackgroundColor', value)}
-          />
-          <ColorField
-            label="Alternating Row Color"
-            value={style.rowAlternateColor || '#ffffff'}
-            onChange={(value) => handleChange('rowAlternateColor', value)}
-          />
           <BooleanField label="Strikethrough" value={style.strikethrough === true} onChange={(value) => handleChange('strikethrough', value)} />
           {style.strikethrough && (
             <>
@@ -202,12 +192,6 @@ export default function StyleTab() {
 
       {component.type === 'Button' && (
         <>
-          <SelectField
-            label="Variant"
-            value={style.variant || 'Primary'}
-            onChange={(value) => handleChange('variant', value)}
-            options={['Primary', 'Secondary', 'Danger', 'Ghost']}
-          />
           <FormField label="Icon Left">
             <input
               type="text"
@@ -283,13 +267,6 @@ export default function StyleTab() {
 
       {component.type === 'StatCard' && (
         <>
-          <SliderField
-            label="Metric Font Size"
-            value={style.metricFontSize || 28}
-            min={16}
-            max={48}
-            onChange={(value) => handleChange('metricFontSize', value)}
-          />
           <ColorField
             label="Trend Color Override"
             value={style.trendColorOverride || '#059669'}
@@ -322,39 +299,17 @@ export default function StyleTab() {
 
       {component.type === 'BarChart' && (
         <>
-          <SliderField label="Bar Radius" value={style.barRadius || 4} min={0} max={8} onChange={(value) => handleChange('barRadius', value)} />
-          <BooleanField label="Show Data Labels" value={style.showDataLabels === true} onChange={(value) => handleChange('showDataLabels', value)} />
         </>
       )}
 
       {component.type === 'LineChart' && (
         <>
-          <SliderField label="Line Width" value={style.lineWidth || 2} min={1} max={6} onChange={(value) => handleChange('lineWidth', value)} />
-          <BooleanField label="Show Data Labels" value={style.showDataLabels === true} onChange={(value) => handleChange('showDataLabels', value)} />
         </>
       )}
 
       {component.type === 'LogsViewer' && (
-        <FormField label="Level Colors">
-          <div className="mini-editor">
-            {(['INFO', 'WARN', 'ERROR', 'DEBUG'] as const).map((level) => (
-              <div key={level} className="mini-editor-row">
-                <span className="form-label">{level}</span>
-                <input
-                  type="color"
-                  className="color-swatch-input"
-                  value={style.levelColors?.[level] || '#2563eb'}
-                  onChange={(e) =>
-                    handleChange('levelColors', {
-                      ...(style.levelColors || {}),
-                      [level]: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        </FormField>
+        <>
+        </>
       )}
     </div>
   );

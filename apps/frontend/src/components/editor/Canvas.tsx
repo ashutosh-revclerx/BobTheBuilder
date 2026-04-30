@@ -16,6 +16,8 @@ import Text from '../dashboard-components/Text';
 import TextInput from '../dashboard-components/TextInput';
 import NumberInput from '../dashboard-components/NumberInput';
 import Select from '../dashboard-components/Select';
+import Image from '../dashboard-components/Image';
+import Embed from '../dashboard-components/Embed';
 import type { ComponentType } from '../../types/template';
 
 const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
@@ -32,6 +34,8 @@ const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
   TextInput,
   NumberInput,
   Select,
+  Image,
+  Embed,
 };
 
 export default function Canvas({ readOnly = false }: { readOnly?: boolean }) {

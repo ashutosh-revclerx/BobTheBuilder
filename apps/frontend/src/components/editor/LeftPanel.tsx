@@ -72,7 +72,9 @@ export default function LeftPanel() {
                     title={`Drag to canvas or click to add`}
                   >
                     <span className="component-card-drag-handle">⠿</span>
-                    <span className="component-card-icon">{opt.icon}</span>
+                    <span className="component-card-icon">
+                      <opt.icon size={16} strokeWidth={2} />
+                    </span>
                     <span className="component-card-label">{opt.label}</span>
                   </button>
                 ))}

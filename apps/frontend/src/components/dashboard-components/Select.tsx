@@ -1,12 +1,15 @@
+import React, { useMemo } from 'react';
 import type { ComponentConfig } from '../../types/template';
 import { runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
 import { resolveBackground } from '../../utils/styleUtils';
 
-export default function Select({ config }: { config: ComponentConfig }) {
+const Select = React.memo(function Select({ config }: { config: ComponentConfig }) {
   const { style, data } = config;
   const setComponentState = useEditorStore((s) => s.setComponentState);
   const componentState = useEditorStore((s) => s.componentState);
+
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
 
   const staticOptions = (data.optionsList?.length ? data.optionsList : (data.options || []).map((option) => ({ label: option, value: option })));
   const dynamicOptions = Array.isArray(data.dbBinding)
@@ -28,13 +31,20 @@ export default function Select({ config }: { config: ComponentConfig }) {
           setComponentState(config.id, 'value', e.target.value);
           runAction(data.onChangeAction, e.target.value);
         }}
+        ref={el => {
+          if (el) {
+            el.style.setProperty('--comp-bg', bg);
+            el.style.setProperty('--comp-border', style.borderColor ?? '');
+            el.style.setProperty('--comp-text', style.textColor ?? '');
+          }
+        }}
         style={{
-          background: resolveBackground(style),
-          color: style.textColor,
+          background: 'var(--comp-bg)',
+          color: 'var(--comp-text)',
           fontFamily: style.fontFamily,
           fontSize: `${style.fontSize}px`,
           borderRadius: `${style.borderRadius}px`,
-          borderColor: style.borderColor,
+          borderColor: 'var(--comp-border)',
           borderWidth: `${style.borderWidth}px`,
           padding: `${style.padding}px`,
           width: '100%',
@@ -52,4 +62,6 @@ export default function Select({ config }: { config: ComponentConfig }) {
       </select>
     </div>
   );
-}
+});
+
+export default Select;
