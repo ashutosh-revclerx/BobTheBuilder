@@ -1,16 +1,18 @@
-import { 
-  Table as TableIcon, 
-  Square, 
-  Type, 
-  Box, 
-  Layout, 
-  BarChart3, 
-  Activity, 
-  FileText, 
-  CheckSquare, 
+import {
+  Table as TableIcon,
+  Square,
+  Type,
+  Box,
+  Layout,
+  BarChart3,
+  Activity,
+  FileText,
+  CheckSquare,
   Hash,
   LineChart as LineIcon,
-  Terminal
+  Terminal,
+  Image as ImageIcon,
+  Play as PlayIcon
 } from 'lucide-react';
 import type { ComponentType } from '../types/template';
 
@@ -63,6 +65,13 @@ export const COMPONENT_REGISTRY: ComponentCategory[] = [
     title: 'Data & Logs',
     options: [
       { type: 'LogsViewer', icon: Terminal, label: 'Logs Viewer', description: 'Display real-time logs' },
+    ],
+  },
+  {
+    title: 'Media',
+    options: [
+      { type: 'Image', icon: ImageIcon, label: 'Image', description: 'Display an image from URL or upload' },
+      { type: 'Embed', icon: PlayIcon, label: 'Embed', description: 'Embed a YouTube / Vimeo / iframe URL' },
     ],
   },
 ];

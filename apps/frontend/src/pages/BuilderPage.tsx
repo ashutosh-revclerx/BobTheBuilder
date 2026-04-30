@@ -34,6 +34,8 @@ export default function BuilderPage() {
 
   const isPreviewMode = useEditorStore((s) => s.isPreviewMode);
   const togglePreviewMode = useEditorStore((s) => s.togglePreviewMode);
+  const previewDevice = useEditorStore((s) => s.previewDevice);
+  const setPreviewDevice = useEditorStore((s) => s.setPreviewDevice);
   const dirtyStyleMap = useEditorStore((s) => s.dirtyStyleMap);
   const dirtyDataMap = useEditorStore((s) => s.dirtyDataMap);
   
@@ -164,8 +166,16 @@ export default function BuilderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // The URL `id` is either a UUID (a real dashboard row in the DB) or a
+  // prebuilt-template slug like "project-overview" / "blank" / a saved-
+  // template id from localStorage. Only UUID dashboards can be PUT — for
+  // anything else the first Save creates a new row and we redirect.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isPersistedDashboard = (candidate: string | undefined): candidate is string =>
+    !!candidate && UUID_RE.test(candidate);
+
   const persistDashboard = async (onlyName: boolean = false) => {
-    if (!id) return;
+    if (!isPersistedDashboard(id)) return;
 
     const state = useEditorStore.getState();
     try {
@@ -188,9 +198,54 @@ export default function BuilderPage() {
     }
   };
 
+  // First Save on a prebuilt template / blank dashboard: POST a new row,
+  // then redirect to /builder/<new-uuid> so subsequent saves PUT to it.
+  const persistAsNewDashboard = async (): Promise<string | null> => {
+    const state = useEditorStore.getState();
+    try {
+      const response = await fetch(`${API_BASE}/api/dashboards`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          name:   state.dashboardName || 'Untitled Dashboard',
+          status: 'draft',
+          config: {
+            components: state.components,
+            queries:    state.queriesConfig,
+          },
+        }),
+      });
+      if (!response.ok) {
+        console.error('[builder] create failed:', await response.text());
+        return null;
+      }
+      const created = await response.json();
+      return created.id as string;
+    } catch (err) {
+      console.error('[builder] create network error:', err);
+      return null;
+    }
+  };
+
   const handleSave = async () => {
     saveToLocalStorage();
-    await persistDashboard();
+
+    if (isPersistedDashboard(id)) {
+      await persistDashboard();
+    } else {
+      const newId = await persistAsNewDashboard();
+      if (newId) {
+        // Clear the local-only "saved template" entry so we don't get a
+        // ghost copy in the gallery alongside the real DB row.
+        if (id) {
+          const fresh = useEditorStore.getState();
+          if (fresh.savedTemplates[id]) {
+            useEditorStore.getState().deleteSavedTemplate?.(id);
+          }
+        }
+        navigate(`/builder/${newId}`, { replace: true });
+      }
+    }
 
     setSaveFlash(true);
     setTimeout(() => setSaveFlash(false), 1200);
@@ -200,7 +255,11 @@ export default function BuilderPage() {
     if (!dashboardName.trim()) {
       setDashboardName('Untitled Dashboard');
     }
-    persistDashboard(true);
+    // Only persist name on blur for already-saved (UUID) dashboards.
+    // For prebuilts the user must hit Save explicitly to create the row.
+    if (isPersistedDashboard(id)) {
+      persistDashboard(true);
+    }
   };
 
   const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -229,7 +288,7 @@ export default function BuilderPage() {
   const isSaved = activeTemplateId ? !!savedTemplates[activeTemplateId] : false;
 
   return (
-    <div className={`builder-layout ${isPreviewMode ? 'preview-mode' : ''}`}>
+    <div className={`builder-layout ${isPreviewMode ? 'preview-mode' : ''} device-${previewDevice}`}>
       {/* ARIA Live Region */}
       <div className="sr-only" aria-live="polite">
         {isPreviewMode ? 'Preview mode active' : 'Edit mode active'}
@@ -309,7 +368,31 @@ export default function BuilderPage() {
             </div>
           )}
           
-          <button 
+          {/* Desktop / Mobile width toggle — only visible in edit mode */}
+          {!isPreviewMode && (
+            <div className="device-toggle" role="group" aria-label="Canvas width">
+              <button
+                type="button"
+                className={`device-toggle__btn${previewDevice === 'desktop' ? ' device-toggle__btn--active' : ''}`}
+                onClick={() => setPreviewDevice('desktop')}
+                title="Desktop width"
+                aria-pressed={previewDevice === 'desktop'}
+              >
+                🖥
+              </button>
+              <button
+                type="button"
+                className={`device-toggle__btn${previewDevice === 'mobile' ? ' device-toggle__btn--active' : ''}`}
+                onClick={() => setPreviewDevice('mobile')}
+                title="Mobile width (375px)"
+                aria-pressed={previewDevice === 'mobile'}
+              >
+                📱
+              </button>
+            </div>
+          )}
+
+          <button
             className={`btn-preview-toggle ${isPreviewMode ? 'preview-active' : ''}`}
             onClick={togglePreviewMode}
             title="Toggle preview mode (Ctrl+Shift+P)"

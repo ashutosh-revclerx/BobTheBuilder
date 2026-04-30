@@ -28,6 +28,8 @@ const COMPONENT_LAYOUTS: Record<ComponentType, LayoutConfig> = {
   BarChart: { x: 0, y: 0, w: 6, h: 12, minW: 3, minH: 6 },
   LineChart: { x: 0, y: 0, w: 6, h: 12, minW: 3, minH: 6 },
   LogsViewer: { x: 0, y: 0, w: 4, h: 12, minW: 4, minH: 4 },
+  Image: { x: 0, y: 0, w: 4, h: 8, minW: 2, minH: 3 },
+  Embed: { x: 0, y: 0, w: 6, h: 10, minW: 3, minH: 4 },
 };
 
 const createBaseData = (): ComponentData => ({
@@ -388,6 +390,38 @@ const createDefaultConfig = (
         },
         layout: { ...COMPONENT_LAYOUTS[type] },
       };
+    case 'Image':
+      return {
+        style: {
+          ...createBaseStyle(),
+          backgroundColor: '#f9fafb',
+          padding: 0,
+          borderRadius: 10,
+        },
+        data: {
+          ...createBaseData(),
+          src: '',
+          uploadedSrc: '',
+          alt: '',
+          fit: 'contain',
+          linkTo: '',
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
+    case 'Embed':
+      return {
+        style: {
+          ...createBaseStyle(),
+          backgroundColor: '#000000',
+          padding: 0,
+          borderRadius: 10,
+        },
+        data: {
+          ...createBaseData(),
+          src: '',
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
     default:
       return {
         style: createBaseStyle(),
@@ -411,6 +445,8 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
   TextInput: createDefaultConfig('TextInput'),
   NumberInput: createDefaultConfig('NumberInput'),
   Select: createDefaultConfig('Select'),
+  Image: createDefaultConfig('Image'),
+  Embed: createDefaultConfig('Embed'),
 };
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -503,6 +539,7 @@ interface EditorState {
   rightPanelOpen: boolean;
   lastSelectedComponentId: string | null;
   isPreviewMode: boolean;
+  previewDevice: 'desktop' | 'mobile';
   rightPanelTab: 'style' | 'data' | 'theme';
   isDirty: boolean;
   status: 'draft' | 'live';
@@ -541,6 +578,7 @@ interface EditorState {
   setQueryState: (queryName: string, state: Partial<QueryState>) => void;
   setComponentState: (componentId: string, key: string, value: unknown) => void;
   setIsPreviewMode: (val: boolean) => void;
+  setPreviewDevice: (device: 'desktop' | 'mobile') => void;
   togglePreviewMode: () => void;
   setRightPanelTab: (tab: 'style' | 'data' | 'theme') => void;
   upsertQuery: (query: Record<string, unknown> & { name: string }) => void;
@@ -566,6 +604,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   rightPanelOpen: true,
   lastSelectedComponentId: null,
   isPreviewMode: false,
+  previewDevice: 'desktop',
   rightPanelTab: 'style',
   isDirty: false,
   status: 'draft',
@@ -1037,6 +1076,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   setIsPreviewMode: (val) => set({ isPreviewMode: val }),
+
+  setPreviewDevice: (device) => set({ previewDevice: device }),
 
   setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
 
