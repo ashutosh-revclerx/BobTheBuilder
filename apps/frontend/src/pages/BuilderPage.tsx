@@ -295,6 +295,7 @@ export default function BuilderPage() {
       </div>
 
       {/* Top Bar */}
+      {!isPreviewMode && (
       <div className="builder-topbar">
         <div className="topbar-logo">
           <div className="topbar-logo-icon">B</div>
@@ -420,6 +421,21 @@ export default function BuilderPage() {
           </button>
         </div>
       </div>
+      )}
+      
+      {/* Floating Exit Preview Button */}
+      {isPreviewMode && (
+        <div className="floating-preview-actions">
+          <button
+            className="btn-preview-toggle preview-active"
+            onClick={togglePreviewMode}
+            title="Exit preview mode (Ctrl+Shift+P)"
+          >
+            <span className="toggle-icon">✎</span>
+            <span className="toggle-label">Exit Preview</span>
+          </button>
+        </div>
+      )}
 
       {/* Body */}
       <div className="builder-body">
@@ -443,7 +459,7 @@ export default function BuilderPage() {
         )}
 
         {/* Left Panel */}
-        {!isPreviewMode && isLeftPanelOpen && <LeftPanel />}
+        {!isPreviewMode && isLeftPanelOpen && <LeftPanel onClose={() => setIsLeftPanelOpen(false)} />}
 
         {/* Canvas */}
         <Canvas readOnly={isPreviewMode} />

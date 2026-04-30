@@ -13,7 +13,7 @@ interface TableProps {
   id?: string;
   onRowClick?: (row: Record<string, unknown>) => void;
   selectedRowId?: string | null;
-  isEditorMode?: boolean;
+  readOnly?: boolean;
 }
 
 function TruncatedCell({
@@ -85,7 +85,8 @@ function matchesRule(row: Record<string, unknown>, rule: TableConditionalRowColo
   }
 }
 
-const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId, isEditorMode = true }: TableProps) {
+const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId, readOnly = false }: TableProps) {
+  const isEditorMode = !readOnly;
   const componentId = id || config.id;
   const { style, data, label } = config;
   const updateData = useEditorStore((state) => state.updateData);

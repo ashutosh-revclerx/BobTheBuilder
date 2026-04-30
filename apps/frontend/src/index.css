@@ -540,6 +540,23 @@ body {
   font-size: 14px;
 }
 
+/* Floating Exit Preview Button */
+.floating-preview-actions {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+.floating-preview-actions .btn-preview-toggle {
+  height: 40px;
+  padding: 0 16px;
+  font-size: 13px;
+  border-color: var(--border);
+}
+
 /* Unsaved Changes Note */
 .unsaved-changes-note {
   font-size: 10px;
@@ -654,6 +671,7 @@ body {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  position: relative;
   animation: slideInLeft 250ms ease-out forwards;
 }
 @keyframes slideInLeft {
@@ -782,10 +800,9 @@ body {
 }
 .preview-mode .builder-canvas-wrapper {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0;
-  box-shadow: 0 0 40px rgba(0,0,0,0.05);
+  max-width: none;
+  margin: 0;
+  padding: 24px;
   background-color: var(--bg-primary);
 }
 .builder-canvas-wrapper.drop-active {
@@ -1582,8 +1599,30 @@ body {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  position: relative;
   overflow: hidden;
   z-index: 20;
+}
+
+/* Panel Resizers */
+.panel-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 50;
+  transition: background var(--transition-fast);
+}
+.panel-resizer:hover, .panel-resizer:active {
+  background: var(--blue-500);
+}
+.panel-resizer-right {
+  right: 0;
+}
+.panel-resizer-left {
+  left: 0;
 }
 
 .right-panel.panel-animate {
