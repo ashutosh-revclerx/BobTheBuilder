@@ -68,23 +68,30 @@ router.post('/', async (req, res) => {
   }
 
   const { name, config, status } = parsed.data;
-  const slug = parsed.data.slug ?? toSlug(name);
+  let slug = parsed.data.slug ?? toSlug(name);
+  let attempts = 0;
 
-  try {
-    const { rows } = await pool.query<DashboardRow>(
-      `INSERT INTO dashboards (name, slug, config, status)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, slug, config, status, created_at, updated_at`,
-      [name, slug, config, status],
-    );
-    return res.status(201).json(rows[0]);
-  } catch (err) {
-    if (pgCode(err) === PG_UNIQUE_VIOLATION) {
-      return res.status(409).json({ error: `Slug "${slug}" is already taken` });
+  while (attempts < 10) {
+    try {
+      const { rows } = await pool.query<DashboardRow>(
+        `INSERT INTO dashboards (name, slug, config, status)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, name, slug, config, status, created_at, updated_at`,
+        [name, slug, config, status],
+      );
+      return res.status(201).json(rows[0]);
+    } catch (err) {
+      if (pgCode(err) === PG_UNIQUE_VIOLATION) {
+        attempts++;
+        slug = `${parsed.data.slug ?? toSlug(name)}-${attempts}`;
+        continue;
+      }
+      console.error('[dashboards] create:', err);
+      return res.status(500).json({ error: 'Internal server error' });
     }
-    console.error('[dashboards] create:', err);
-    return res.status(500).json({ error: 'Internal server error' });
   }
+
+  return res.status(409).json({ error: 'Could not generate a unique slug after 10 attempts' });
 });
 
 // ─── GET /api/dashboards ──────────────────────────────────────────────────────
