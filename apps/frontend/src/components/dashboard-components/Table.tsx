@@ -225,7 +225,9 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
               backgroundColor: style.searchBarBackground || 'var(--bg-primary)',
               color: style.searchBarTextColor || 'var(--text-primary)',
               borderColor: style.searchBarBorderColor || 'var(--border)',
-              fontSize: style.fontSize ? `${Math.max(12, style.fontSize - 2)}px` : '12px',
+              fontSize: style.fontSize ? `${Math.max(11, style.fontSize - 2)}px` : '12px',
+              padding: '4px 8px',
+              height: 'auto',
             }}
           />
         ) : null}

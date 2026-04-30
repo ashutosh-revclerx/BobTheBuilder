@@ -131,7 +131,7 @@ const LogsViewer = React.memo(function LogsViewer({ config }: LogsViewerProps) {
               backgroundColor: style.searchBarBackground || 'var(--bg-primary)',
               color: style.searchBarTextColor || 'var(--text-primary)',
               borderColor: style.searchBarBorderColor || 'var(--border)',
-              fontSize: '11px',
+              fontSize: style.fontSize ? `${Math.max(11, style.fontSize - 2)}px` : '11px',
               padding: '4px 8px',
               height: 'auto',
             }}

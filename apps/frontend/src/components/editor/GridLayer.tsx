@@ -125,6 +125,7 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
   const setDraggingType = useEditorStore((s) => s.setDraggingType);
 
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; id: string } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(1200);
 
@@ -223,6 +224,18 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
     setConfirmRemoveId(null);
   }, []);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, id });
+  }, []);
+
+  useEffect(() => {
+    const closeMenu = () => setContextMenu(null);
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
+  }, []);
+
   const size = draggingType ? DEFAULT_SIZES[draggingType] ?? { w: 4, h: 4 } : { w: 4, h: 4 };
 
   return (
@@ -274,7 +287,7 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
         }}
       >
         {filteredComponentIds.map(id => (
-          <div key={id}>
+          <div key={id} onContextMenu={(e) => handleContextMenu(e, id)}>
             <CanvasComponentWrapper
               id={id}
               componentMap={componentMap}
@@ -288,6 +301,22 @@ export function GridLayer({ parentId, parentTab, componentMap, customGap, readOn
           </div>
         ))}
       </Responsive>
+
+      {contextMenu && (
+        <div 
+          className="canvas-context-menu" 
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={e => e.stopPropagation()}
+        >
+          <button className="menu-item" onClick={() => { useEditorStore.getState().duplicateComponent(contextMenu.id); setContextMenu(null); }}>
+            <span className="menu-icon">⧉</span> Duplicate
+          </button>
+          <div className="menu-divider" />
+          <button className="menu-item danger" onClick={() => { removeComponent(contextMenu.id); setContextMenu(null); }}>
+            <span className="menu-icon">🗑</span> Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }

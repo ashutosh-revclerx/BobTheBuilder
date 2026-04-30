@@ -12,10 +12,10 @@ const LABEL_SIZES         = [10, 12, 14];
 const BORDER_RADIUSES     = [0, 2, 4, 6, 8, 10, 12, 16, 24];
 const BORDER_WIDTHS       = [0, 1, 2, 4, 6, 8];
 const BUTTON_VARIANT_DEFAULTS: Record<string, Partial<ComponentStyle>> = {
-  Primary: { backgroundColor: '#2563eb', textColor: '#ffffff', borderColor: '#2563eb' },
-  Secondary: { backgroundColor: '#f2f4f7', textColor: '#0f1117', borderColor: '#e3e6ec' },
-  Danger: { backgroundColor: '#dc2626', textColor: '#ffffff', borderColor: '#dc2626' },
-  Ghost: { backgroundColor: 'transparent', textColor: '#2563eb', borderColor: '#e3e6ec' },
+  Primary: { backgroundColor: '#2563eb', textColor: '#ffffff', borderColor: '#2563eb', hoverBackgroundColor: '#1d4ed8' },
+  Secondary: { backgroundColor: '#f2f4f7', textColor: '#0f1117', borderColor: '#e3e6ec', hoverBackgroundColor: '#e5e7eb' },
+  Danger: { backgroundColor: '#dc2626', textColor: '#ffffff', borderColor: '#dc2626', hoverBackgroundColor: '#b91c1c' },
+  Ghost: { backgroundColor: 'transparent', textColor: '#2563eb', borderColor: '#e3e6ec', hoverBackgroundColor: '#eff6ff' },
 };
 const LINE_HEIGHTS        = [1.2, 1.4, 1.6, 1.8];
 const FONT_WEIGHT_OPTIONS = [
@@ -520,11 +520,8 @@ export default function ThemeTab() {
                   options={['Primary', 'Secondary', 'Danger', 'Ghost']}
                   value={style.variant ?? 'Primary'}
                   onChange={(v) => {
-                    set('variant', v);
-                    const defaults = BUTTON_VARIANT_DEFAULTS[v as string];
-                    if (defaults) {
-                      updateStyle(lastSelectedComponentId, defaults);
-                    }
+                    const defaults = BUTTON_VARIANT_DEFAULTS[v as string] || {};
+                    updateStyle(lastSelectedComponentId, { variant: v as any, ...defaults });
                   }}
                 />
                 <LocalColorField
@@ -596,12 +593,65 @@ export default function ThemeTab() {
                     onChange={(v) => setDebounced('yAxisColor', v)}
                   />
                 </div>
+
+                <div className="theme-divider" />
+                {ctype === 'BarChart' && (
+                  <FormField label="Bar Radius (px)">
+                    <input
+                      type="range"
+                      className="slider-input"
+                      min={0}
+                      max={12}
+                      step={1}
+                      value={style.barRadius ?? 4}
+                      onChange={(e) => set('barRadius', Number(e.target.value))}
+                    />
+                    <span className="slider-value">{style.barRadius ?? 4}px</span>
+                  </FormField>
+                )}
+                {ctype === 'LineChart' && (
+                  <FormField label="Line Width (px)">
+                    <input
+                      type="range"
+                      className="slider-input"
+                      min={1}
+                      max={8}
+                      step={1}
+                      value={style.lineWidth ?? 2}
+                      onChange={(e) => set('lineWidth', Number(e.target.value))}
+                    />
+                    <span className="slider-value">{style.lineWidth ?? 2}px</span>
+                  </FormField>
+                )}
+                <FormField label="Show Data Labels">
+                  <div className="option-group">
+                    <button
+                      className={`option-button ${style.showDataLabels ? 'active' : ''}`}
+                      onClick={() => set('showDataLabels', !style.showDataLabels)}
+                    >
+                      {style.showDataLabels ? 'On' : 'Off'}
+                    </button>
+                  </div>
+                </FormField>
               </>
             )}
 
             {/* ── LogsViewer ── */}
             {ctype === 'LogsViewer' && (
               <>
+                <div className="theme-divider" />
+                <LocalColorField
+                  label="Search Bar Background"
+                  componentId={lastSelectedComponentId}
+                  value={style.searchBarBackground ?? '#1e1e1e'}
+                  onChange={(v) => setDebounced('searchBarBackground', v)}
+                />
+                <LocalColorField
+                  label="Search Bar Text Color"
+                  componentId={lastSelectedComponentId}
+                  value={style.searchBarTextColor ?? '#ffffff'}
+                  onChange={(v) => setDebounced('searchBarTextColor', v)}
+                />
                 <FormField label="Font Family">
                   <select
                     className="form-select"

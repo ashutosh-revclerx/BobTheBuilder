@@ -69,12 +69,36 @@ export default function BuilderPage() {
     loadFromLocalStorage();
   }, [loadFromLocalStorage]);
 
-  // Keyboard shortcut: Ctrl/Cmd + Shift + P
+  // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // 1. Preview toggle (Ctrl/Cmd + Shift + P)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toUpperCase() === 'P') {
         e.preventDefault();
         togglePreviewMode();
+        return;
+      }
+
+      if (isInput) return;
+
+      // 2. Duplication (Cmd/Ctrl + D)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        const selectedId = useEditorStore.getState().selectedComponentId;
+        if (selectedId) {
+          useEditorStore.getState().duplicateComponent(selectedId);
+        }
+      }
+
+      // 3. Deletion (Delete/Backspace)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const selectedId = useEditorStore.getState().selectedComponentId;
+        if (selectedId) {
+          useEditorStore.getState().removeComponent(selectedId);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);

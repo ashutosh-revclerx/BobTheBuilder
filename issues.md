@@ -16,16 +16,16 @@ Bugs and missing controls in existing components. Mostly Ashutosh's territory �
 
 | # | Title | Owner | Pri | Size |
 |---|---|---|---|---|
-| 1  | Font size slider doesn't affect LineChart text | Ashutosh | 🟡 | S |
-| 2  | TabbedContainer — per-tab background/border colours | Ashutosh | 🟡 | M |
-| 3  | Label text on top of every component should be editable | Ashutosh | 🟡 | S |
-| 4  | Chart components — X/Y axis colour controls in StyleTab | Ashutosh | 🟡 | S |
-| 5  | Search bar (Table, LogsViewer) needs colour/font controls | Ashutosh | 🟢 | S |
-| 6  | TabbedContainer navbar (the View1/View2 strip) needs colour controls | Ashutosh | 🟡 | S |
-| 7  | Preview mode stretches components edge-to-edge — should respect grid | Ashutosh | 🔴 | M |
-| 9  | Button — colour & border colour controls in StyleTab don't apply | Ashutosh | 🔴 | S |
-| 10 | More font styling: weight, italic, letter-spacing, line-height | Ashutosh | 🟢 | M |
-| 24 | Component icons in LeftPanel — replace text-only with proper icons | Ashutosh | 🟢 | S |
+| 1  | [x] Font size slider doesn't affect LineChart text | Ashutosh | 🟡 | S |
+| 2  | [x] TabbedContainer — per-tab background/border colours | Ashutosh | 🟡 | M |
+| 3  | [x] Label text on top of every component should be editable | Ashutosh | 🟡 | S |
+| 4  | [x] Chart components — X/Y axis colour controls in StyleTab | Ashutosh | 🟡 | S |
+| 5  | [x] Search bar (Table, LogsViewer) needs colour/font controls | Ashutosh | 🟢 | S |
+| 6  | [x] TabbedContainer navbar (the View1/View2 strip) needs colour controls | Ashutosh | 🟡 | S |
+| 7  | [x] Preview mode stretches components edge-to-edge — should respect grid | Ashutosh | 🔴 | M |
+| 9  | [x] Button — colour & border colour controls in StyleTab don't apply | Ashutosh | 🔴 | S |
+| 10 | [x] More font styling: weight, italic, letter-spacing, line-height | Ashutosh | 🟢 | M |
+| 24 | [x] Component icons in LeftPanel — replace text-only with proper icons | Ashutosh | 🟢 | S |
 
 ---
 
@@ -38,7 +38,7 @@ Features that change *what* you can build. Mostly Ayushmaan — these touch rout
 | 8  | New components: **Image** + **About** | Ayushmaan | 🟡 | M |
 | 11 | Auto-adjust components — wrap to next row when minW is hit by viewport | Ayushmaan | 🟡 | M |
 | 12 | Audit pass: every component reviewed for missing fields / sane defaults | Ayushmaan + Ashutosh | 🟡 | L |
-| 13 | Copy/duplicate a component on the canvas (right-click or Cmd-D) | Ashutosh | 🟡 | S |
+| 13 | [x] Copy/duplicate a component on the canvas (right-click or Cmd-D) | Ashutosh | 🟡 | S |
 | 14 | Mobile preview toggle (Desktop / 375px) — same builder, narrower canvas | Ayushmaan | 🟢 | M |
 | 15 | Editing a pre-built template currently doesn't save — fix the template→DB path | Ayushmaan | 🔴 | M |
 | 16 | Left sidebar — Layers panel + Settings panel | Ashutosh | 🟢 | M |
@@ -56,7 +56,7 @@ Cross-cutting work — backend, ops, LLM prompt iteration, documentation. Heavie
 | 18 | WebSocket / streaming executor type — currently only REST/agent/postgres | Ayushmaan | 🟢 | L |
 | 19 | Detailed README at repo root — install, run, architecture diagram, demo flow | Ayushmaan | 🔴 | M |
 | 20 | Performance pass — improve LCP & CLS scores in DevTools (lazy-load builder, defer fonts) | Ayushmaan | 🟡 | M |
-| 21 | Customer delete UI + backend route | Ashutosh | 🔴 | S |
+| 21 | [x] Customer delete UI + backend route | Ashutosh | 🔴 | S |
 | 22 | Better AI templates — hand-craft a strong reference dashboard, feed it to the LLM as a few-shot example | Ashutosh | 🟡 | M |
 | 23 | Build a real "AI Explainability" dashboard manually as a showcase / few-shot anchor | Ashutosh | 🟢 | M |
 | 26 | ResourcesPage — handle more auth types (OAuth2, custom headers) and websocket resources | Ayushmaan | 🟢 | M |

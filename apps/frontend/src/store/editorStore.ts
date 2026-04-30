@@ -546,6 +546,7 @@ interface EditorState {
   upsertQuery: (query: Record<string, unknown> & { name: string }) => void;
   setStatus: (status: 'draft' | 'live', publishedAt: string | null) => void;
   applyThemeToAll: (paletteName: 'Cobalt' | 'Forest' | 'Graphite' | 'Amber' | 'Obsidian') => void;
+  duplicateComponent: (id?: string) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -839,6 +840,76 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         components: state.components.filter((component) => !idsToRemove.has(component.id)),
         selectedComponentId: idsToRemove.has(state.selectedComponentId || '') ? null : state.selectedComponentId,
+        isDirty: true,
+      };
+    });
+  },
+
+  duplicateComponent: (id) => {
+    set((state) => {
+      const targetId = id || state.selectedComponentId;
+      if (!targetId) return state;
+
+      const source = state.components.find((c) => c.id === targetId);
+      if (!source) return state;
+
+      const newIdMap: Record<string, string> = {};
+      const componentsToDuplicate: ComponentConfig[] = [];
+
+      const collect = (cid: string) => {
+        const comp = state.components.find((c) => c.id === cid);
+        if (!comp) return;
+
+        const newCid = `${comp.type.toLowerCase()}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        newIdMap[cid] = newCid;
+        componentsToDuplicate.push(comp);
+
+        state.components
+          .filter((c) => c.parentId === cid)
+          .forEach((child) => collect(child.id));
+      };
+
+      collect(targetId);
+
+      const duplicated = componentsToDuplicate.map((comp) => {
+        const newCid = newIdMap[comp.id];
+        const newParentId = comp.parentId ? newIdMap[comp.parentId] : undefined;
+
+        const layout = clone(comp.layout);
+        if (comp.id === targetId) {
+          layout.y = (layout.y ?? 0) + (layout.h ?? 2);
+          
+          // Collision check: if the new position overlaps with any existing component at the same level
+          const levelSiblings = state.components.filter(s => 
+            newParentId !== undefined ? s.parentId === newParentId : !s.parentId
+          );
+          
+          let collision = levelSiblings.some(s => 
+            layout.x < (s.layout.x + s.layout.w) && 
+            (layout.x + layout.w) > s.layout.x && 
+            layout.y < (s.layout.y + s.layout.h) && 
+            (layout.y + layout.h) > s.layout.y
+          );
+
+          // If collision, push to bottom
+          if (collision) {
+             layout.y = levelSiblings.reduce((max, s) => Math.max(max, (s.layout?.y ?? 0) + (s.layout?.h ?? 2)), 0);
+          }
+        }
+
+        return {
+          ...clone(comp),
+          id: newCid,
+          parentId: newParentId,
+          layout,
+          label: `${comp.label} (Copy)`,
+        };
+      });
+
+      return {
+        components: [...state.components, ...duplicated],
+        selectedComponentId: newIdMap[targetId],
+        lastSelectedComponentId: newIdMap[targetId],
         isDirty: true,
       };
     });
