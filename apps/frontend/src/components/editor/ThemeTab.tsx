@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import type { ComponentStyle } from '../../types/template';
 import { resolveBackground, GRADIENT_DIRECTIONS } from '../../utils/styleUtils';
+import { useDebouncedStyle } from '../../hooks/useDebouncedStyle';
 
 // ─── Option lists ─────────────────────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ const THEME_PRESETS = [
   { name: 'Obsidian', surface: '#09090b', panel: '#0f0f12',  primary: '#6366f1' },
 ];
 
-// ─── Small reusable field controls ───────────────────────────────────────────
+// ─── Optimized field controls ────────────────────────────────────────────────
 
 function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -47,36 +48,52 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-function ColorField({
+function LocalColorField({
   label,
   value,
+  componentId,
   onChange,
 }: {
   label: string;
   value: string;
+  componentId: string;
   onChange: (v: string) => void;
 }) {
+  const [localColor, setLocalColor] = useState(value);
+
+  useEffect(() => {
+    setLocalColor(value);
+  }, [value, componentId]);
+
+  const commit = (v: string) => {
+    if (v !== value) {
+      onChange(v);
+    }
+  };
+
   return (
     <FormField label={label}>
       <div className="color-picker-group">
         <input
           type="color"
           className="color-swatch-input"
-          value={value.startsWith('#') ? value : '#ffffff'}
-          onChange={(e) => onChange(e.target.value)}
+          value={localColor.startsWith('#') ? localColor : '#ffffff'}
+          onChange={(e) => setLocalColor(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          onMouseUp={(e) => commit((e.target as HTMLInputElement).value)}
         />
         <input
           type="text"
           className="color-hex-input"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={localColor}
+          onChange={(e) => setLocalColor(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
           placeholder="#ffffff"
         />
       </div>
     </FormField>
   );
 }
-
 
 function OptionGroup<T extends number | string>({
   label,
@@ -112,10 +129,14 @@ function OptionGroup<T extends number | string>({
 
 function GradientEditor({
   style,
+  componentId,
   onChange,
+  onToggle,
 }: {
   style: ComponentStyle;
+  componentId: string;
   onChange: (key: keyof ComponentStyle, value: unknown) => void;
+  onToggle: (key: keyof ComponentStyle, value: unknown) => void;
 }) {
   const gradient = style.backgroundGradient ?? {
     enabled: false,
@@ -129,8 +150,8 @@ function GradientEditor({
   };
 
   const toggleGradient = (on: boolean) => {
-    update({ enabled: on });
-    if (on) onChange('backgroundColor', 'transparent');
+    onToggle('backgroundGradient', { ...gradient, enabled: on });
+    if (on) onToggle('backgroundColor', 'transparent');
   };
 
   const setStop = (i: number, patch: Partial<{ color: string; position: number }>) => {
@@ -140,12 +161,12 @@ function GradientEditor({
 
   const addStop = () => {
     if (gradient.stops.length >= 4) return;
-    update({ stops: [...gradient.stops, { color: '#94a3b8', position: 50 }] });
+    onToggle('backgroundGradient', { ...gradient, stops: [...gradient.stops, { color: '#94a3b8', position: 50 }] });
   };
 
   const removeStop = (i: number) => {
     if (gradient.stops.length <= 2) return;
-    update({ stops: gradient.stops.filter((_, idx) => idx !== i) });
+    onToggle('backgroundGradient', { ...gradient, stops: gradient.stops.filter((_, idx) => idx !== i) });
   };
 
   const previewStyle: ComponentStyle = { ...style, backgroundGradient: { ...gradient, enabled: true } };
@@ -171,21 +192,12 @@ function GradientEditor({
       </div>
 
       {!isOn ? (
-        <div className="color-picker-group">
-          <input
-            type="color"
-            className="color-swatch-input"
-            value={(style.backgroundColor ?? '#ffffff').startsWith('#') ? (style.backgroundColor ?? '#ffffff') : '#ffffff'}
-            onChange={(e) => onChange('backgroundColor', e.target.value)}
-          />
-          <input
-            type="text"
-            className="color-hex-input"
-            value={style.backgroundColor ?? '#ffffff'}
-            onChange={(e) => onChange('backgroundColor', e.target.value)}
-            placeholder="#ffffff"
-          />
-        </div>
+        <LocalColorField
+          label="Background Color"
+          componentId={componentId}
+          value={style.backgroundColor ?? '#ffffff'}
+          onChange={(v) => onChange('backgroundColor', v)}
+        />
       ) : (
         <div className="gradient-editor">
           {/* Live preview bar */}
@@ -216,12 +228,13 @@ function GradientEditor({
             <label className="form-label">Color Stops</label>
             {gradient.stops.map((stop, i) => (
               <div key={i} className="gradient-stop-row">
-                <input
-                  type="color"
-                  className="color-swatch-input"
-                  value={stop.color.startsWith('#') ? stop.color : '#3b82f6'}
-                  onChange={(e) => setStop(i, { color: e.target.value })}
-                />
+                <div className="color-picker-group" style={{ width: 'auto' }}>
+                   <LocalColorStopInput 
+                    value={stop.color} 
+                    componentId={componentId}
+                    onChange={(c) => setStop(i, { color: c })}
+                   />
+                </div>
                 <input
                   type="range"
                   className="slider-input"
@@ -255,6 +268,24 @@ function GradientEditor({
   );
 }
 
+function LocalColorStopInput({ value, componentId, onChange }: { value: string; componentId: string; onChange: (v: string) => void }) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => setLocal(value), [value, componentId]);
+  
+  const commit = (v: string) => { if (v !== value) onChange(v); };
+
+  return (
+    <input
+      type="color"
+      className="color-swatch-input"
+      value={local.startsWith('#') ? local : '#3b82f6'}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={(e) => commit(e.target.value)}
+      onMouseUp={(e) => commit((e.target as HTMLInputElement).value)}
+    />
+  );
+}
+
 // ─── Main ThemeTab ────────────────────────────────────────────────────────────
 
 export default function ThemeTab() {
@@ -263,17 +294,22 @@ export default function ThemeTab() {
   const updateStyle             = useEditorStore((s) => s.updateStyle);
   const applyThemeToAll         = useEditorStore((s) => s.applyThemeToAll);
 
+  const debouncedUpdateStyle = useDebouncedStyle(lastSelectedComponentId || '', 150);
+
   const [expandedSection, setExpandedSection] = useState<'component' | 'presets' | ''>('component');
 
   const component = components.find((c) => c.id === lastSelectedComponentId);
-  if (!component) return null;
+  if (!component || !lastSelectedComponentId) return null;
 
   const { style, data } = component;
   const ctype = component.type;
 
   const set = (key: keyof ComponentStyle, value: unknown) => {
-    if (!lastSelectedComponentId) return;
     updateStyle(lastSelectedComponentId, { [key]: value } as Partial<ComponentStyle>);
+  };
+
+  const setDebounced = (key: keyof ComponentStyle, value: unknown) => {
+    debouncedUpdateStyle(key, value);
   };
 
   const toggle = (section: 'component' | 'presets') =>
@@ -305,13 +341,19 @@ export default function ThemeTab() {
           <div className="theme-section-content">
 
             {/* Background (solid + gradient) */}
-            <GradientEditor style={style} onChange={set} />
+            <GradientEditor 
+              style={style} 
+              componentId={lastSelectedComponentId} 
+              onChange={setDebounced} 
+              onToggle={set}
+            />
 
             {/* Universal */}
-            <ColorField
+            <LocalColorField
               label="Border Color"
+              componentId={lastSelectedComponentId}
               value={style.borderColor ?? '#e5e7eb'}
-              onChange={(v) => set('borderColor', v)}
+              onChange={(v) => setDebounced('borderColor', v)}
             />
             <OptionGroup
               label="Border Width (px)"
@@ -325,10 +367,11 @@ export default function ThemeTab() {
               value={style.borderRadius ?? 8}
               onChange={(v) => set('borderRadius', v)}
             />
-            <ColorField
+            <LocalColorField
               label="Text Color"
+              componentId={lastSelectedComponentId}
               value={style.textColor ?? '#0f1117'}
-              onChange={(v) => set('textColor', v)}
+              onChange={(v) => setDebounced('textColor', v)}
             />
             <OptionGroup
               label="Padding (px)"
@@ -340,10 +383,11 @@ export default function ThemeTab() {
             {/* ── StatCard ── */}
             {ctype === 'StatCard' && (
               <>
-                <ColorField
+                <LocalColorField
                   label="Accent Color"
+                  componentId={lastSelectedComponentId}
                   value={style.borderLeftColor ?? '#2563eb'}
-                  onChange={(v) => set('borderLeftColor', v)}
+                  onChange={(v) => setDebounced('borderLeftColor', v)}
                 />
                 <OptionGroup
                   label="Value Text Size (px)"
@@ -363,20 +407,23 @@ export default function ThemeTab() {
             {/* ── Table ── */}
             {ctype === 'Table' && (
               <>
-                <ColorField
+                <LocalColorField
                   label="Header Background"
+                  componentId={lastSelectedComponentId}
                   value={style.headerBackgroundColor ?? '#f2f4f7'}
-                  onChange={(v) => set('headerBackgroundColor', v)}
+                  onChange={(v) => setDebounced('headerBackgroundColor', v)}
                 />
-                <ColorField
+                <LocalColorField
                   label="Row Hover / Stripe Color"
+                  componentId={lastSelectedComponentId}
                   value={style.rowAlternateColor ?? '#f8fafc'}
-                  onChange={(v) => set('rowAlternateColor', v)}
+                  onChange={(v) => setDebounced('rowAlternateColor', v)}
                 />
-                <ColorField
+                <LocalColorField
                   label="Selected Row Color"
+                  componentId={lastSelectedComponentId}
                   value={style.selectedRowColor ?? '#dbeafe'}
-                  onChange={(v) => set('selectedRowColor', v)}
+                  onChange={(v) => setDebounced('selectedRowColor', v)}
                 />
                 <FormField label="Stripe Rows">
                   <div className="option-group">
@@ -394,10 +441,11 @@ export default function ThemeTab() {
             {/* ── Button ── */}
             {ctype === 'Button' && (
               <>
-                <ColorField
+                <LocalColorField
                   label="Hover Background"
+                  componentId={lastSelectedComponentId}
                   value={style.hoverBackgroundColor ?? '#1d4ed8'}
-                  onChange={(v) => set('hoverBackgroundColor', v)}
+                  onChange={(v) => setDebounced('hoverBackgroundColor', v)}
                 />
                 <OptionGroup
                   label="Font Weight"
@@ -423,42 +471,30 @@ export default function ThemeTab() {
                   <label className="form-label">Series Colors</label>
                   {Array.from({ length: seriesCount }).map((_, i) => (
                     <div key={i} className="color-picker-group" style={{ marginBottom: '4px' }}>
-                      <input
-                        type="color"
-                        className="color-swatch-input"
+                      <LocalSeriesColorInput 
                         value={currentSeriesColors[i] ?? '#2563eb'}
-                        onChange={(e) => {
+                        componentId={lastSelectedComponentId}
+                        label={data.series?.[i]?.name ?? `Series ${i + 1}`}
+                        onChange={(c) => {
                           const next = [...currentSeriesColors];
-                          next[i] = e.target.value;
-                          set('seriesColors', next);
+                          next[i] = c;
+                          setDebounced('seriesColors', next);
                         }}
                       />
-                      <input
-                        type="text"
-                        className="color-hex-input"
-                        value={currentSeriesColors[i] ?? '#2563eb'}
-                        onChange={(e) => {
-                          const next = [...currentSeriesColors];
-                          next[i] = e.target.value;
-                          set('seriesColors', next);
-                        }}
-                        placeholder="#2563eb"
-                      />
-                      <span className="form-label" style={{ marginLeft: '6px', marginBottom: 0 }}>
-                        {data.series?.[i]?.name ?? `Series ${i + 1}`}
-                      </span>
                     </div>
                   ))}
                 </div>
-                <ColorField
+                <LocalColorField
                   label="Grid Line Color"
+                  componentId={lastSelectedComponentId}
                   value={style.gridColor ?? '#e5e7eb'}
-                  onChange={(v) => set('gridColor', v)}
+                  onChange={(v) => setDebounced('gridColor', v)}
                 />
-                <ColorField
+                <LocalColorField
                   label="Axis Text Color"
+                  componentId={lastSelectedComponentId}
                   value={style.axisColor ?? '#94a3b8'}
-                  onChange={(v) => set('axisColor', v)}
+                  onChange={(v) => setDebounced('axisColor', v)}
                 />
               </>
             )}
@@ -483,20 +519,23 @@ export default function ThemeTab() {
                   value={style.lineHeight ?? 1.4}
                   onChange={(v) => set('lineHeight', v)}
                 />
-                <ColorField
+                <LocalColorField
                   label="INFO Color"
+                  componentId={lastSelectedComponentId}
                   value={style.levelColors?.INFO ?? '#0284c7'}
-                  onChange={(v) => set('levelColors', { ...style.levelColors, INFO: v })}
+                  onChange={(v) => setDebounced('levelColors', { ...style.levelColors, INFO: v })}
                 />
-                <ColorField
+                <LocalColorField
                   label="WARN Color"
+                  componentId={lastSelectedComponentId}
                   value={style.levelColors?.WARN ?? '#d97706'}
-                  onChange={(v) => set('levelColors', { ...style.levelColors, WARN: v })}
+                  onChange={(v) => setDebounced('levelColors', { ...style.levelColors, WARN: v })}
                 />
-                <ColorField
+                <LocalColorField
                   label="ERROR Color"
+                  componentId={lastSelectedComponentId}
                   value={style.levelColors?.ERROR ?? '#dc2626'}
-                  onChange={(v) => set('levelColors', { ...style.levelColors, ERROR: v })}
+                  onChange={(v) => setDebounced('levelColors', { ...style.levelColors, ERROR: v })}
                 />
               </>
             )}
@@ -541,5 +580,36 @@ export default function ThemeTab() {
       </div>
 
     </div>
+  );
+}
+
+function LocalSeriesColorInput({ value, componentId, label, onChange }: { value: string; componentId: string; label: string; onChange: (v: string) => void }) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => setLocal(value), [value, componentId]);
+  
+  const commit = (v: string) => { if (v !== value) onChange(v); };
+
+  return (
+    <>
+      <input
+        type="color"
+        className="color-swatch-input"
+        value={local ?? '#2563eb'}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={(e) => commit(e.target.value)}
+        onMouseUp={(e) => commit((e.target as HTMLInputElement).value)}
+      />
+      <input
+        type="text"
+        className="color-hex-input"
+        value={local ?? '#2563eb'}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={(e) => commit(e.target.value)}
+        placeholder="#2563eb"
+      />
+      <span className="form-label" style={{ marginLeft: '6px', marginBottom: 0 }}>
+        {label}
+      </span>
+    </>
   );
 }

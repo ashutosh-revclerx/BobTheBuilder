@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import type { ComponentConfig } from '../../types/template';
 import type { QueryConfig } from '@btb/shared';
 import { executeQuery } from '../../engine/queryEngine';
@@ -28,13 +29,16 @@ function pickIcon(label: string): string {
   return STAT_ICONS.default;
 }
 
-export default function StatCard({ config }: StatCardProps) {
+const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
   const { style, data, label } = config;
   const queryResults = useEditorStore((state) => state.queryResults);
   const queriesConfig = useEditorStore((state) => state.queriesConfig);
   const queryName = parseQueryName(data.dbBinding);
   const queryState = queryName ? queryResults[queryName] : undefined;
   const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === queryName) as QueryConfig | undefined;
+  
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
+  
   const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const value = `${data.prefix ?? ''}${typeof rawData === 'string' ? rawData : String(rawData ?? '—')}${data.suffix ?? ''}`;
@@ -47,14 +51,21 @@ export default function StatCard({ config }: StatCardProps) {
   return (
     <div
       className="stat-card"
+      ref={el => {
+        if (el) {
+          el.style.setProperty('--comp-bg', bg);
+          el.style.setProperty('--comp-border', style.borderColor ?? '');
+          el.style.setProperty('--comp-text', style.textColor ?? '');
+        }
+      }}
       style={{
-        background: resolveBackground(style),
+        background: 'var(--comp-bg)',
         fontFamily: style.fontFamily,
         fontSize: style.fontSize ? `${style.fontSize}px` : undefined,
-        borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
-        borderColor: style.borderColor,
+        borderColor: 'var(--comp-border)',
         borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
         borderStyle: 'solid',
+        borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         padding: style.padding ? `${style.padding}px` : undefined,
         height: '100%',
         display: 'flex',
@@ -73,7 +84,7 @@ export default function StatCard({ config }: StatCardProps) {
           <QueryErrorBanner compact queryName={queryConfig.name} error={queryState.error || ''} onRetry={() => executeQuery(queryConfig)} />
         ) : (
           <>
-            <div className="stat-card-value" style={{ fontSize: `${style.metricFontSize || 28}px`, color: style.textColor }}>
+            <div className="stat-card-value" style={{ fontSize: `${style.metricFontSize || 28}px`, color: 'var(--comp-text)' }}>
               {value}
             </div>
             {data.sparklineData?.length ? (
@@ -104,4 +115,6 @@ export default function StatCard({ config }: StatCardProps) {
       {data.comparisonValue ? <div style={{ color: '#5c6370', fontSize: '12px', marginTop: '6px' }}>{data.comparisonValue}</div> : null}
     </div>
   );
-}
+});
+
+export default StatCard;

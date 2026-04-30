@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { ComponentConfig, ComponentType } from '../../types/template';
 import InlinePicker from '../editor/InlinePicker';
 import { GridLayer } from '../editor/GridLayer';
@@ -11,11 +11,13 @@ interface ContainerProps {
   readOnly?: boolean;
 }
 
-export default function Container({ config, componentMap, readOnly = false }: ContainerProps) {
+const Container = React.memo(function Container({ config, componentMap, readOnly = false }: ContainerProps) {
   const { style, data } = config;
   const [showPicker, setShowPicker] = useState(false);
   const addComponent = useEditorStore((s) => s.addComponent);
   const selectComponent = useEditorStore((s) => s.selectComponent);
+
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
 
   const handleAddInside = (type: ComponentType) => {
     selectComponent(config.id);
@@ -26,10 +28,16 @@ export default function Container({ config, componentMap, readOnly = false }: Co
   return (
     <div
       className="container-component"
+      ref={el => {
+        if (el) {
+          el.style.setProperty('--comp-bg', bg);
+          el.style.setProperty('--comp-border', style.borderColor ?? '');
+        }
+      }}
       style={{
-        background: resolveBackground(style),
+        background: 'var(--comp-bg)',
         borderRadius: `${style.borderRadius}px`,
-        borderColor: style.borderColor,
+        borderColor: 'var(--comp-border)',
         borderWidth: `${style.borderWidth}px`,
         borderStyle: 'solid',
         padding: `${style.padding ?? 16}px`,
@@ -66,7 +74,7 @@ export default function Container({ config, componentMap, readOnly = false }: Co
                     : style.justifyContent === 'Space Around'
                       ? 'space-around'
                       : 'flex-start',
-          borderTop: data.divider ? `1px solid ${style.borderColor || '#e3e6ec'}` : undefined,
+          borderTop: data.divider ? `1px solid var(--comp-border)` : undefined,
         }}
       >
         <GridLayer parentId={config.id} componentMap={componentMap} customGap={data.gap ?? 10} readOnly={readOnly} />
@@ -82,4 +90,6 @@ export default function Container({ config, componentMap, readOnly = false }: Co
       {showPicker && <InlinePicker onClose={() => setShowPicker(false)} onSelect={handleAddInside} />}
     </div>
   );
-}
+});
+
+export default Container;

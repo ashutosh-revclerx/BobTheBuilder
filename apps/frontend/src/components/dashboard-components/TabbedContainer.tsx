@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { ComponentConfig, ComponentType } from '../../types/template';
 import InlinePicker from '../editor/InlinePicker';
 import { GridLayer } from '../editor/GridLayer';
@@ -12,13 +12,15 @@ interface TabbedContainerProps {
   readOnly?: boolean;
 }
 
-export default function TabbedContainer({ config, componentMap, readOnly = false }: TabbedContainerProps) {
+const TabbedContainer = React.memo(function TabbedContainer({ config, componentMap, readOnly = false }: TabbedContainerProps) {
   const { style, data } = config;
   const [showPicker, setShowPicker] = useState(false);
   const activeTabs = useEditorStore((s) => s.activeTabs);
   const setActiveTab = useEditorStore((s) => s.setActiveTab);
   const addComponent = useEditorStore((s) => s.addComponent);
   const selectComponent = useEditorStore((s) => s.selectComponent);
+
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
 
   const tabs = data.tabs || ['View 1'];
   const initialTab = data.defaultTab && tabs.includes(data.defaultTab) ? data.defaultTab : tabs[0];
@@ -46,10 +48,16 @@ export default function TabbedContainer({ config, componentMap, readOnly = false
   return (
     <div
       className="tabbed-container-component"
+      ref={el => {
+        if (el) {
+          el.style.setProperty('--comp-bg', bg);
+          el.style.setProperty('--comp-border', style.borderColor ?? '');
+        }
+      }}
       style={{
-        background: resolveBackground(style),
+        background: 'var(--comp-bg)',
         borderRadius: `${style.borderRadius}px`,
-        borderColor: style.borderColor,
+        borderColor: 'var(--comp-border)',
         borderWidth: `${style.borderWidth}px`,
         borderStyle: 'solid',
         height: '100%',
@@ -88,4 +96,6 @@ export default function TabbedContainer({ config, componentMap, readOnly = false
       {showPicker && <InlinePicker onClose={() => setShowPicker(false)} onSelect={handleAddInside} />}
     </div>
   );
-}
+});
+
+export default TabbedContainer;

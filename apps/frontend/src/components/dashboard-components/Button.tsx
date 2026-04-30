@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { QueryConfig } from '@btb/shared';
 import type { ComponentConfig } from '../../types/template';
 import { executeQuery } from '../../engine/queryEngine';
@@ -17,13 +17,16 @@ const VARIANT_STYLES = {
   Ghost: { backgroundColor: 'transparent', color: '#2563eb', borderColor: '#e3e6ec' },
 } as const;
 
-export default function Button({ config }: ButtonProps) {
+const Button = React.memo(function Button({ config }: ButtonProps) {
   const { style, data, label } = config;
   const queryResults = useEditorStore((state) => state.queryResults);
   const queriesConfig = useEditorStore((state) => state.queriesConfig);
   const [localLoading, setLocalLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [hovered, setHovered] = useState(false);
+  
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
+  
   const targetQueryName = parseQueryName(data.dbBinding);
   const queryState = targetQueryName ? queryResults[targetQueryName] : undefined;
   const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === targetQueryName) as QueryConfig | undefined;
@@ -64,14 +67,21 @@ export default function Button({ config }: ButtonProps) {
   return (
     <div
       className="button-component"
+      ref={el => {
+        if (el) {
+          el.style.setProperty('--comp-bg', bg);
+          el.style.setProperty('--comp-border', style.borderColor ?? '');
+          el.style.setProperty('--comp-text', style.textColor ?? '');
+        }
+      }}
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: style.padding ? `${style.padding}px` : '16px',
-        background: resolveBackground(style),
+        background: 'var(--comp-bg)',
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
-        border: style.borderWidth ? `${style.borderWidth}px solid ${style.borderColor || 'transparent'}` : undefined,
+        border: style.borderWidth ? `${style.borderWidth}px solid var(--comp-border)` : undefined,
         height: '100%',
         overflow: 'visible',
         position: 'relative',
@@ -129,4 +139,6 @@ export default function Button({ config }: ButtonProps) {
       </button>
     </div>
   );
-}
+});
+
+export default Button;

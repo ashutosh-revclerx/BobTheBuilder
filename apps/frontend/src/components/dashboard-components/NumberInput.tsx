@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import type { ComponentConfig } from '../../types/template';
 import { runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
@@ -16,12 +17,14 @@ function formatValue(value: number, formatter: string | undefined) {
   return String(value);
 }
 
-export default function NumberInput({ config }: { config: ComponentConfig }) {
+const NumberInput = React.memo(function NumberInput({ config }: { config: ComponentConfig }) {
   const { style, data } = config;
   const setComponentState = useEditorStore((s) => s.setComponentState);
   const componentState = useEditorStore((s) => s.componentState);
   const val = Number(componentState[config.id]?.value ?? data.mockValue ?? 0);
   const outOfRange = (data.min !== undefined && val < data.min) || (data.max !== undefined && val > data.max);
+
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
 
   return (
     <div className="atomic-input-wrapper" style={{ height: '100%', display: 'flex', flexDirection: style.labelPosition === 'Left' ? 'row' : 'column', gap: '8px' }}>
@@ -37,13 +40,20 @@ export default function NumberInput({ config }: { config: ComponentConfig }) {
             setComponentState(config.id, 'value', nextValue);
             runAction(data.onChangeAction, nextValue);
           }}
+          ref={el => {
+            if (el) {
+              el.style.setProperty('--comp-bg', bg);
+              el.style.setProperty('--comp-border', outOfRange ? '#dc2626' : (style.borderColor ?? ''));
+              el.style.setProperty('--comp-text', style.textColor ?? '');
+            }
+          }}
           style={{
-            background: resolveBackground(style),
-            color: style.textColor,
+            background: 'var(--comp-bg)',
+            color: 'var(--comp-text)',
             fontFamily: style.fontFamily,
             fontSize: `${style.fontSize}px`,
             borderRadius: `${style.borderRadius}px`,
-            borderColor: outOfRange ? '#dc2626' : style.borderColor,
+            borderColor: 'var(--comp-border)',
             borderWidth: `${style.borderWidth}px`,
             padding: `${style.padding}px`,
             flex: 1,
@@ -60,4 +70,6 @@ export default function NumberInput({ config }: { config: ComponentConfig }) {
       {outOfRange ? <div style={{ fontSize: '11px', color: '#dc2626' }}>{data.errorMessage || 'Value out of range'}</div> : null}
     </div>
   );
-}
+});
+
+export default NumberInput;

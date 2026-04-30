@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import {
   BarChart as RechartsBarChart,
   Bar,
@@ -41,13 +42,16 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
-export default function BarChart({ config }: { config: ComponentConfig }) {
+const BarChart = React.memo(function BarChart({ config }: { config: ComponentConfig }) {
   const { style, data, label } = config;
   const queryResults = useEditorStore((state) => state.queryResults);
   const queriesConfig = useEditorStore((state) => state.queriesConfig);
   const queryName = parseQueryName(data.dbBinding);
   const queryState = queryName ? queryResults[queryName] : undefined;
   const queryConfig = queriesConfig.find((query: QueryConfig) => query.name === queryName) as QueryConfig | undefined;
+  
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
+  
   const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const chartData = Array.isArray(rawData) ? rawData : [];
@@ -60,11 +64,18 @@ export default function BarChart({ config }: { config: ComponentConfig }) {
   return (
     <div
       className="chart-component"
+      ref={el => {
+        if (el) {
+          el.style.setProperty('--comp-bg', bg);
+          el.style.setProperty('--comp-border', style.borderColor ?? '');
+          el.style.setProperty('--comp-text', style.textColor ?? '');
+        }
+      }}
       style={{
-        background: resolveBackground(style),
+        background: 'var(--comp-bg)',
         fontFamily: style.fontFamily,
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
-        borderColor: style.borderColor,
+        borderColor: 'var(--comp-border)',
         borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
         borderStyle: 'solid',
         padding: style.padding ? `${style.padding}px` : undefined,
@@ -73,7 +84,7 @@ export default function BarChart({ config }: { config: ComponentConfig }) {
         flexDirection: 'column',
       }}
     >
-      <div className="chart-component-title" style={{ color: style.textColor }}>{label}</div>
+      <div className="chart-component-title" style={{ color: 'var(--comp-text)' }}>{label}</div>
       <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
         {queryState?.status === 'error' && queryConfig ? (
           <div className="dashboard-query-error-wrap">
@@ -109,4 +120,6 @@ export default function BarChart({ config }: { config: ComponentConfig }) {
       </div>
     </div>
   );
-}
+});
+
+export default BarChart;

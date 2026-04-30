@@ -1,13 +1,13 @@
+import React, { useMemo } from 'react';
 import type { ComponentConfig } from '../../types/template';
 import { evaluateExpression } from '../../engine/runtimeUtils';
 import { resolveBackground } from '../../utils/styleUtils';
 
-export default function Text({ config }: { config: ComponentConfig }) {
+const Text = React.memo(function Text({ config }: { config: ComponentConfig }) {
   const { style, data } = config;
-  // Prefer a resolved binding (e.g. {{queries.X.data.content}}). The binding
-  // resolver replaces the string with the live value and flips the
-  // _resolvedBindings.dbBinding flag. Fall back to mockValue otherwise so
-  // unbound text components still work for static labels.
+  
+  const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
+  
   const isBound = data._resolvedBindings?.dbBinding;
   const sourceValue = isBound && data.dbBinding != null && data.dbBinding !== ''
     ? data.dbBinding
@@ -20,14 +20,21 @@ export default function Text({ config }: { config: ComponentConfig }) {
   return (
     <div
       className="atomic-text-block"
+      ref={el => {
+        if (el) {
+          el.style.setProperty('--comp-bg', bg);
+          el.style.setProperty('--comp-border', style.borderColor ?? '');
+          el.style.setProperty('--comp-text', style.textColor ?? '');
+        }
+      }}
       style={{
-        color: style.textColor,
+        color: 'var(--comp-text)',
         fontFamily: style.fontFamily,
         fontSize: `${style.fontSize}px`,
         padding: `${style.padding}px`,
-        background: resolveBackground(style),
+        background: 'var(--comp-bg)',
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
-        border: style.borderWidth ? `${style.borderWidth}px solid ${style.borderColor || '#000000'}` : undefined,
+        border: style.borderWidth ? `${style.borderWidth}px solid var(--comp-border)` : undefined,
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -48,4 +55,6 @@ export default function Text({ config }: { config: ComponentConfig }) {
       {content}
     </div>
   );
-}
+});
+
+export default Text;
