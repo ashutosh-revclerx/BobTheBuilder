@@ -123,6 +123,7 @@ export interface ComponentData {
   rows?: Record<string, any>[];
   searchable?: boolean;
   pagination?: boolean;
+  allowAddRows?: boolean;
   conditionalRowColor?: TableConditionalRowColorRule[];
   onRowSelectAction?: string;
   columnVisibility?: Record<string, boolean>;

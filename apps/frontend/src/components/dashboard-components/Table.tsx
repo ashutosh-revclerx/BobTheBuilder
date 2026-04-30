@@ -252,7 +252,7 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
               </tr>
             </thead>
             <tbody>
-              {pagedRows.map((row, pagedIndex) => {
+              {pagedRows.map((row) => {
                 const actualIndex = rawRows.indexOf(row);
                 // Fallback to actualIndex if id/key are empty strings or nullish to prevent duplicate React keys
                 const rowKey = (row.id !== undefined && row.id !== null && row.id !== '') ? row.id :
