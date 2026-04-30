@@ -2032,6 +2032,23 @@ body {
   text-align: right;
 }
 
+/* Panel Section Divider */
+.panel-section-divider {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 12px 0 6px 0;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.panel-section-divider:first-child {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 4px;
+}
+
 /* Mini Editor */
 .mini-editor { margin-top: 8px; }
 .mini-editor-row {
@@ -2042,6 +2059,7 @@ body {
 }
 .mini-editor-row input {
   flex: 1;
+  min-width: 0;
   padding: 5px 8px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
@@ -2051,6 +2069,12 @@ body {
   outline: none;
   font-family: 'DM Sans', sans-serif;
   transition: border-color var(--transition-fast);
+}
+.mini-editor-row input.color-swatch-input {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 28px;
+  padding: 0;
 }
 .mini-editor-row input:focus { border-color: var(--blue-500); }
 .mini-editor-delete {

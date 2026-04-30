@@ -278,6 +278,26 @@ export default function DataTab() {
     );
   };
 
+  const handleTableRowChange = (rowIndex: number, fieldKey: string, value: string) => {
+    const nextRows = [...rows];
+    nextRows[rowIndex] = { ...nextRows[rowIndex], [fieldKey]: value };
+    handleDataField('rows', nextRows);
+    handleDataField('mockValue', nextRows);
+  };
+
+  const handleTableAddRow = () => {
+    const newRow = Object.fromEntries(columns.map((col) => [col.fieldKey, '']));
+    const nextRows = [...rows, newRow];
+    handleDataField('rows', nextRows);
+    handleDataField('mockValue', nextRows);
+  };
+
+  const handleTableDeleteRow = (rowIndex: number) => {
+    const nextRows = rows.filter((_, index) => index !== rowIndex);
+    handleDataField('rows', nextRows);
+    handleDataField('mockValue', nextRows);
+  };
+
   const handleConditionalRowRuleChange = (
     index: number,
     field: keyof TableConditionalRowColorRule,
@@ -409,110 +429,204 @@ export default function DataTab() {
 
       {isTable && (
         <>
+          {/* ── Behavior ───────────────────────────────────── */}
+          <div className="panel-section-divider">Behavior</div>
+
           <BooleanField label="Searchable" value={data.searchable !== false} onChange={(value) => handleDataField('searchable', value)} />
           <BooleanField label="Pagination" value={data.pagination !== false} onChange={(value) => handleDataField('pagination', value)} />
+          <BooleanField label="Allow adding rows" value={data.allowAddRows === true} onChange={(value) => handleDataField('allowAddRows', value)} />
           <TextField
-            label="On row select -> set variable"
+            label="On row select → variable"
             value={data.onRowSelectAction ?? ''}
             onChange={(value) => handleDataField('onRowSelectAction', value)}
+            placeholder="e.g. selectedUser"
           />
 
-          <FormField label="Columns">
-            <div className="mini-editor">
-              {columns.map((column, index) => (
-                <div key={`${column.fieldKey}-${index}`} className="mini-editor-row">
-                  <input value={column.name} onChange={(e) => handleColumnChange(index, 'name', e.target.value)} placeholder="Column name" />
-                  <input
-                    value={column.fieldKey}
-                    onChange={(e) => handleColumnChange(index, 'fieldKey', e.target.value)}
-                    placeholder="Field key"
-                  />
-                  <button
-                    className="mini-editor-delete"
-                    onClick={() => handleDataField('columns', columns.filter((_, currentIndex) => currentIndex !== index))}
-                  >
-                    x
-                  </button>
+          {/* ── Columns ────────────────────────────────────── */}
+          <div className="panel-section-divider">Columns</div>
+
+          <div className="mini-editor">
+            {/* header hint */}
+            {columns.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto', gap: '4px', padding: '0 0 4px 0' }}>
+                <span className="form-label" style={{ fontSize: '10px', opacity: 0.6 }}>Display Name</span>
+                <span className="form-label" style={{ fontSize: '10px', opacity: 0.6 }}>Field Key</span>
+                <span className="form-label" style={{ fontSize: '10px', opacity: 0.6 }}>Visible</span>
+                <span />
+              </div>
+            )}
+
+            {columns.map((column, index) => (
+              <div key={`${column.fieldKey}-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto', gap: '4px', marginBottom: '6px', alignItems: 'center' }}>
+                <input
+                  className="form-input"
+                  style={{ fontSize: '11px', padding: '4px 6px' }}
+                  value={column.name}
+                  onChange={(e) => handleColumnChange(index, 'name', e.target.value)}
+                  placeholder="Name"
+                />
+                <input
+                  className="form-input"
+                  style={{ fontSize: '11px', padding: '4px 6px', fontFamily: 'monospace', color: 'var(--blue-400)' }}
+                  value={column.fieldKey}
+                  onChange={(e) => handleColumnChange(index, 'fieldKey', e.target.value)}
+                  placeholder="field_key"
+                />
+                <input
+                  type="checkbox"
+                  title="Visible"
+                  style={{ width: '14px', height: '14px', cursor: 'pointer', margin: '0 auto' }}
+                  checked={data.columnVisibility?.[column.fieldKey] !== false}
+                  onChange={(e) =>
+                    handleDataField('columnVisibility', {
+                      ...(data.columnVisibility ?? {}),
+                      [column.fieldKey]: e.target.checked,
+                    })
+                  }
+                />
+                <button
+                  className="mini-editor-delete"
+                  title="Remove column"
+                  onClick={() => handleDataField('columns', columns.filter((_, i) => i !== index))}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+
+            <button
+              className="mini-editor-add"
+              onClick={() => handleDataField('columns', [...columns, { name: '', fieldKey: '' }])}
+            >
+              + Add Column
+            </button>
+          </div>
+
+          {/* ── Rows (Data) ────────────────────────────────────── */}
+          <div className="panel-section-divider">Rows (Data)</div>
+
+          <div className="mini-editor">
+            {rows.map((row, rowIndex) => (
+              <div key={`row-${rowIndex}`} style={{ 
+                background: 'var(--bg-surface)', 
+                border: '1px solid var(--border)', 
+                borderRadius: '6px', 
+                padding: '8px', 
+                marginBottom: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Row {rowIndex + 1}</span>
+                  <button className="mini-editor-delete" title="Delete row" onClick={() => handleTableDeleteRow(rowIndex)}>×</button>
                 </div>
-              ))}
-              <button
-                className="mini-editor-add"
-                onClick={() => handleDataField('columns', [...columns, { name: '', fieldKey: '' }])}
+                
+                {columns.filter(c => c.fieldKey).map((column) => (
+                  <div key={column.fieldKey} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '80px', fontSize: '10px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={column.name || column.fieldKey}>
+                      {column.name || column.fieldKey}
+                    </span>
+                    <input
+                      className="form-input"
+                      style={{ flex: 1, minWidth: 0, fontSize: '11px', padding: '4px 6px' }}
+                      value={String(row[column.fieldKey] ?? '')}
+                      onChange={(e) => handleTableRowChange(rowIndex, column.fieldKey, e.target.value)}
+                      placeholder="Value"
+                    />
+                  </div>
+                ))}
+              </div>
+            ))}
+            
+            <button className="mini-editor-add" onClick={handleTableAddRow}>
+              + Add Row
+            </button>
+          </div>
+
+          {/* ── Conditional Row Colours ─────────────────────── */}
+          <div className="panel-section-divider">Conditional Row Colors</div>
+
+          <div className="mini-editor">
+            {(data.conditionalRowColor ?? []).map((rule, index) => (
+              <div
+                key={`rule-${index}`}
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  padding: '8px',
+                  marginBottom: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
               >
-                + Add column
-              </button>
-            </div>
-          </FormField>
-
-          <FormField label="Column visibility">
-            <div className="mini-editor">
-              {columns.map((column) => (
-                <label key={column.fieldKey} className="mini-editor-row">
+                {/* row 1: field + operator + value */}
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <input
-                    type="checkbox"
-                    checked={data.columnVisibility?.[column.fieldKey] !== false}
-                    onChange={(e) =>
-                      handleDataField('columnVisibility', {
-                        ...(data.columnVisibility ?? {}),
-                        [column.fieldKey]: e.target.checked,
-                      })
-                    }
+                    className="form-input"
+                    style={{ flex: 1, minWidth: 0, fontSize: '11px', padding: '4px 6px' }}
+                    value={rule.field}
+                    onChange={(e) => handleConditionalRowRuleChange(index, 'field', e.target.value)}
+                    placeholder="Field"
                   />
-                  <span className="form-label">{column.name || column.fieldKey}</span>
-                </label>
-              ))}
-            </div>
-          </FormField>
-
-          <FormField label="Conditional row color">
-            <div className="mini-editor">
-              {(data.conditionalRowColor ?? []).map((rule, index) => (
-                <div key={`${rule.field}-${index}`} className="mini-editor-row">
-                  <input value={rule.field} onChange={(e) => handleConditionalRowRuleChange(index, 'field', e.target.value)} placeholder="Field" />
                   <select
                     className="form-select"
+                    style={{ flex: '0 0 56px', fontSize: '11px', padding: '4px 4px' }}
                     value={rule.operator}
                     onChange={(e) => handleConditionalRowRuleChange(index, 'operator', e.target.value)}
                   >
-                    {CONDITION_OPERATORS.map((operator) => (
-                      <option key={operator} value={operator}>
-                        {operator}
-                      </option>
+                    {CONDITION_OPERATORS.map((op) => (
+                      <option key={op} value={op}>{op}</option>
                     ))}
                   </select>
-                  <input value={rule.value} onChange={(e) => handleConditionalRowRuleChange(index, 'value', e.target.value)} placeholder="Value" />
+                  <input
+                    className="form-input"
+                    style={{ flex: 1, minWidth: 0, fontSize: '11px', padding: '4px 6px' }}
+                    value={rule.value}
+                    onChange={(e) => handleConditionalRowRuleChange(index, 'value', e.target.value)}
+                    placeholder="Value"
+                  />
+                </div>
+                {/* row 2: color label + swatch + delete */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="form-label" style={{ flex: 1, fontSize: '10px' }}>Row color</span>
                   <input
                     type="color"
                     className="color-swatch-input"
                     value={rule.color}
                     onChange={(e) => handleConditionalRowRuleChange(index, 'color', e.target.value)}
                   />
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{rule.color}</span>
                   <button
                     className="mini-editor-delete"
+                    title="Remove rule"
                     onClick={() =>
                       handleDataField(
                         'conditionalRowColor',
-                        (data.conditionalRowColor ?? []).filter((_, currentIndex) => currentIndex !== index),
+                        (data.conditionalRowColor ?? []).filter((_, i) => i !== index),
                       )
                     }
                   >
-                    x
+                    ×
                   </button>
                 </div>
-              ))}
-              <button
-                className="mini-editor-add"
-                onClick={() =>
-                  handleDataField('conditionalRowColor', [
-                    ...(data.conditionalRowColor ?? []),
-                    { field: '', operator: '=', value: '', color: '#eff6ff' },
-                  ])
-                }
-              >
-                + Add rule
-              </button>
-            </div>
-          </FormField>
+              </div>
+            ))}
+
+            <button
+              className="mini-editor-add"
+              onClick={() =>
+                handleDataField('conditionalRowColor', [
+                  ...(data.conditionalRowColor ?? []),
+                  { field: '', operator: '=', value: '', color: '#eff6ff' },
+                ])
+              }
+            >
+              + Add Rule
+            </button>
+          </div>
         </>
       )}
 

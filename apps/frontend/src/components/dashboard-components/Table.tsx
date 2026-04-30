@@ -89,6 +89,7 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
   const isEditorMode = !readOnly;
   const componentId = id || config.id;
   const { style, data, label } = config;
+  const isEditable = isEditorMode || data.allowAddRows;
   const updateData = useEditorStore((state) => state.updateData);
   const setComponentState = useEditorStore((state) => state.setComponentState);
   const componentState = useEditorStore((state) => state.componentState);
@@ -251,14 +252,21 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
               </tr>
             </thead>
             <tbody>
-              {pagedRows.map((row, rowIndex) => (
+              {pagedRows.map((row, pagedIndex) => {
+                const actualIndex = rawRows.indexOf(row);
+                // Fallback to actualIndex if id/key are empty strings or nullish to prevent duplicate React keys
+                const rowKey = (row.id !== undefined && row.id !== null && row.id !== '') ? row.id :
+                               (row.key !== undefined && row.key !== null && row.key !== '') ? row.key :
+                               actualIndex;
+                
+                return (
                 <tr
-                  key={String(row.id ?? row.key ?? rowIndex)}
+                  key={String(rowKey)}
                   onClick={() => handleRowClick(row)}
                   style={{
                     borderBottom: '1px solid var(--border)',
                     cursor: 'pointer',
-                    backgroundColor: resolveRowBackground(row, rowIndex),
+                    backgroundColor: resolveRowBackground(row, actualIndex),
                   }}
                 >
                   {visibleColumns.map((column, columnIndex) => (
@@ -266,19 +274,19 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
                       key={column.fieldKey}
                       text={String(row[column.fieldKey] ?? '')}
                       colWidth={colWidths[columnIndex] || 0}
-                      isEditorMode={isEditorMode}
-                      onEdit={(value) => handleCellEdit(rowIndex, column.fieldKey, value)}
+                      isEditorMode={isEditable}
+                      onEdit={(value) => handleCellEdit(actualIndex, column.fieldKey, value)}
                       textDecoration={shouldStrikeThrough(row) ? 'line-through' : undefined}
                     />
                   ))}
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         )}
       </div>
 
-      {isEditorMode ? (
+      {isEditable ? (
         <button className="table-add-row-btn" onClick={() => updateData(componentId, { rows: [...rawRows, Object.fromEntries(visibleColumns.map((column) => [column.fieldKey, '']))] })}>
           + Add Row
         </button>
