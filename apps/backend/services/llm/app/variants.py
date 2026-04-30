@@ -198,7 +198,7 @@ def _repaint_component(component: dict[str, Any], palette: dict[str, str]) -> di
     if ctype in {"StatCard", "StatusBadge"}:
         style["backgroundColor"] = palette["card_tint"]
         style["borderLeftColor"] = palette["card_accent"]
-        style["borderLeftWidth"] = 3
+        style.setdefault("borderLeftWidth", 4)
         style["textColor"] = palette["text"]
         style["mutedColor"] = palette["text_muted"]
 
@@ -216,6 +216,7 @@ def _repaint_component(component: dict[str, Any], palette: dict[str, str]) -> di
         style["rowHoverColor"] = palette.get("primary_subtle", palette["primary"] + "22")
         style["textColor"] = palette["text"]
         style["mutedColor"] = palette["text_muted"]
+        style.setdefault("stripeRows", True)
 
     elif ctype == "LogsViewer":
         style["backgroundColor"] = palette["panel"]
@@ -250,8 +251,8 @@ def _repaint_component(component: dict[str, Any], palette: dict[str, str]) -> di
         style["borderColor"] = palette["primary"]
         style["textColor"] = palette["primary_text"]
         style["hoverBackgroundColor"] = palette.get("primary_hover", palette["primary"])
-        style["fontWeight"] = 600
-        style["padding"] = 14
+        style.setdefault("fontWeight", 600)
+        style.setdefault("padding", 14)
 
     return component
 

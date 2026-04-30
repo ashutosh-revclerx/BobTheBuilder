@@ -5,7 +5,16 @@ import { pool } from '../db/client.js';
 const router = Router();
 
 const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL ?? 'http://localhost:8000';
-const LLM_TIMEOUT_MS  = 60_000;
+const DEFAULT_LLM_TIMEOUT_MS = 180_000;
+
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const LLM_TIMEOUT_MS = readPositiveIntEnv('LLM_TIMEOUT_MS', DEFAULT_LLM_TIMEOUT_MS);
 
 const GenerateSchema = z.object({
   prompt:        z.string().min(3),
@@ -226,7 +235,8 @@ router.post('/generate', async (req, res) => {
     return res.json(json);
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
-      return res.status(504).json({ error: 'LLM service took longer than 60 seconds' });
+      const seconds = Math.round(LLM_TIMEOUT_MS / 1000);
+      return res.status(504).json({ error: `LLM service took longer than ${seconds} seconds` });
     }
     console.error('[dashboards] generate proxy error:', err);
     return res.status(502).json({ error: 'Could not reach the LLM service' });

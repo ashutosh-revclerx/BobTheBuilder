@@ -199,7 +199,7 @@ export default function GeneratePage() {
               onClick={() => void handleSubmit()}
             >
               {submitting ? <span className="spinner dashboard-list-button-spinner" /> : null}
-              <span>{submitting ? 'Generating… (5-30s)' : '✨ Generate'}</span>
+              <span>{submitting ? 'Generating… this can take up to 3 min' : '✨ Generate'}</span>
             </button>
           </div>
         </section>
