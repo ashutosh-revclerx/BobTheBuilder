@@ -215,7 +215,19 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
       <div className="table-component-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="table-component-title" style={{ color: 'var(--comp-text)' }}>{label}</div>
         {data.searchable ? (
-          <input className="form-input" type="text" placeholder="Search..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
+          <input 
+            className="form-input table-search-input" 
+            type="text" 
+            placeholder="Search..." 
+            value={searchTerm} 
+            onChange={(event) => setSearchTerm(event.target.value)} 
+            style={{
+              backgroundColor: style.searchBarBackground || 'var(--bg-primary)',
+              color: style.searchBarTextColor || 'var(--text-primary)',
+              borderColor: style.searchBarBorderColor || 'var(--border)',
+              fontSize: style.fontSize ? `${Math.max(12, style.fontSize - 2)}px` : '12px',
+            }}
+          />
         ) : null}
       </div>
 

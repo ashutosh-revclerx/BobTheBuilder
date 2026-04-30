@@ -22,6 +22,10 @@ const TEXT_TRANSFORM_OPTIONS = [
   { label: 'Uppercase',  value: 'uppercase'  as const },
   { label: 'Capitalize', value: 'capitalize' as const },
 ];
+const FONT_STYLE_OPTIONS = [
+  { label: 'Normal', value: 'normal' as const },
+  { label: 'Italic', value: 'italic' as const },
+];
 const LOG_FONT_OPTIONS = ['Fira Code', 'JetBrains Mono', 'Courier New'];
 const MAX_SERIES_COLORS = 5;
 const DEFAULT_GRADIENT_STOPS = [
@@ -292,6 +296,7 @@ export default function ThemeTab() {
   const lastSelectedComponentId = useEditorStore((s) => s.lastSelectedComponentId);
   const components              = useEditorStore((s) => s.components);
   const updateStyle             = useEditorStore((s) => s.updateStyle);
+  const updateLabel             = useEditorStore((s) => s.updateLabel);
   const applyThemeToAll         = useEditorStore((s) => s.applyThemeToAll);
 
   const debouncedUpdateStyle = useDebouncedStyle(lastSelectedComponentId || '', 150);
@@ -340,6 +345,19 @@ export default function ThemeTab() {
         {expandedSection === 'component' && (
           <div className="theme-section-content">
 
+            {/* Item 3: Label Editor */}
+            <FormField label="Component Label">
+              <input
+                type="text"
+                className="form-input"
+                value={component.label}
+                onChange={(e) => updateLabel(lastSelectedComponentId, e.target.value)}
+                placeholder="Enter label..."
+              />
+            </FormField>
+
+            <div className="theme-divider" />
+
             {/* Background (solid + gradient) */}
             <GradientEditor 
               style={style} 
@@ -378,6 +396,43 @@ export default function ThemeTab() {
               options={PADDING_OPTIONS}
               value={style.padding ?? 16}
               onChange={(v) => set('padding', v)}
+            />
+
+            <div className="theme-divider" />
+            <p className="section-subtitle">Typography</p>
+
+            <OptionGroup
+              label="Font Weight"
+              options={FONT_WEIGHT_OPTIONS.map((o) => o.value)}
+              value={style.fontWeight ?? 400}
+              renderLabel={(v) => FONT_WEIGHT_OPTIONS.find((o) => o.value === v)?.label ?? String(v)}
+              onChange={(v) => set('fontWeight', v)}
+            />
+            <OptionGroup
+              label="Font Style"
+              options={FONT_STYLE_OPTIONS.map((o) => o.value)}
+              value={style.fontStyle ?? 'normal'}
+              renderLabel={(v) => FONT_STYLE_OPTIONS.find((o) => o.value === v)?.label ?? v}
+              onChange={(v) => set('fontStyle', v)}
+            />
+            <FormField label="Letter Spacing (px)">
+              <input
+                type="range"
+                className="slider-input"
+                min={-2}
+                max={10}
+                step={0.5}
+                value={style.letterSpacing ?? 0}
+                onChange={(e) => set('letterSpacing', Number(e.target.value))}
+              />
+              <span className="slider-value">{style.letterSpacing ?? 0}px</span>
+            </FormField>
+            <OptionGroup
+              label="Text Transform"
+              options={TEXT_TRANSFORM_OPTIONS.map((o) => o.value)}
+              value={style.textTransform ?? 'none'}
+              renderLabel={(v) => TEXT_TRANSFORM_OPTIONS.find((o) => o.value === v)?.label ?? v}
+              onChange={(v) => set('textTransform', v)}
             />
 
             {/* ── StatCard ── */}
@@ -435,6 +490,19 @@ export default function ThemeTab() {
                     </button>
                   </div>
                 </FormField>
+                <div className="theme-divider" />
+                <LocalColorField
+                  label="Search Bar Background"
+                  componentId={lastSelectedComponentId}
+                  value={style.searchBarBackground ?? '#ffffff'}
+                  onChange={(v) => setDebounced('searchBarBackground', v)}
+                />
+                <LocalColorField
+                  label="Search Bar Text Color"
+                  componentId={lastSelectedComponentId}
+                  value={style.searchBarTextColor ?? '#0f1117'}
+                  onChange={(v) => setDebounced('searchBarTextColor', v)}
+                />
               </>
             )}
 
@@ -496,6 +564,20 @@ export default function ThemeTab() {
                   value={style.axisColor ?? '#94a3b8'}
                   onChange={(v) => setDebounced('axisColor', v)}
                 />
+                <div className="gradient-editor-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <LocalColorField
+                    label="X-Axis Color"
+                    componentId={lastSelectedComponentId}
+                    value={style.xAxisColor ?? style.axisColor ?? '#94a3b8'}
+                    onChange={(v) => setDebounced('xAxisColor', v)}
+                  />
+                  <LocalColorField
+                    label="Y-Axis Color"
+                    componentId={lastSelectedComponentId}
+                    value={style.yAxisColor ?? style.axisColor ?? '#94a3b8'}
+                    onChange={(v) => setDebounced('yAxisColor', v)}
+                  />
+                </div>
               </>
             )}
 
@@ -536,6 +618,45 @@ export default function ThemeTab() {
                   componentId={lastSelectedComponentId}
                   value={style.levelColors?.ERROR ?? '#dc2626'}
                   onChange={(v) => setDebounced('levelColors', { ...style.levelColors, ERROR: v })}
+                />
+                <div className="theme-divider" />
+                <LocalColorField
+                  label="Search Bar Background"
+                  componentId={lastSelectedComponentId}
+                  value={style.searchBarBackground ?? '#ffffff'}
+                  onChange={(v) => setDebounced('searchBarBackground', v)}
+                />
+              </>
+            )}
+
+            {/* ── TabbedContainer ── */}
+            {ctype === 'TabbedContainer' && (
+              <>
+                <LocalColorField
+                  label="Header Strip Background"
+                  componentId={lastSelectedComponentId}
+                  value={style.tabHeaderBackground ?? '#f8fafc'}
+                  onChange={(v) => setDebounced('tabHeaderBackground', v)}
+                />
+                <div className="gradient-editor-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <LocalColorField
+                    label="Tab Text Color"
+                    componentId={lastSelectedComponentId}
+                    value={style.tabHeaderTextColor ?? '#64748b'}
+                    onChange={(v) => setDebounced('tabHeaderTextColor', v)}
+                  />
+                  <LocalColorField
+                    label="Active Tab BG"
+                    componentId={lastSelectedComponentId}
+                    value={style.tabHeaderActiveBackground ?? '#ffffff'}
+                    onChange={(v) => setDebounced('tabHeaderActiveBackground', v)}
+                  />
+                </div>
+                <LocalColorField
+                  label="Active Tab Text"
+                  componentId={lastSelectedComponentId}
+                  value={style.tabHeaderActiveTextColor ?? '#2563eb'}
+                  onChange={(v) => setDebounced('tabHeaderActiveTextColor', v)}
                 />
               </>
             )}

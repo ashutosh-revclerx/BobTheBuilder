@@ -93,11 +93,34 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
         ) : (
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={100}>
             <RechartsBarChart data={chartData as Record<string, unknown>[]} layout={isHorizontal ? 'vertical' : 'horizontal'}>
-              {data.showGrid !== false ? <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={!isHorizontal} /> : null}
-              <XAxis dataKey={isHorizontal ? undefined : xKey} type={isHorizontal ? 'number' : 'category'} />
-              <YAxis dataKey={isHorizontal ? xKey : undefined} type={isHorizontal ? 'category' : 'number'} />
-              <Tooltip content={<CustomTooltip />} />
-              {data.showLegend !== false ? <Legend /> : null}
+              {data.showGrid !== false ? (
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke={style.gridColor || "rgba(0,0,0,0.06)"} 
+                  vertical={!isHorizontal} 
+                />
+              ) : null}
+              <XAxis 
+                dataKey={isHorizontal ? undefined : xKey} 
+                type={isHorizontal ? 'number' : 'category'} 
+                hide={data.showXAxis === false}
+                tick={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#94a3b8' }}
+                stroke={style.xAxisColor || style.axisColor || '#e5e7eb'}
+              />
+              <YAxis 
+                dataKey={isHorizontal ? xKey : undefined} 
+                type={isHorizontal ? 'category' : 'number'} 
+                hide={data.showYAxis === false}
+                tick={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#94a3b8' }}
+                stroke={style.yAxisColor || style.axisColor || '#e5e7eb'}
+              />
+              <Tooltip 
+                content={<CustomTooltip />} 
+                contentStyle={{ fontSize: style.fontSize || 12 }}
+              />
+              {data.showLegend !== false ? (
+                <Legend wrapperStyle={{ fontSize: style.fontSize || 12 }} />
+              ) : null}
               {activeSeries.map((seriesItem, index) => (
                 <Bar
                   key={seriesItem.fieldKey}
@@ -108,7 +131,13 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
                   stackId={data.stacked ? 'stack' : undefined}
                   onClick={(entry) => runAction(data.onBarClickAction, entry)}
                 >
-                  {style.showDataLabels ? <LabelList dataKey={seriesItem.fieldKey} position={isHorizontal ? 'right' : 'top'} /> : null}
+                  {style.showDataLabels ? (
+                    <LabelList 
+                      dataKey={seriesItem.fieldKey} 
+                      position={isHorizontal ? 'right' : 'top'} 
+                      style={{ fontSize: style.fontSize || 11, fill: style.textColor || '#666' }}
+                    />
+                  ) : null}
                   {chartData.map((_, cellIndex) => (
                     <Cell key={cellIndex} fill={palette[cellIndex % palette.length]} />
                   ))}

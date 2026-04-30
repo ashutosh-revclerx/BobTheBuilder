@@ -70,18 +70,15 @@ const Button = React.memo(function Button({ config }: ButtonProps) {
       ref={el => {
         if (el) {
           el.style.setProperty('--comp-bg', bg);
-          el.style.setProperty('--comp-border', style.borderColor ?? '');
-          el.style.setProperty('--comp-text', style.textColor ?? '');
+          el.style.setProperty('--comp-border', style.borderColor || variant.borderColor);
+          el.style.setProperty('--comp-text', style.textColor || variant.color);
         }
       }}
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: style.padding ? `${style.padding}px` : '16px',
-        background: 'var(--comp-bg)',
-        borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
-        border: style.borderWidth ? `${style.borderWidth}px solid var(--comp-border)` : undefined,
+        padding: style.padding ? `${style.padding}px` : '0',
         height: '100%',
         overflow: 'visible',
         position: 'relative',
@@ -111,11 +108,13 @@ const Button = React.memo(function Button({ config }: ButtonProps) {
           backgroundColor:
             hovered && style.hoverBackgroundColor
               ? style.hoverBackgroundColor
-              : (style.backgroundColor || variant.backgroundColor),
-          color: style.textColor || variant.color,
+              : 'var(--comp-bg)',
+          color: 'var(--comp-text)',
           fontFamily: style.fontFamily,
+          fontStyle: style.fontStyle || 'normal',
+          letterSpacing: style.letterSpacing ? `${style.letterSpacing}px` : 'normal',
           borderRadius: style.borderRadius ? `${style.borderRadius}px` : '6px',
-          border: `${style.borderWidth ?? 1}px solid ${style.borderColor || variant.borderColor}`,
+          border: `${style.borderWidth ?? 1}px solid var(--comp-border)`,
           padding: style.padding ? `${style.padding}px` : '10px 20px',
           cursor: disabled ? 'not-allowed' : 'pointer',
           fontWeight: style.fontWeight ?? 600,
@@ -124,7 +123,7 @@ const Button = React.memo(function Button({ config }: ButtonProps) {
           width: style.fullWidth ? '100%' : 'auto',
           minWidth: style.fullWidth ? '100%' : 'unset',
           height: '100%',
-          transition: 'background-color 0.15s, color 0.15s',
+          transition: 'background-color 0.15s, color 0.15s, border-color 0.15s',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',

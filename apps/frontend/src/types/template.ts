@@ -12,6 +12,10 @@ export interface ComponentStyle {
   strikethrough?: boolean;
   strikethroughField?: string;
   strikethroughValue?: string;
+  letterSpacing?: number;
+  fontStyle?: 'normal' | 'italic';
+  fontWeight?: number;
+  textTransform?: 'none' | 'uppercase' | 'capitalize';
   variant?: 'Primary' | 'Secondary' | 'Danger' | 'Ghost';
   iconLeft?: string;
   fullWidth?: boolean;
@@ -40,10 +44,14 @@ export interface ComponentStyle {
   seriesColors?: string[];
   gridColor?: string;
   axisColor?: string;
+  xAxisColor?: string;
+  yAxisColor?: string;
+  xAxisLabel?: string;
+  yAxisLabel?: string;
+
   // Button-specific
   hoverBackgroundColor?: string;
-  fontWeight?: number;
-  textTransform?: 'none' | 'uppercase' | 'capitalize';
+
   // Table-specific
   selectedRowColor?: string;
   stripeRows?: boolean;
@@ -54,6 +62,18 @@ export interface ComponentStyle {
   focusBorderColor?: string;
   borderLeftColor?: string;
   borderLeftWidth?: number;
+
+  // TabbedContainer-specific
+  tabHeaderBackground?: string;
+  tabHeaderTextColor?: string;
+  tabHeaderActiveBackground?: string;
+  tabHeaderActiveTextColor?: string;
+  tabHeaderBorderColor?: string;
+
+  // Search-specific (Table, Logs)
+  searchBarBackground?: string;
+  searchBarTextColor?: string;
+  searchBarBorderColor?: string;
 }
 
 export interface ComponentEvent {
@@ -97,6 +117,7 @@ export interface ComponentData {
   tabs?: string[];
   defaultTab?: string;
   onTabChangeAction?: string;
+  tabStyles?: Record<string, Partial<ComponentStyle>>;
 
   columns?: TableColumn[];
   rows?: Record<string, any>[];
@@ -134,6 +155,8 @@ export interface ComponentData {
   showGrid?: boolean;
   xAxisLabel?: string;
   yAxisLabel?: string;
+  showXAxis?: boolean;
+  showYAxis?: boolean;
   colorScheme?: 'Blue' | 'Green' | 'Amber' | 'Multi';
   orientation?: 'Vertical' | 'Horizontal';
   stacked?: boolean;

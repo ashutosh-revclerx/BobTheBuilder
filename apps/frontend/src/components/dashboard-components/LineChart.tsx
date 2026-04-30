@@ -91,11 +91,31 @@ const LineChart = React.memo(function LineChart({ config }: { config: ComponentC
         ) : (
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={100}>
             <RechartsLineChart data={chartData as Record<string, unknown>[]}>
-              {data.showGrid !== false ? <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} /> : null}
-              <XAxis dataKey={xKey} />
-              <YAxis />
-              <Tooltip content={<CustomTooltip />} />
-              {data.showLegend !== false ? <Legend /> : null}
+              {data.showGrid !== false ? (
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke={style.gridColor || "rgba(0,0,0,0.06)"} 
+                  vertical={false} 
+                />
+              ) : null}
+              <XAxis 
+                dataKey={xKey} 
+                hide={data.showXAxis === false}
+                tick={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#94a3b8' }}
+                stroke={style.xAxisColor || style.axisColor || '#e5e7eb'}
+              />
+              <YAxis 
+                hide={data.showYAxis === false}
+                tick={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#94a3b8' }}
+                stroke={style.yAxisColor || style.axisColor || '#e5e7eb'}
+              />
+              <Tooltip 
+                content={<CustomTooltip />} 
+                contentStyle={{ fontSize: style.fontSize || 12 }}
+              />
+              {data.showLegend !== false ? (
+                <Legend wrapperStyle={{ fontSize: style.fontSize || 12 }} />
+              ) : null}
               {activeSeries.map((seriesItem, index) => (
                 <Fragment key={seriesItem.fieldKey}>
                   {data.fillArea ? <Area key={`${seriesItem.fieldKey}-area`} dataKey={seriesItem.fieldKey} fill={palette[index % palette.length]} stroke="none" fillOpacity={0.12} /> : null}
@@ -114,7 +134,13 @@ const LineChart = React.memo(function LineChart({ config }: { config: ComponentC
                       onClick: (event) => runAction(data.onPointClickAction, event),
                     }}
                   >
-                    {style.showDataLabels ? <LabelList dataKey={seriesItem.fieldKey} position="top" /> : null}
+                    {style.showDataLabels ? (
+                      <LabelList 
+                        dataKey={seriesItem.fieldKey} 
+                        position="top" 
+                        style={{ fontSize: style.fontSize || 11, fill: style.textColor || '#666' }}
+                      />
+                    ) : null}
                   </Line>
                 </Fragment>
               ))}

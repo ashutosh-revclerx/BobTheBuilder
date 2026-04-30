@@ -43,6 +43,8 @@ const TabbedContainer = React.memo(function TabbedContainer({ config, componentM
     runAction(data.onTabChangeAction, nextTab);
   };
 
+  const currentTabStyle = data.tabStyles?.[currentTab] || {};
+  const currentBg = currentTabStyle.backgroundColor || bg;
   const tabDirection = style.tabPosition === 'Left' ? 'row' : style.tabPosition === 'Bottom' ? 'column-reverse' : 'column';
 
   return (
@@ -50,38 +52,69 @@ const TabbedContainer = React.memo(function TabbedContainer({ config, componentM
       className="tabbed-container-component"
       ref={el => {
         if (el) {
-          el.style.setProperty('--comp-bg', bg);
-          el.style.setProperty('--comp-border', style.borderColor ?? '');
+          el.style.setProperty('--comp-bg', currentBg);
+          el.style.setProperty('--comp-border', currentTabStyle.borderColor || style.borderColor || '');
         }
       }}
       style={{
         background: 'var(--comp-bg)',
-        borderRadius: `${style.borderRadius}px`,
+        borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         borderColor: 'var(--comp-border)',
-        borderWidth: `${style.borderWidth}px`,
+        borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
         borderStyle: 'solid',
         height: '100%',
         display: 'flex',
         flexDirection: tabDirection as 'column',
       }}
     >
-      <div className="tabbed-header" style={{ display: 'flex', flexDirection: style.tabPosition === 'Left' ? 'column' : 'row' }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            className={`tabbed-header-btn ${currentTab === tab ? 'active' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleTabChange(tab);
-            }}
-          >
-            {tab}
-          </button>
-        ))}
+      <div 
+        className="tabbed-header" 
+        style={{ 
+          display: 'flex', 
+          flexDirection: style.tabPosition === 'Left' ? 'column' : 'row',
+          background: style.tabHeaderBackground || 'transparent',
+          borderColor: style.tabHeaderBorderColor || style.borderColor || 'transparent',
+          borderBottomWidth: style.tabPosition === 'Top' ? '1px' : '0',
+          borderTopWidth: style.tabPosition === 'Bottom' ? '1px' : '0',
+          borderRightWidth: style.tabPosition === 'Left' ? '1px' : '0',
+          borderStyle: 'solid',
+        }}
+      >
+        {tabs.map((tab) => {
+          const isActive = currentTab === tab;
+          return (
+            <button
+              key={tab}
+              className={`tabbed-header-btn ${isActive ? 'active' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTabChange(tab);
+              }}
+              style={{
+                backgroundColor: isActive 
+                  ? (style.tabHeaderActiveBackground || 'transparent')
+                  : 'transparent',
+                color: isActive
+                  ? (style.tabHeaderActiveTextColor || style.tabHeaderTextColor || 'inherit')
+                  : (style.tabHeaderTextColor || 'inherit'),
+                fontSize: style.fontSize ? `${style.fontSize}px` : undefined,
+                fontWeight: isActive ? 600 : (style.fontWeight || 400),
+              }}
+            >
+              {tab}
+            </button>
+          );
+        })}
       </div>
 
       <div className="tabbed-content" style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
-        <GridLayer parentId={config.id} parentTab={currentTab} componentMap={componentMap} customGap={data.gap ?? 10} readOnly={readOnly} />
+        <GridLayer 
+          parentId={config.id} 
+          parentTab={currentTab} 
+          componentMap={componentMap} 
+          customGap={data.gap ?? 10} 
+          readOnly={readOnly} 
+        />
       </div>
 
       {!readOnly && (

@@ -121,7 +121,21 @@ const LogsViewer = React.memo(function LogsViewer({ config }: LogsViewerProps) {
           {label || 'Terminal Logs'}
         </div>
         {data.logSearchable && (
-          <input type="text" className="form-input" placeholder="Search logs..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <input 
+            type="text" 
+            className="form-input logs-search-input" 
+            placeholder="Search logs..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            style={{
+              backgroundColor: style.searchBarBackground || 'var(--bg-primary)',
+              color: style.searchBarTextColor || 'var(--text-primary)',
+              borderColor: style.searchBarBorderColor || 'var(--border)',
+              fontSize: '11px',
+              padding: '4px 8px',
+              height: 'auto',
+            }}
+          />
         )}
       </div>
       <div
@@ -136,6 +150,7 @@ const LogsViewer = React.memo(function LogsViewer({ config }: LogsViewerProps) {
           gap: '4px',
           minHeight: 0,
           whiteSpace: data.wrapLines ? 'pre-wrap' : 'pre',
+          lineHeight: style.lineHeight || 1.5,
         }}
       >
         {queryState?.status === 'error' && queryConfig ? (

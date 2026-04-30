@@ -782,8 +782,11 @@ body {
 }
 .preview-mode .builder-canvas-wrapper {
   width: 100%;
-  margin: 0;
+  max-width: 1200px;
+  margin: 0 auto;
   padding: 0;
+  box-shadow: 0 0 40px rgba(0,0,0,0.05);
+  background-color: var(--bg-primary);
 }
 .builder-canvas-wrapper.drop-active {
   background-image: radial-gradient(circle, rgba(37,99,235,0.12) 1px, transparent 1px);

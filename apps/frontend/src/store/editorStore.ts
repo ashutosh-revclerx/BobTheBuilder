@@ -316,6 +316,8 @@ const createDefaultConfig = (
           showGrid: true,
           xAxisLabel: '',
           yAxisLabel: '',
+          showXAxis: true,
+          showYAxis: true,
           colorScheme: 'Blue',
           onBarClickAction: '',
         },
@@ -347,6 +349,8 @@ const createDefaultConfig = (
           showGrid: true,
           xAxisLabel: '',
           yAxisLabel: '',
+          showXAxis: true,
+          showYAxis: true,
           colorScheme: 'Blue',
           fillArea: false,
           onPointClickAction: '',
@@ -509,6 +513,7 @@ interface EditorState {
   setDashboardName: (name: string) => void;
   updateStyle: (componentId: string, style: Partial<ComponentStyle>) => void;
   updateData: (componentId: string, data: Partial<ComponentData>) => void;
+  updateLabel: (componentId: string, label: string) => void;
   updateLayouts: (layouts: { id: string; x: number; y: number; w: number; h: number }[]) => void;
   addComponent: (
     type: ComponentType,
@@ -712,6 +717,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         isDirty: true,
       };
     });
+  },
+
+  updateLabel: (componentId, label) => {
+    set((state) => ({
+      components: state.components.map((c) => (c.id === componentId ? { ...c, label } : c)),
+      isDirty: true,
+    }));
   },
 
   updateLayouts: (newLayouts) => {
