@@ -490,7 +490,7 @@ const normalizeComponent = (component: ComponentConfig): ComponentConfig => {
 
   return {
     ...component,
-    label: component.label || component.data?.label || `New ${component.type}`,
+    label: component.label ?? component.data?.label ?? `New ${component.type}`,
     visible: typeof visibleValue === 'boolean' ? String(visibleValue) : visibleValue,
     visibleForRoles: normalizeVisibleForRoles(component.visibleForRoles ?? data.visibleForRoles),
     style: {
@@ -760,7 +760,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   updateLabel: (componentId, label) => {
     set((state) => ({
-      components: state.components.map((c) => (c.id === componentId ? { ...c, label } : c)),
+      components: state.components.map((c) => 
+        c.id === componentId ? normalizeComponent({ ...c, label }) : c
+      ),
       isDirty: true,
     }));
   },
