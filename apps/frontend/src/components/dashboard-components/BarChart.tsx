@@ -4,6 +4,7 @@ import {
   Bar,
   CartesianGrid,
   Cell,
+  Label,
   LabelList,
   Legend,
   ResponsiveContainer,
@@ -92,7 +93,11 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={100}>
-            <RechartsBarChart data={chartData as Record<string, unknown>[]} layout={isHorizontal ? 'vertical' : 'horizontal'}>
+            <RechartsBarChart 
+              data={chartData as Record<string, unknown>[]} 
+              layout={isHorizontal ? 'vertical' : 'horizontal'}
+              margin={{ top: 10, right: 30, left: 20, bottom: 20 }}
+            >
               {data.showGrid !== false ? (
                 <CartesianGrid 
                   strokeDasharray="3 3" 
@@ -106,14 +111,32 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
                 hide={data.showXAxis === false}
                 tick={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#94a3b8' }}
                 stroke={style.xAxisColor || style.axisColor || '#e5e7eb'}
-              />
+              >
+                {data.xAxisLabel && (
+                  <Label 
+                    value={data.xAxisLabel} 
+                    position="insideBottom" 
+                    offset={-5} 
+                    style={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#94a3b8', fontWeight: 500 }}
+                  />
+                )}
+              </XAxis>
               <YAxis 
                 dataKey={isHorizontal ? xKey : undefined} 
                 type={isHorizontal ? 'category' : 'number'} 
                 hide={data.showYAxis === false}
                 tick={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#94a3b8' }}
                 stroke={style.yAxisColor || style.axisColor || '#e5e7eb'}
-              />
+              >
+                {data.yAxisLabel && (
+                  <Label 
+                    value={data.yAxisLabel} 
+                    angle={-90} 
+                    position="insideLeft" 
+                    style={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#94a3b8', fontWeight: 500, textAnchor: 'middle' }}
+                  />
+                )}
+              </YAxis>
               <Tooltip 
                 content={<CustomTooltip />} 
                 contentStyle={{ fontSize: style.fontSize || 12 }}
