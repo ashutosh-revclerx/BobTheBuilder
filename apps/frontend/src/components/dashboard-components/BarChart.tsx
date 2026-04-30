@@ -80,7 +80,7 @@ export default function BarChart({ config }: { config: ComponentConfig }) {
             <QueryErrorBanner queryName={queryConfig.name} error={queryState.error || ''} onRetry={() => executeQuery(queryConfig)} />
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={100}>
             <RechartsBarChart data={chartData as Record<string, unknown>[]} layout={isHorizontal ? 'vertical' : 'horizontal'}>
               {data.showGrid !== false ? <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={!isHorizontal} /> : null}
               <XAxis dataKey={isHorizontal ? undefined : xKey} type={isHorizontal ? 'number' : 'category'} />

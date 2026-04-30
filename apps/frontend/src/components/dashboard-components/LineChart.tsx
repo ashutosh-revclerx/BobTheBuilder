@@ -79,7 +79,7 @@ export default function LineChart({ config }: { config: ComponentConfig }) {
             <QueryErrorBanner queryName={queryConfig.name} error={queryState.error || ''} onRetry={() => executeQuery(queryConfig)} />
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={100}>
             <RechartsLineChart data={chartData as Record<string, unknown>[]}>
               {data.showGrid !== false ? <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} /> : null}
               <XAxis dataKey={xKey} />
