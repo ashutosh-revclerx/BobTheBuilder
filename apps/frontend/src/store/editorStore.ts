@@ -93,7 +93,9 @@ const createDefaultConfig = (
       return {
         style: {
           ...createBaseStyle(),
-          textColor: '#2563eb',
+          backgroundColor: '#2563eb',
+          textColor: '#ffffff',
+          borderColor: '#2563eb',
           variant: 'Primary',
           iconLeft: '',
           fullWidth: false,

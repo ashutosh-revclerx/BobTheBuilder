@@ -11,6 +11,12 @@ const VALUE_SIZES         = [24, 32, 40, 48];
 const LABEL_SIZES         = [10, 12, 14];
 const BORDER_RADIUSES     = [0, 2, 4, 6, 8, 10, 12, 16, 24];
 const BORDER_WIDTHS       = [0, 1, 2, 4, 6, 8];
+const BUTTON_VARIANT_DEFAULTS: Record<string, Partial<ComponentStyle>> = {
+  Primary: { backgroundColor: '#2563eb', textColor: '#ffffff', borderColor: '#2563eb' },
+  Secondary: { backgroundColor: '#f2f4f7', textColor: '#0f1117', borderColor: '#e3e6ec' },
+  Danger: { backgroundColor: '#dc2626', textColor: '#ffffff', borderColor: '#dc2626' },
+  Ghost: { backgroundColor: 'transparent', textColor: '#2563eb', borderColor: '#e3e6ec' },
+};
 const LINE_HEIGHTS        = [1.2, 1.4, 1.6, 1.8];
 const FONT_WEIGHT_OPTIONS = [
   { label: 'Normal', value: 400 },
@@ -509,6 +515,18 @@ export default function ThemeTab() {
             {/* ── Button ── */}
             {ctype === 'Button' && (
               <>
+                <OptionGroup
+                  label="Button Variant"
+                  options={['Primary', 'Secondary', 'Danger', 'Ghost']}
+                  value={style.variant ?? 'Primary'}
+                  onChange={(v) => {
+                    set('variant', v);
+                    const defaults = BUTTON_VARIANT_DEFAULTS[v as string];
+                    if (defaults) {
+                      updateStyle(lastSelectedComponentId, defaults);
+                    }
+                  }}
+                />
                 <LocalColorField
                   label="Hover Background"
                   componentId={lastSelectedComponentId}
