@@ -13,7 +13,8 @@ interface QueryConfig {
   dependsOn?: string[];
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001/api/execute';
+const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+const BACKEND_URL = env?.VITE_BACKEND_URL || 'http://localhost:3001/api/execute';
 
 export const useQueryEngine = (queries: QueryConfig[]) => {
   const { setQueryState, getGlobalState } = useAppState();

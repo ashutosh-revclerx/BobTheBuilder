@@ -1,4 +1,4 @@
-import React, { Fragment, useMemo } from 'react';
+import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { QueryConfig } from '@btb/shared';
 import {
   Area,
@@ -8,7 +8,6 @@ import {
   Legend,
   Line,
   LineChart as RechartsLineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -26,6 +25,29 @@ const COLOR_SCHEMES = {
   Amber: ['#d97706', '#f59e0b', '#fbbf24'],
   Multi: ['#2563eb', '#059669', '#d97706', '#dc2626'],
 };
+
+function useChartSize(ref: React.RefObject<HTMLDivElement | null>) {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const updateSize = () => {
+      const rect = element.getBoundingClientRect();
+      const width = Math.floor(rect.width);
+      const height = Math.floor(rect.height);
+      setSize((prev) => prev.width === width && prev.height === height ? prev : { width, height });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+
+  return size;
+}
 
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
@@ -59,6 +81,9 @@ const LineChart = React.memo(function LineChart({ config }: { config: ComponentC
   const activeSeries = data.yField ? [{ name: 'Value', fieldKey: data.yField }] : series;
   const palette = style.seriesColors?.length ? style.seriesColors : COLOR_SCHEMES[data.colorScheme || 'Blue'];
   const xKey = data.xField || 'label';
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartSize = useChartSize(chartRef);
+  const canRenderChart = chartSize.width > 0 && chartSize.height > 0;
 
   return (
     <div
@@ -84,14 +109,15 @@ const LineChart = React.memo(function LineChart({ config }: { config: ComponentC
       }}
     >
       <div className="chart-component-title" style={{ color: 'var(--comp-text)' }}>{label}</div>
-      <div style={{ flex: 1, minHeight: 0, width: '100%' }}>
+      <div ref={chartRef} style={{ flex: 1, minHeight: 120, width: '100%' }}>
         {queryState?.status === 'error' && queryConfig ? (
           <div className="dashboard-query-error-wrap">
             <QueryErrorBanner queryName={queryConfig.name} error={queryState.error || ''} onRetry={() => executeQuery(queryConfig)} />
           </div>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={100}>
+        ) : canRenderChart ? (
             <RechartsLineChart 
+              width={chartSize.width}
+              height={chartSize.height}
               data={chartData as Record<string, unknown>[]}
               margin={{ top: 10, right: 30, left: 20, bottom: 20 }}
             >
@@ -167,7 +193,8 @@ const LineChart = React.memo(function LineChart({ config }: { config: ComponentC
                 </Fragment>
               ))}
             </RechartsLineChart>
-          </ResponsiveContainer>
+        ) : (
+          <div style={{ height: '100%', minHeight: 120 }} />
         )}
       </div>
     </div>

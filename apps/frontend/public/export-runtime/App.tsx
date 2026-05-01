@@ -12,11 +12,15 @@ const DashboardApp = () => {
   useQueryEngine(queriesConfig as any);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 py-4 px-8">
-        <h1 className="text-xl font-bold text-gray-800">{dashboardConfig.name}</h1>
+    <div className="exported-dashboard-app">
+      <header className="exported-dashboard-header">
+        <div className="exported-dashboard-brand">
+          <span className="exported-dashboard-logo">B</span>
+          <h1 className="exported-dashboard-title">{dashboardConfig.name}</h1>
+        </div>
+        <span className="exported-dashboard-meta">Exported dashboard</span>
       </header>
-      <main>
+      <main className="exported-dashboard-main">
         <Renderer config={dashboardConfig as any} />
       </main>
     </div>
