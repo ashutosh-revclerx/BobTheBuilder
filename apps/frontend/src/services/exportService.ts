@@ -3,9 +3,8 @@ import { saveAs } from 'file-saver';
 
 // Helper to get file content (in a real app, these might be fetched or bundled)
 const getRuntimeFile = async (path: string) => {
-  // For the purpose of this implementation, we will fetch the local files 
-  // which are served by the dev server.
-  const response = await fetch(`/src/export-runtime/${path}`);
+  // We fetch from the public folder which is served as-is by Vite
+  const response = await fetch(`/export-runtime/${path}`);
   return response.text();
 };
 
@@ -22,14 +21,14 @@ export const downloadAsCode = async (dashboardState: any) => {
 
   // 2. Add Runtime files
   const runtimeFiles = [
-    'BindingResolver.ts',
-    'QueryEngine.ts',
-    'Renderer.tsx',
-    'StateManager.tsx',
+    'runtime/BindingResolver.ts',
+    'runtime/QueryEngine.ts',
+    'runtime/Renderer.tsx',
+    'runtime/StateManager.tsx',
     'App.tsx',
-    'components/Button.tsx',
-    'components/Table.tsx',
-    'components/Text.tsx'
+    'runtime/components/Button.tsx',
+    'runtime/components/Table.tsx',
+    'runtime/components/Text.tsx'
   ];
 
   const runtimeFolder = zip.folder('src/runtime');
@@ -37,12 +36,14 @@ export const downloadAsCode = async (dashboardState: any) => {
 
   for (const file of runtimeFiles) {
     const content = await getRuntimeFile(file);
-    if (file.startsWith('components/')) {
-      componentsFolder!.file(file.replace('components/', ''), content);
+    if (file.includes('components/')) {
+      const fileName = file.split('/').pop()!;
+      componentsFolder!.file(fileName, content);
     } else if (file === 'App.tsx') {
       zip.file('src/App.tsx', content);
     } else {
-      runtimeFolder!.file(file, content);
+      const fileName = file.split('/').pop()!;
+      runtimeFolder!.file(fileName, content);
     }
   }
 

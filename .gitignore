@@ -48,3 +48,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Dashboard Exports
+*-export.zip
+*-app.zip
+*.zip
+export_progress.md
