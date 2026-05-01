@@ -12,10 +12,19 @@ const Text = React.memo(function Text({ config }: { config: ComponentConfig }) {
   const sourceValue = isBound && data.dbBinding != null && data.dbBinding !== ''
     ? data.dbBinding
     : data.mockValue;
-  const resolvedValue = data.expression
-    ? evaluateExpression(String(sourceValue ?? ''), '')
+    
+  const resolvedValue = (data.expression && typeof sourceValue === 'string')
+    ? evaluateExpression(sourceValue, '')
     : sourceValue;
-  const content = String(resolvedValue ?? '');
+    
+  let content = '';
+  if (resolvedValue !== null && resolvedValue !== undefined) {
+    if (typeof resolvedValue === 'object') {
+      content = JSON.stringify(resolvedValue, null, 2);
+    } else {
+      content = String(resolvedValue);
+    }
+  }
 
   return (
     <div

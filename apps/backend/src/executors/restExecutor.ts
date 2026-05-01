@@ -71,9 +71,21 @@ export async function restExecutor(input: RestExecutorInput): Promise<ExecutorRe
       : await response.text();
 
     if (!response.ok) {
+      // Pluck a meaningful detail from the response body when available so
+      // the frontend doesn't show a useless "Unprocessable Entity".
+      let detail = '';
+      if (data && typeof data === 'object') {
+        const obj = data as Record<string, unknown>;
+        detail = String(obj.detail || obj.error || obj.message || '').slice(0, 200);
+      } else if (typeof data === 'string') {
+        detail = data.slice(0, 200);
+      }
+
       return {
         success: false,
-        error:   `Upstream returned ${response.status} ${response.statusText}`,
+        error:   detail
+          ? `Upstream returned ${response.status} ${response.statusText} — ${detail}`
+          : `Upstream returned ${response.status} ${response.statusText}`,
         data,
       };
     }

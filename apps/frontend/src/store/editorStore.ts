@@ -585,6 +585,7 @@ interface EditorState {
   setStatus: (status: 'draft' | 'live', publishedAt: string | null) => void;
   applyThemeToAll: (paletteName: 'Cobalt' | 'Forest' | 'Graphite' | 'Amber' | 'Obsidian') => void;
   duplicateComponent: (id?: string) => void;
+  importDashboard: (data: any) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -672,7 +673,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       originalTemplateId: saved.originalTemplateId,
       dashboardName: saved.dashboardName,
       components: normalizedComponents,
-      queriesConfig: clone((saved as any).queries || []),
+      queriesConfig: clone(saved.queries || []),
       status: (saved as any).status || 'draft',
       publishedAt: (saved as any).publishedAt || null,
       selectedComponentId: null,
@@ -956,15 +957,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   saveToLocalStorage: () => {
     const state = get();
+    const activeId = state.activeTemplateId;
+    if (!activeId) return;
+
+    // Real DB-backed dashboards (UUID id) live in Postgres — the builder PUTs
+    // to /api/dashboards/<uuid> on Save and the loader fetches from the DB
+    // unconditionally. Skip localStorage writes for UUID ids so that local
+    // snapshots never shadow the canonical DB version.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (UUID_RE.test(activeId)) {
+      set({ isDirty: false });
+      return;
+    }
+
     const saved: SavedTemplate = {
-      templateId: state.activeTemplateId!,
+      templateId: activeId,
       dashboardName: state.dashboardName,
       components: clone(state.components),
+      queries: clone(state.queriesConfig),
       savedAt: new Date().toISOString(),
       originalTemplateId: state.originalTemplateId!,
     };
 
-    const existing = { ...state.savedTemplates, [state.activeTemplateId!]: saved };
+    const existing = { ...state.savedTemplates, [activeId]: saved };
     set({ savedTemplates: existing, isDirty: false });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
   },
@@ -1220,6 +1235,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
 
       return { components, isDirty: true };
+    });
+  },
+  
+  importDashboard: (data) => {
+    const { metadata, config, queries, state } = data;
+    const normalizedComponents = normalizeComponents(clone(config.components || []));
+    
+    set({
+      dashboardName: metadata.name,
+      components: normalizedComponents,
+      queriesConfig: clone(queries || []),
+      status: metadata.status || 'draft',
+      publishedAt: metadata.publishedAt || null,
+      activeTabs: state?.activeTabs || {},
+      selectedComponentId: null,
+      lastSelectedComponentId: normalizedComponents[0]?.id ?? null,
+      isDirty: false,
+      activeTemplateId: null, // Importing a file breaks template link
+      originalTemplateId: null,
+      dirtyStyleMap: {},
+      dirtyDataMap: {},
+      queryResults: {},
+      componentState: {},
     });
   },
 }));

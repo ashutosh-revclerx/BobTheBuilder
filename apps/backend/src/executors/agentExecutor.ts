@@ -47,6 +47,7 @@ export async function agentExecutor(input: AgentExecutorInput): Promise<Executor
   const headers = buildAuthHeaders(authType, resolvedSecret);
 
   // ── 1. Kick off the job ─────────────────────────────────────────────────────
+  console.log(`[agentExecutor] kickoff → ${kickUrl.toString()}`);
   let kickoffResponse: Response;
   try {
     kickoffResponse = await fetch(kickUrl.toString(), {
@@ -55,13 +56,32 @@ export async function agentExecutor(input: AgentExecutorInput): Promise<Executor
       body:    JSON.stringify(body ?? {}),
     });
   } catch (err) {
-    return { success: false, error: `Agent kickoff failed: ${(err as Error).message}` };
+    return { success: false, error: `Agent kickoff failed (${kickUrl.toString()}): ${(err as Error).message}` };
   }
 
   if (!kickoffResponse.ok) {
+    // Read the response body so the user sees the API's actual complaint
+    // (e.g. "url: must be a valid URL") instead of a generic status text.
+    let detail = '';
+    try {
+      const raw = await kickoffResponse.text();
+      if (raw) {
+        // If it's JSON, pluck the most useful field; otherwise show first 200 chars
+        try {
+          const parsed = JSON.parse(raw);
+          detail = parsed?.detail || parsed?.error || parsed?.message
+                || JSON.stringify(parsed).slice(0, 200);
+        } catch {
+          detail = raw.slice(0, 200);
+        }
+      }
+    } catch { /* ignore body read errors */ }
+
     return {
       success: false,
-      error:   `Agent kickoff returned ${kickoffResponse.status} ${kickoffResponse.statusText}`,
+      error:   detail
+        ? `Agent kickoff returned ${kickoffResponse.status} ${kickoffResponse.statusText} — ${detail}`
+        : `Agent kickoff returned ${kickoffResponse.status} ${kickoffResponse.statusText}`,
     };
   }
 
@@ -78,15 +98,19 @@ export async function agentExecutor(input: AgentExecutorInput): Promise<Executor
   }
 
   // ── 2. Poll for completion ──────────────────────────────────────────────────
-  // Prefer poll_url from the kickoff response if provided (e.g. Nexus returns
-  // "/public/result/<id>"). Fallback to the convention `{base}/jobs/{jobId}`.
+  // Prefer poll_url / result_url from the kickoff response. If the agent
+  // service doesn't provide one, fall back to a generic convention.
+  // Currently our only agent (Nexus) uses `/public/result/<id>`.
+  // If you add a second agent with a different convention, make sure its
+  // kickoff response includes a `poll_url` field so this fallback never fires.
   const startedAt = Date.now();
-  const pollUrlFromResponse: string | undefined = kickoffJson?.poll_url ?? kickoffJson?.pollUrl;
+  const pollUrlFromResponse: string | undefined =
+    kickoffJson?.poll_url ?? kickoffJson?.pollUrl ?? kickoffJson?.result_url;
   const pollUrl = pollUrlFromResponse
     ? (pollUrlFromResponse.startsWith('http')
         ? pollUrlFromResponse
         : `${base}${pollUrlFromResponse.startsWith('/') ? '' : '/'}${pollUrlFromResponse}`)
-    : `${base}/jobs/${encodeURIComponent(jobId)}`;
+    : `${base}/public/result/${encodeURIComponent(jobId)}`;
 
   for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt++) {
     if (Date.now() - startedAt >= MAX_TOTAL_MS) {

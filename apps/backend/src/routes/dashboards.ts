@@ -5,7 +5,16 @@ import { pool } from '../db/client.js';
 const router = Router();
 
 const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL ?? 'http://localhost:8000';
-const LLM_TIMEOUT_MS  = 60_000;
+const DEFAULT_LLM_TIMEOUT_MS = 180_000;
+
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const LLM_TIMEOUT_MS = readPositiveIntEnv('LLM_TIMEOUT_MS', DEFAULT_LLM_TIMEOUT_MS);
 
 const GenerateSchema = z.object({
   prompt:        z.string().min(3),
@@ -68,23 +77,30 @@ router.post('/', async (req, res) => {
   }
 
   const { name, config, status } = parsed.data;
-  const slug = parsed.data.slug ?? toSlug(name);
+  let slug = parsed.data.slug ?? toSlug(name);
+  let attempts = 0;
 
-  try {
-    const { rows } = await pool.query<DashboardRow>(
-      `INSERT INTO dashboards (name, slug, config, status)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, slug, config, status, created_at, updated_at`,
-      [name, slug, config, status],
-    );
-    return res.status(201).json(rows[0]);
-  } catch (err) {
-    if (pgCode(err) === PG_UNIQUE_VIOLATION) {
-      return res.status(409).json({ error: `Slug "${slug}" is already taken` });
+  while (attempts < 10) {
+    try {
+      const { rows } = await pool.query<DashboardRow>(
+        `INSERT INTO dashboards (name, slug, config, status)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, name, slug, config, status, created_at, updated_at`,
+        [name, slug, config, status],
+      );
+      return res.status(201).json(rows[0]);
+    } catch (err) {
+      if (pgCode(err) === PG_UNIQUE_VIOLATION) {
+        attempts++;
+        slug = `${parsed.data.slug ?? toSlug(name)}-${attempts}`;
+        continue;
+      }
+      console.error('[dashboards] create:', err);
+      return res.status(500).json({ error: 'Internal server error' });
     }
-    console.error('[dashboards] create:', err);
-    return res.status(500).json({ error: 'Internal server error' });
   }
+
+  return res.status(409).json({ error: 'Could not generate a unique slug after 10 attempts' });
 });
 
 // ─── GET /api/dashboards ──────────────────────────────────────────────────────
@@ -219,7 +235,8 @@ router.post('/generate', async (req, res) => {
     return res.json(json);
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
-      return res.status(504).json({ error: 'LLM service took longer than 60 seconds' });
+      const seconds = Math.round(LLM_TIMEOUT_MS / 1000);
+      return res.status(504).json({ error: `LLM service took longer than ${seconds} seconds` });
     }
     console.error('[dashboards] generate proxy error:', err);
     return res.status(502).json({ error: 'Could not reach the LLM service' });

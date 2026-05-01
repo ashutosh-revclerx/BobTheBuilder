@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 
 from .archetypes import classify_prompt
+from .design_enrichment import enrich_config
 from .gemini_client import GeminiError, generate_dashboard_config
 from .prompts import SYSTEM_PROMPT_VERSION, build_system_prompt, build_user_prompt
 from .schemas import GenerateRequest, GenerateResponse
@@ -68,6 +69,8 @@ def generate(req: GenerateRequest) -> GenerateResponse:
     except GeminiError as e:
         logger.error("Gemini failure: %s", e)
         raise HTTPException(status_code=502, detail=str(e))
+
+    base_config = enrich_config(base_config)
 
     # Use the first 40 chars of the prompt as a friendly base name.
     base_name = req.prompt.strip().splitlines()[0][:40].strip() or "Untitled"

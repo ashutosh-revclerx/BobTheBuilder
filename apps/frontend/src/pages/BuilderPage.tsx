@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEditorStore } from '../store/editorStore';
 import { getTemplateById, getBlankTemplate } from '../templates';
@@ -8,6 +8,7 @@ import LeftPanel from '../components/editor/LeftPanel';
 import PublishToggle from '../components/editor/PublishToggle';
 import AssignmentModal from '../components/editor/AssignmentModal';
 import { useKineticWidth } from '../hooks/useTextMeasure';
+import { exportProject, importProject } from '../services/ProjectService';
 
 const API_BASE = 'http://localhost:3001';
 
@@ -25,6 +26,7 @@ export default function BuilderPage() {
   const selectedComponentId = useEditorStore((s) => s.selectedComponentId);
   const activeTemplateId = useEditorStore((s) => s.activeTemplateId);
   const originalTemplateId = useEditorStore((s) => s.originalTemplateId);
+  const importDashboard = useEditorStore((state) => state.importDashboard);
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
@@ -47,6 +49,34 @@ export default function BuilderPage() {
   // Assignment state
   const [assignedCustomers, setAssignedCustomers] = useState<any[]>([]);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = async () => {
+    try {
+      await exportProject(useEditorStore.getState());
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Export failed. Check console for details.');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const projectData = await importProject(file);
+      importDashboard(projectData);
+      e.target.value = ''; // Reset for same file selection
+    } catch (err) {
+      console.error('Import failed:', err);
+      alert('Import failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  };
 
   const hasUnsavedChanges = isDirty || Object.keys(dirtyStyleMap).length > 0 || Object.keys(dirtyDataMap).length > 0;
 
@@ -112,7 +142,41 @@ export default function BuilderPage() {
 
     let cancelled = false;
 
+    // For UUID dashboards (real DB rows) the DB is the source of truth.
+    // localStorage was previously checked first — but a stale snapshot
+    // there (e.g. one written mid-edit before queries hydrated) silently
+    // shadowed the DB and left queriesConfig empty, which made every
+    // Button click no-op because the named query couldn't be found.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isUuid = UUID_RE.test(id);
+
     const load = async () => {
+      // 1. UUID → fetch from DB unconditionally.
+      if (isUuid) {
+        try {
+          const response = await fetch(`${API_BASE}/api/dashboards/${id}`);
+          if (!response.ok) {
+            navigate('/');
+            return;
+          }
+          const dashboard = await response.json();
+          if (cancelled) return;
+          loadTemplate(
+            dashboard.id,
+            dashboard.name,
+            dashboard.config?.components ?? [],
+            dashboard.config?.queries ?? [],
+            dashboard.status,
+            dashboard.published_at,
+          );
+        } catch {
+          if (!cancelled) navigate('/');
+        }
+        return;
+      }
+
+      // 2. Non-UUID id (prebuilt / "blank" / saved-template slug):
+      //    localStorage / hardcoded templates are the only sources.
       const saved = savedTemplates[id];
       if (saved) {
         loadSavedTemplate(saved);
@@ -127,35 +191,12 @@ export default function BuilderPage() {
 
       const template = getTemplateById(id);
       if (template) {
-        loadTemplate(template.id, template.name, template.components);
+        loadTemplate(template.id, template.name, template.components, template.queries ?? []);
         return;
       }
 
-      try {
-        const response = await fetch(`${API_BASE}/api/dashboards/${id}`);
-        if (!response.ok) {
-          navigate('/');
-          return;
-        }
-
-        const dashboard = await response.json();
-        if (cancelled) {
-          return;
-        }
-
-        loadTemplate(
-          dashboard.id,
-          dashboard.name,
-          dashboard.config?.components ?? [],
-          dashboard.config?.queries ?? [],
-          dashboard.status,
-          dashboard.published_at,
-        );
-      } catch {
-        if (!cancelled) {
-          navigate('/');
-        }
-      }
+      // Nothing matched — bail.
+      navigate('/');
     };
 
     void load();
@@ -295,6 +336,7 @@ export default function BuilderPage() {
       </div>
 
       {/* Top Bar */}
+      {!isPreviewMode && (
       <div className="builder-topbar">
         <div className="topbar-logo">
           <div className="topbar-logo-icon">B</div>
@@ -367,6 +409,32 @@ export default function BuilderPage() {
               <button className="confirm-no" onClick={() => setShowResetConfirm(false)}>No</button>
             </div>
           )}
+
+          {!isPreviewMode && (
+            <>
+              <button
+                className="btn-topbar"
+                onClick={handleExport}
+                title="Download full project ZIP"
+              >
+                ⤓ Export
+              </button>
+              <button
+                className="btn-topbar"
+                onClick={handleImportClick}
+                title="Upload project ZIP"
+              >
+                ⤒ Import
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                accept=".zip"
+                onChange={handleImport}
+              />
+            </>
+          )}
           
           {/* Desktop / Mobile width toggle — only visible in edit mode */}
           {!isPreviewMode && (
@@ -420,6 +488,21 @@ export default function BuilderPage() {
           </button>
         </div>
       </div>
+      )}
+      
+      {/* Floating Exit Preview Button */}
+      {isPreviewMode && (
+        <div className="floating-preview-actions">
+          <button
+            className="btn-preview-toggle preview-active"
+            onClick={togglePreviewMode}
+            title="Exit preview mode (Ctrl+Shift+P)"
+          >
+            <span className="toggle-icon">✎</span>
+            <span className="toggle-label">Exit Preview</span>
+          </button>
+        </div>
+      )}
 
       {/* Body */}
       <div className="builder-body">
@@ -443,7 +526,7 @@ export default function BuilderPage() {
         )}
 
         {/* Left Panel */}
-        {!isPreviewMode && isLeftPanelOpen && <LeftPanel />}
+        {!isPreviewMode && isLeftPanelOpen && <LeftPanel onClose={() => setIsLeftPanelOpen(false)} />}
 
         {/* Canvas */}
         <Canvas readOnly={isPreviewMode} />

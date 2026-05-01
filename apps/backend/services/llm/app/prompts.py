@@ -7,9 +7,10 @@ The version is logged on each call — useful when output quality regresses.
 """
 
 from .archetypes import ARCHETYPE_RULES, DashboardType
+from .component_capabilities import format_capabilities_for_prompt
 from .schemas import GenerateRequest, ResourceContext
 
-SYSTEM_PROMPT_VERSION = "v3.2"
+SYSTEM_PROMPT_VERSION = "v4.0"
 
 
 # ─── Schema description (human-friendly, complements response_schema) ────────
@@ -26,7 +27,7 @@ REQUIRED FIELDS on every component:
   - id        kebab-case unique string         e.g. "tbl-orders"
   - type      one of: StatCard | Table | BarChart | LineChart | StatusBadge |
               Button | LogsViewer | Container | TabbedContainer | Text |
-              TextInput | NumberInput | Select
+              TextInput | NumberInput | Select | Image | Embed
   - label     human-readable label             e.g. "Recent Orders"
   - layout    { "x": 0, "y": 0, "w": 6, "h": 12 }
               12-col grid; rowHeight is small; sensible heights are 4-18 rows
@@ -186,6 +187,123 @@ VALID OUTPUT:
 
 Notice: button uses `queries.run-scrape.trigger` (no braces). Text uses
 `{{queries.run-scrape.data.content}}` (with braces). Body templates the input.
+
+# Worked example — polished analytics dashboard (component-specific properties)
+
+USER PROMPT: "Sales analytics dashboard. KPI cards at top, revenue trend, orders table."
+RESOURCE: { "name": "analytics-api", "type": "REST", "endpoints": [
+  {"method":"GET","path":"/metrics/summary"},
+  {"method":"GET","path":"/metrics/revenue-trend"},
+  {"method":"GET","path":"/orders"}
+] }
+
+VALID OUTPUT — every component uses specific style/data properties beyond base colors:
+{
+  "components": [
+    {
+      "id": "stat-revenue", "type": "StatCard", "label": "Monthly Revenue",
+      "layout": {"x":0,"y":0,"w":3,"h":5},
+      "style": {
+        "backgroundGradient": {"enabled":true,"direction":135,
+          "stops":[{"color":"#1e40af","position":0},{"color":"#2563eb","position":100}]},
+        "borderLeftColor":"#60a5fa","borderLeftWidth":4,
+        "textColor":"#ffffff","metricFontSize":32,"labelFontSize":13,
+        "borderRadius":12,"padding":20
+      },
+      "data": {"mockValue":"$48,200","prefix":"$","trend":"+12%","trendType":"positive",
+               "dbBinding":"{{queries.get-summary.data.revenue}}"}
+    },
+    {
+      "id": "stat-orders", "type": "StatCard", "label": "Total Orders",
+      "layout": {"x":3,"y":0,"w":3,"h":5},
+      "style": {
+        "backgroundColor":"#f0fdf4","borderLeftColor":"#16a34a","borderLeftWidth":4,
+        "metricFontSize":32,"labelFontSize":13,"borderRadius":12,"padding":20
+      },
+      "data": {"mockValue":"1,284","trend":"+8%","trendType":"positive",
+               "dbBinding":"{{queries.get-summary.data.order_count}}"}
+    },
+    {
+      "id": "stat-aov", "type": "StatCard", "label": "Avg Order Value",
+      "layout": {"x":6,"y":0,"w":3,"h":5},
+      "style": {
+        "backgroundColor":"#fefce8","borderLeftColor":"#d97706","borderLeftWidth":4,
+        "metricFontSize":32,"labelFontSize":13,"borderRadius":12,"padding":20
+      },
+      "data": {"mockValue":"$37.55","prefix":"$","trend":"+3%","trendType":"positive",
+               "dbBinding":"{{queries.get-summary.data.aov}}"}
+    },
+    {
+      "id": "stat-churn", "type": "StatCard", "label": "Churn Rate",
+      "layout": {"x":9,"y":0,"w":3,"h":5},
+      "style": {
+        "backgroundColor":"#fff1f2","borderLeftColor":"#e11d48","borderLeftWidth":4,
+        "metricFontSize":32,"labelFontSize":13,"borderRadius":12,"padding":20
+      },
+      "data": {"mockValue":"2.4%","suffix":"%","trend":"-0.3%","trendType":"negative",
+               "dbBinding":"{{queries.get-summary.data.churn_rate}}"}
+    },
+    {
+      "id": "chart-trend", "type": "LineChart", "label": "Revenue Over Time",
+      "layout": {"x":0,"y":5,"w":8,"h":11},
+      "style": {
+        "backgroundColor":"#ffffff","borderColor":"#e5e7eb",
+        "seriesColors":["#2563eb","#7c3aed","#059669"],
+        "gridColor":"#f1f5f9","axisColor":"#94a3b8","borderRadius":12
+      },
+      "data": {"showGrid":true,"showLegend":true,"xField":"date",
+               "series":[{"name":"Revenue","fieldKey":"revenue"}],"smooth":true,
+               "dbBinding":"{{queries.get-trend.data}}"}
+    },
+    {
+      "id": "chart-category", "type": "BarChart", "label": "Revenue by Category",
+      "layout": {"x":8,"y":5,"w":4,"h":11},
+      "style": {
+        "backgroundColor":"#ffffff","borderColor":"#e5e7eb",
+        "seriesColors":["#2563eb","#7c3aed","#0891b2","#059669"],
+        "gridColor":"#f1f5f9","axisColor":"#94a3b8","borderRadius":12
+      },
+      "data": {"showGrid":true,"showLegend":false,"xField":"category",
+               "series":[{"name":"Amount","fieldKey":"amount"}],"dbBinding":"{{queries.get-trend.data}}"}
+    },
+    {
+      "id": "tbl-orders", "type": "Table", "label": "Recent Orders",
+      "layout": {"x":0,"y":16,"w":12,"h":12},
+      "style": {
+        "backgroundColor":"#ffffff","borderColor":"#e5e7eb",
+        "headerBackgroundColor":"#f8fafc","headerTextColor":"#374151",
+        "rowHoverColor":"#f0f9ff","stripeRows":true,
+        "searchBarBackground":"#f9fafb","borderRadius":12
+      },
+      "data": {
+        "searchable":true,"pagination":true,
+        "columns":[
+          {"name":"Order ID","fieldKey":"id"},
+          {"name":"Customer","fieldKey":"customer_name"},
+          {"name":"Amount","fieldKey":"amount"},
+          {"name":"Status","fieldKey":"status"},
+          {"name":"Date","fieldKey":"created_at"}
+        ],
+        "dbBinding":"{{queries.get-orders.data}}"
+      }
+    }
+  ],
+  "queries": [
+    {"name":"get-summary","resource":"analytics-api","endpoint":"/metrics/summary",
+     "method":"GET","trigger":"onLoad"},
+    {"name":"get-trend","resource":"analytics-api","endpoint":"/metrics/revenue-trend",
+     "method":"GET","trigger":"onLoad"},
+    {"name":"get-orders","resource":"analytics-api","endpoint":"/orders",
+     "method":"GET","trigger":"onLoad","params":{"limit":"50","sort":"created_at:desc"}}
+  ]
+}
+
+Notice: StatCards use backgroundGradient OR colored backgroundColor, always with
+borderLeftColor/Width, metricFontSize, labelFontSize, trend/trendType.
+Charts use seriesColors, gridColor, axisColor, showGrid, showLegend, xField, series.
+Table uses headerBackgroundColor, stripeRows, rowHoverColor, searchBarBackground,
+searchable, pagination, and explicit columns.
+Every component goes well beyond the base backgroundColor/borderColor/textColor.
 """
 
 
@@ -211,6 +329,26 @@ def build_system_prompt() -> str:
         "You are a senior product designer and frontend engineer.\n"
         "Design a production-quality dashboard, then output ONE valid JSON config.\n\n"
         f"{SCHEMA_RULES}\n\n"
+        f"{format_capabilities_for_prompt()}\n\n"
+        "## Design quality rules — follow these on every generation\n"
+        "- Use at least 3 component-specific style/data properties per component.\n"
+        "- Do NOT generate identical-looking components (same bg, no accent, no data config).\n"
+        "- StatCards MUST use: metricFontSize, labelFontSize, borderLeftColor, borderLeftWidth.\n"
+        "  Use backgroundGradient on the primary/hero StatCard.\n"
+        "  Always include trend and trendType when the metric has a direction.\n"
+        "- Charts MUST use: seriesColors, gridColor, axisColor, showGrid, showLegend,\n"
+        "  xField, series. Set smooth:true on LineCharts.\n"
+        "- Tables MUST use: headerBackgroundColor, stripeRows:true, rowHoverColor,\n"
+        "  searchable:true, pagination:true, and explicit columns array.\n"
+        "- Buttons MUST stand out: set variant, fontWeight:600, and hoverBackgroundColor.\n"
+        "  Always set loadingState:true on buttons that fire queries.\n"
+        "- LogsViewer MUST set fontFamily:'Fira Code', infoColor, warnColor, errorColor,\n"
+        "  messageField, levelField, timestampField.\n"
+        "- Text components for long content MUST set overflow:'Scroll', lineHeight:1.6.\n"
+        "- TabbedContainer MUST set tabHeaderActiveBackground and tabStyle.\n"
+        "  tabs must be a plain string array: [\"Overview\", \"Details\"] — NOT objects.\n"
+        "- Visual hierarchy: StatCards at y:0, charts/tables below.\n"
+        "\n"
         "## Hard constraints\n"
         "- Use ONLY resources from the supplied list. Never invent a resource name.\n"
         "- Use ONLY endpoints from the supplied catalog when one exists.\n"

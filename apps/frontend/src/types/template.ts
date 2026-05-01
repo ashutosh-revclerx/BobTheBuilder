@@ -123,6 +123,7 @@ export interface ComponentData {
   rows?: Record<string, any>[];
   searchable?: boolean;
   pagination?: boolean;
+  allowAddRows?: boolean;
   conditionalRowColor?: TableConditionalRowColorRule[];
   onRowSelectAction?: string;
   columnVisibility?: Record<string, boolean>;
@@ -258,6 +259,7 @@ export interface SavedTemplate {
   templateId: string;
   dashboardName: string;
   components: ComponentConfig[];
+  queries?: any[];
   savedAt: string;
   originalTemplateId: string;
 }
