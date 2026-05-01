@@ -956,15 +956,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   saveToLocalStorage: () => {
     const state = get();
+    const activeId = state.activeTemplateId;
+    if (!activeId) return;
+
+    // Real DB-backed dashboards (UUID id) live in Postgres — the builder PUTs
+    // to /api/dashboards/<uuid> on Save and the loader fetches from the DB
+    // unconditionally. Persisting to localStorage here would write a partial
+    // snapshot (no `queries` field) that would later shadow the DB if the
+    // load order ever regresses. Skip the write entirely for UUID ids.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (UUID_RE.test(activeId)) {
+      set({ isDirty: false });
+      return;
+    }
+
     const saved: SavedTemplate = {
-      templateId: state.activeTemplateId!,
+      templateId: activeId,
       dashboardName: state.dashboardName,
       components: clone(state.components),
       savedAt: new Date().toISOString(),
       originalTemplateId: state.originalTemplateId!,
     };
 
-    const existing = { ...state.savedTemplates, [state.activeTemplateId!]: saved };
+    const existing = { ...state.savedTemplates, [activeId]: saved };
     set({ savedTemplates: existing, isDirty: false });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
   },

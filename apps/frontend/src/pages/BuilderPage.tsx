@@ -112,7 +112,41 @@ export default function BuilderPage() {
 
     let cancelled = false;
 
+    // For UUID dashboards (real DB rows) the DB is the source of truth.
+    // localStorage was previously checked first — but a stale snapshot
+    // there (e.g. one written mid-edit before queries hydrated) silently
+    // shadowed the DB and left queriesConfig empty, which made every
+    // Button click no-op because the named query couldn't be found.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isUuid = UUID_RE.test(id);
+
     const load = async () => {
+      // 1. UUID → fetch from DB unconditionally.
+      if (isUuid) {
+        try {
+          const response = await fetch(`${API_BASE}/api/dashboards/${id}`);
+          if (!response.ok) {
+            navigate('/');
+            return;
+          }
+          const dashboard = await response.json();
+          if (cancelled) return;
+          loadTemplate(
+            dashboard.id,
+            dashboard.name,
+            dashboard.config?.components ?? [],
+            dashboard.config?.queries ?? [],
+            dashboard.status,
+            dashboard.published_at,
+          );
+        } catch {
+          if (!cancelled) navigate('/');
+        }
+        return;
+      }
+
+      // 2. Non-UUID id (prebuilt / "blank" / saved-template slug):
+      //    localStorage / hardcoded templates are the only sources.
       const saved = savedTemplates[id];
       if (saved) {
         loadSavedTemplate(saved);
@@ -131,31 +165,8 @@ export default function BuilderPage() {
         return;
       }
 
-      try {
-        const response = await fetch(`${API_BASE}/api/dashboards/${id}`);
-        if (!response.ok) {
-          navigate('/');
-          return;
-        }
-
-        const dashboard = await response.json();
-        if (cancelled) {
-          return;
-        }
-
-        loadTemplate(
-          dashboard.id,
-          dashboard.name,
-          dashboard.config?.components ?? [],
-          dashboard.config?.queries ?? [],
-          dashboard.status,
-          dashboard.published_at,
-        );
-      } catch {
-        if (!cancelled) {
-          navigate('/');
-        }
-      }
+      // Nothing matched — bail.
+      navigate('/');
     };
 
     void load();
