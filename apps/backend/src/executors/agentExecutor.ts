@@ -59,9 +59,28 @@ export async function agentExecutor(input: AgentExecutorInput): Promise<Executor
   }
 
   if (!kickoffResponse.ok) {
+    // Read the response body so the user sees the API's actual complaint
+    // (e.g. "url: must be a valid URL") instead of a generic status text.
+    let detail = '';
+    try {
+      const raw = await kickoffResponse.text();
+      if (raw) {
+        // If it's JSON, pluck the most useful field; otherwise show first 200 chars
+        try {
+          const parsed = JSON.parse(raw);
+          detail = parsed?.detail || parsed?.error || parsed?.message
+                || JSON.stringify(parsed).slice(0, 200);
+        } catch {
+          detail = raw.slice(0, 200);
+        }
+      }
+    } catch { /* ignore body read errors */ }
+
     return {
       success: false,
-      error:   `Agent kickoff returned ${kickoffResponse.status} ${kickoffResponse.statusText}`,
+      error:   detail
+        ? `Agent kickoff returned ${kickoffResponse.status} ${kickoffResponse.statusText} — ${detail}`
+        : `Agent kickoff returned ${kickoffResponse.status} ${kickoffResponse.statusText}`,
     };
   }
 
