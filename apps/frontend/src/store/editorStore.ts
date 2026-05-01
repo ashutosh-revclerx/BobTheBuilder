@@ -585,6 +585,7 @@ interface EditorState {
   setStatus: (status: 'draft' | 'live', publishedAt: string | null) => void;
   applyThemeToAll: (paletteName: 'Cobalt' | 'Forest' | 'Graphite' | 'Amber' | 'Obsidian') => void;
   duplicateComponent: (id?: string) => void;
+  importDashboard: (data: any) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -1234,6 +1235,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
 
       return { components, isDirty: true };
+    });
+  },
+  
+  importDashboard: (data) => {
+    const { metadata, config, queries, state } = data;
+    const normalizedComponents = normalizeComponents(clone(config.components || []));
+    
+    set({
+      dashboardName: metadata.name,
+      components: normalizedComponents,
+      queriesConfig: clone(queries || []),
+      status: metadata.status || 'draft',
+      publishedAt: metadata.publishedAt || null,
+      activeTabs: state?.activeTabs || {},
+      selectedComponentId: null,
+      lastSelectedComponentId: normalizedComponents[0]?.id ?? null,
+      isDirty: false,
+      activeTemplateId: null, // Importing a file breaks template link
+      originalTemplateId: null,
+      dirtyStyleMap: {},
+      dirtyDataMap: {},
+      queryResults: {},
+      componentState: {},
     });
   },
 }));
