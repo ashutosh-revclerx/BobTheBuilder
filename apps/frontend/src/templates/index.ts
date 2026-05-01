@@ -3,12 +3,14 @@ import projectOverview from './project-overview';
 import sprintTracker from './sprint-tracker';
 import budgetMonitor from './budget-monitor';
 import phase1Testing from './phase1-testing';
+import nexusOperations from './nexus-operations';
 
 export const templates: TemplateConfig[] = [
   phase1Testing,
   projectOverview,
   sprintTracker,
   budgetMonitor,
+  nexusOperations,
 ];
 
 export function getTemplateById(id: string): TemplateConfig | undefined {

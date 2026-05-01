@@ -259,6 +259,7 @@ export interface SavedTemplate {
   templateId: string;
   dashboardName: string;
   components: ComponentConfig[];
+  queries?: any[];
   savedAt: string;
   originalTemplateId: string;
 }

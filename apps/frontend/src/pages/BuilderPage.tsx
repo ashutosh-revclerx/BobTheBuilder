@@ -191,7 +191,7 @@ export default function BuilderPage() {
 
       const template = getTemplateById(id);
       if (template) {
-        loadTemplate(template.id, template.name, template.components);
+        loadTemplate(template.id, template.name, template.components, template.queries ?? []);
         return;
       }
 
