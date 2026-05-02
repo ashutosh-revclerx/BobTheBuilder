@@ -9,6 +9,7 @@ import PublishToggle from '../components/editor/PublishToggle';
 import AssignmentModal from '../components/editor/AssignmentModal';
 import { useKineticWidth } from '../hooks/useTextMeasure';
 import { exportProject, importProject } from '../services/ProjectService';
+import { downloadAsCode } from '../services/exportService';
 
 const API_BASE = 'http://localhost:3001';
 
@@ -57,6 +58,15 @@ export default function BuilderPage() {
     } catch (err) {
       console.error('Export failed:', err);
       alert('Export failed. Check console for details.');
+    }
+  };
+
+  const handleDownloadAsCode = async () => {
+    try {
+      await downloadAsCode(useEditorStore.getState());
+    } catch (err) {
+      console.error('Download as code failed:', err);
+      alert('Download as code failed. Check console for details.');
     }
   };
 
@@ -418,6 +428,13 @@ export default function BuilderPage() {
                 title="Download full project ZIP"
               >
                 ⤓ Export
+              </button>
+              <button
+                className="btn-topbar"
+                onClick={handleDownloadAsCode}
+                title="Download fully runnable dashboard app"
+              >
+                ⚡ Code
               </button>
               <button
                 className="btn-topbar"
