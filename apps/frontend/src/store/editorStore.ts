@@ -922,7 +922,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const newCid = newIdMap[comp.id];
         const newParentId = comp.parentId ? newIdMap[comp.parentId] : undefined;
 
-        const layout = clone(comp.layout);
+        const layout = clone(comp.layout) || { x: 0, y: 0, w: 2, h: 2 };
         if (comp.id === targetId) {
           layout.y = (layout.y ?? 0) + (layout.h ?? 2);
           
@@ -931,12 +931,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             newParentId !== undefined ? s.parentId === newParentId : !s.parentId
           );
           
-          let collision = levelSiblings.some(s => 
-            layout.x < (s.layout.x + s.layout.w) && 
-            (layout.x + layout.w) > s.layout.x && 
-            layout.y < (s.layout.y + s.layout.h) && 
-            (layout.y + layout.h) > s.layout.y
-          );
+          let collision = levelSiblings.some(s => {
+            if (!s.layout) return false;
+            return (layout.x ?? 0) < ((s.layout.x ?? 0) + (s.layout.w ?? 2)) && 
+                   ((layout.x ?? 0) + (layout.w ?? 2)) > (s.layout.x ?? 0) && 
+                   (layout.y ?? 0) < ((s.layout.y ?? 0) + (s.layout.h ?? 2)) && 
+                   ((layout.y ?? 0) + (layout.h ?? 2)) > (s.layout.y ?? 0);
+          });
 
           // If collision, push to bottom
           if (collision) {
