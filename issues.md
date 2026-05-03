@@ -112,3 +112,18 @@ Roughly even. Ashutosh has more high-priority items (the visible UI bugs from th
 ```
 - [ ] (#28) Title — Owner — Pri — short description
 ```
+date 03/05/2026
+issue 28 the stat button have options of tred but they are not binded , hard code values
+Sparkline data in stat tab is just a place holder
+tables should have variants
+if component label istoo long no handlin / preferably it should wrap to next line or two lines and ajjsut the component 
+Visible for roles is still not usable  adsut the download property accordingly for this case
+there is allow adding  row property , whats the ppurpose
+Text Transform not working
+the themes does not change the internal parts of components, 
+theer is no background color with the themes for canvas 
+gradiant for buttons not working  
+the text box has no option to directly write values in it , we have to do it in through property panel
+there is a Link URL in the yext box it should not be there ,or there should be a enable button check for the same (please ayushman review )
+in status badge there is Show dot it should be inside a property where user can select from multiple signs 
+in input button Validation pattern property please verify it
