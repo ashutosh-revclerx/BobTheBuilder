@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: btb-backend
+  namespace: btb-production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: btb-backend
+  template:
+    metadata:
+      labels:
+        app: btb-backend
+    spec:
+      containers:
+      - name: backend
+        image: your-registry/btb-backend:v1
+        ports:
+        - containerPort: 3001
+        envFrom:
+        - configMapRef:
+            name: btb-config
+        - secretRef:
+            name: btb-secrets
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        # Basic tcp liveness check since no /health endpoint is explicitly defined
+        livenessProbe:
+          tcpSocket:
+            port: 3001
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          tcpSocket:
+            port: 3001
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: btb-backend-service
+  namespace: btb-production
+spec:
+  selector:
+    app: btb-backend
+  ports:
+  - protocol: TCP
+    port: 3001
+    targetPort: 3001
+  type: ClusterIP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: btb-backend-hpa
+  namespace: btb-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: btb-backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75

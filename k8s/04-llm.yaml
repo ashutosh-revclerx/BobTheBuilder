@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: btb-llm
+  namespace: btb-production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: btb-llm
+  template:
+    metadata:
+      labels:
+        app: btb-llm
+    spec:
+      containers:
+      - name: llm
+        image: your-registry/btb-llm:v1
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: btb-config
+        - secretRef:
+            name: btb-secrets
+        - secretRef:
+            name: llm-secrets
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: btb-llm-service
+  namespace: btb-production
+spec:
+  selector:
+    app: btb-llm
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+  type: ClusterIP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: btb-llm-hpa
+  namespace: btb-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: btb-llm
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80

@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: btb-postgres
+  namespace: btb-production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: btb-postgres
+  template:
+    metadata:
+      labels:
+        app: btb-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: dashboard_user
+        - name: POSTGRES_PASSWORD
+          value: dashboard_pass
+        - name: POSTGRES_DB
+          value: dashboard_db
+        # In a real production environment, you would use a PersistentVolumeClaim here
+        # to ensure database data persists across pod restarts.
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: btb-postgres-service
+  namespace: btb-production
+spec:
+  selector:
+    app: btb-postgres
+  ports:
+  - protocol: TCP
+    port: 5432
+    targetPort: 5432
+  type: ClusterIP
