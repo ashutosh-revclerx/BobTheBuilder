@@ -46,7 +46,7 @@ const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
   const trendType = data.trendType || 'positive';
   const isPositive = trendType === 'positive';
   const isNeutral = trendType === 'neutral';
-  const trendColor = style.trendColorOverride || (isNeutral ? '#9ba3af' : isPositive ? '#059669' : '#dc2626');
+  const trendColor = style.trendColorOverride || (isNeutral ? '#4b5563' : isPositive ? '#047857' : '#b91c1c');
 
   return (
     <div
@@ -74,7 +74,7 @@ const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
       }}
     >
       <div className="stat-card-top" style={{ flexShrink: 0 }}>
-        <div className="stat-card-label" style={{ color: style.textColor ? `${style.textColor}88` : undefined }}>
+        <div className="stat-card-label" style={{ color: style.textColor ? `${style.textColor}bb` : '#4b5563' }}>
           {label}
         </div>
         <div className="stat-card-icon">{pickIcon(label)}</div>
@@ -112,7 +112,7 @@ const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
           {isNeutral ? '—' : isPositive ? '↑' : '↓'} {trendValue}
         </span>
       )}
-      {data.comparisonValue ? <div style={{ color: '#5c6370', fontSize: '12px', marginTop: '6px' }}>{data.comparisonValue}</div> : null}
+      {data.comparisonValue ? <div style={{ color: '#4b5563', fontSize: '12px', marginTop: '6px' }}>{data.comparisonValue}</div> : null}
     </div>
   );
 });

@@ -7,18 +7,18 @@ interface StatusBadgeProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  success: '#059669',
-  done: '#059669',
-  completed: '#059669',
-  active: '#059669',
-  danger: '#dc2626',
-  blocked: '#dc2626',
-  error: '#dc2626',
-  critical: '#dc2626',
-  warning: '#d97706',
-  'in progress': '#2563eb',
-  'to do': '#9ba3af',
-  pending: '#9ba3af',
+  success: '#047857',
+  done: '#047857',
+  completed: '#047857',
+  active: '#047857',
+  danger: '#b91c1c',
+  blocked: '#b91c1c',
+  error: '#b91c1c',
+  critical: '#b91c1c',
+  warning: '#92400e',
+  'in progress': '#1d4ed8',
+  'to do': '#4b5563',
+  pending: '#4b5563',
 };
 
 function resolveColor(label: string, fallback: string): string {
@@ -40,7 +40,7 @@ const StatusBadge = React.memo(function StatusBadge({ config }: StatusBadgeProps
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const statusStr = typeof rawData === 'string' ? rawData : String(rawData ?? 'Unknown');
   const mapping = data.mapping || {};
-  const badgeColor = mapping[statusStr] || resolveColor(statusStr, data.defaultColor || style.textColor || '#3b82f6');
+  const badgeColor = mapping[statusStr] || resolveColor(statusStr, data.defaultColor || style.textColor || '#1d4ed8');
   const size = data.size || 'Medium';
 
   return (
