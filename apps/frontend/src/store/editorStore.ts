@@ -43,7 +43,7 @@ const createBaseData = (): ComponentData => ({
 
 const createBaseStyle = (): ComponentStyle => ({
   backgroundColor: '#ffffff',
-  textColor: '#0f1117',
+  textColor: '#111827', /* Gray 900 */
   fontFamily: 'Inter',
   fontSize: 14,
   borderRadius: 8,
@@ -96,9 +96,9 @@ const createDefaultConfig = (
       return {
         style: {
           ...createBaseStyle(),
-          backgroundColor: '#2563eb',
+          backgroundColor: '#1d4ed8', /* Blue 700 - Contrast 6.6:1 */
           textColor: '#ffffff',
-          borderColor: '#2563eb',
+          borderColor: '#1d4ed8',
           variant: 'Primary',
           iconLeft: '',
           fullWidth: false,
@@ -195,7 +195,7 @@ const createDefaultConfig = (
       return {
         style: {
           ...createBaseStyle(),
-          textColor: '#2563eb',
+          textColor: '#1d4ed8',
           fontSize: 13,
           borderRadius: 10,
           padding: 16,
@@ -207,11 +207,11 @@ const createDefaultConfig = (
           mockValue: 'Active',
           refreshOn: 'onLoad',
           mapping: {
-            Active: '#059669',
-            Pending: '#d97706',
-            Error: '#dc2626',
+            Active: '#047857',
+            Pending: '#92400e',
+            Error: '#b91c1c',
           },
-          defaultColor: '#9ba3af',
+          defaultColor: '#4b5563',
           showDot: true,
           size: 'Medium',
         },
@@ -371,10 +371,10 @@ const createDefaultConfig = (
           fontSize: 12,
           borderRadius: 6,
           levelColors: {
-            INFO: '#059669',
-            WARN: '#d97706',
-            ERROR: '#dc2626',
-            DEBUG: '#2563eb',
+            INFO: '#047857',
+            WARN: '#92400e',
+            ERROR: '#b91c1c',
+            DEBUG: '#1d4ed8',
           },
         },
         data: {
@@ -545,6 +545,9 @@ interface EditorState {
   isDirty: boolean;
   status: 'draft' | 'live';
   publishedAt: string | null;
+  canvasStyle: {
+    backgroundColor: string;
+  };
   loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null) => void;
   loadSavedTemplate: (saved: SavedTemplate) => void;
   selectComponent: (id: string | null) => void;
@@ -611,6 +614,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   isDirty: false,
   status: 'draft',
   publishedAt: null,
+  canvasStyle: {
+    backgroundColor: '#f3f4f6',
+  },
 
   setDraggingType: (type) => set({ draggingType: type }),
 
@@ -1133,36 +1139,73 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!palette) return;
 
     set((state) => {
+      const canvasStyle = { ...state.canvasStyle, backgroundColor: palette.surface };
       const components = state.components.map((comp) => {
         const style = { ...comp.style };
         const ctype = comp.type;
+
+        const isDark = palette.surface.startsWith('#0') || palette.surface.startsWith('#1');
 
         // Base
         style.backgroundColor = palette.panel;
         style.borderColor = palette.border;
         style.textColor = palette.text;
 
-        // Component-specific tints
-        if (ctype === 'StatCard' || ctype === 'StatusBadge') {
+        // Component-specific tints and semantic colors
+        if (ctype === 'StatCard') {
           style.backgroundColor = palette.card_tint;
+          style.trendColorOverride = palette.success;
+          style.textColor = palette.text;
+        } else if (ctype === 'StatusBadge') {
+          style.backgroundColor = palette.card_tint;
+          style.textColor = palette.primary;
+          comp.data.mapping = {
+            ...comp.data.mapping,
+            Active: palette.success,
+            Pending: palette.warning,
+            Error: palette.error,
+          };
         } else if (ctype === 'BarChart' || ctype === 'LineChart') {
           style.backgroundColor = palette.chart_tint;
+          style.xAxisColor = isDark ? '#94a3b8' : '#4b5563';
+          style.yAxisColor = style.xAxisColor;
+          style.gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
+          style.axisColor = style.xAxisColor;
+          style.textColor = palette.text;
         } else if (ctype === 'Table') {
           style.backgroundColor = palette.table_tint;
+          style.headerBackgroundColor = palette.surface;
+          style.textColor = palette.text;
+          style.rowAlternateColor = isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc';
+          style.borderColor = palette.border;
+          style.searchBarBackground = palette.surface;
+          style.searchBarTextColor = palette.text;
         } else if (ctype === 'Container' || ctype === 'TabbedContainer') {
           style.backgroundColor = palette.surface;
+          style.textColor = palette.text;
+          if (ctype === 'TabbedContainer') {
+            style.tabHeaderBackground = palette.panel;
+            style.tabHeaderTextColor = isDark ? '#94a3b8' : '#64748b';
+            style.tabHeaderActiveTextColor = palette.primary;
+            style.tabHeaderActiveBackground = palette.panel;
+          }
         } else if (ctype === 'TextInput' || ctype === 'NumberInput' || ctype === 'Select') {
           style.backgroundColor = palette.input_tint;
+          style.textColor = palette.text;
+          style.borderColor = palette.border;
         } else if (ctype === 'Button') {
           style.backgroundColor = palette.primary;
+          style.textColor = palette.primary_text;
+          style.borderColor = palette.primary;
         } else if (ctype === 'Text') {
           style.backgroundColor = 'transparent';
+          style.textColor = palette.text;
         }
 
         return { ...comp, style };
       });
 
-      return { components, isDirty: true };
+      return { components, canvasStyle, isDirty: true };
     });
   },
   

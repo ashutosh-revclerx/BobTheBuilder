@@ -66,10 +66,13 @@ export default function Canvas({ readOnly = false }: { readOnly?: boolean }) {
     clearCanvasSelection();
   };
 
+  const canvasStyle = useEditorStore((s) => s.canvasStyle);
+
   return (
     <div
       className={`builder-canvas-wrapper${draggingType ? ' drop-active' : ''}`}
       onClick={handleCanvasClick}
+      style={{ backgroundColor: canvasStyle.backgroundColor }}
     >
       <div className="builder-canvas">
         <GridLayer parentId="root" componentMap={ComponentMap} readOnly={readOnly} />

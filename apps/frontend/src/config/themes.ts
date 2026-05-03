@@ -25,6 +25,7 @@ export interface ResolvedTheme extends ThemePalette {
   success: string;
   warning: string;
   error: string;
+  primary_text: string;
 }
 
 export const THEME_REGISTRY: Record<string, ThemePalette> = {
@@ -140,15 +141,23 @@ export function resolveTheme(name: ThemeName): ResolvedTheme | null {
   const base = THEME_REGISTRY[name];
   if (!base) return null;
 
+  // Simple heuristic for dark themes: if the surface is very dark
+  const isDark = base.surface.startsWith('#0') || base.surface.startsWith('#1');
+
+  // Simple contrast check for primary text (white or dark)
+  // Neon green, cyan, etc need dark text.
+  const isPrimaryLight = ['#22c55e', '#22d3ee', '#fcd9a8', '#fde68a'].includes(base.primary.toLowerCase());
+
   return {
     ...base,
     card_tint: hexToRgba(base.primary, 0.08),
     chart_tint: hexToRgba(base.primary, 0.2),
     table_tint: hexToRgba(base.primary, 0.05),
     input_tint: hexToRgba(base.primary, 0.12),
-    // Default status colors
-    success: '#16a34a',
-    warning: '#d97706',
-    error: '#dc2626',
+    // Status colors adjusted for brightness
+    success: isDark ? '#4ade80' : '#047857',
+    warning: isDark ? '#fbbf24' : '#92400e',
+    error:   isDark ? '#f87171' : '#b91c1c',
+    primary_text: isPrimaryLight ? '#0f172a' : '#ffffff',
   };
 }
