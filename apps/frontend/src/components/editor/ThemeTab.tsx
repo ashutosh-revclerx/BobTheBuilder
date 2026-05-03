@@ -3,6 +3,7 @@ import { useEditorStore } from '../../store/editorStore';
 import type { ComponentStyle } from '../../types/template';
 import { resolveBackground, GRADIENT_DIRECTIONS } from '../../utils/styleUtils';
 import { useDebouncedStyle } from '../../hooks/useDebouncedStyle';
+import { THEME_REGISTRY, resolveTheme } from '../../config/themes';
 
 // ─── Option lists ─────────────────────────────────────────────────────────────
 
@@ -39,13 +40,10 @@ const DEFAULT_GRADIENT_STOPS = [
   { color: '#8b5cf6', position: 100 },
 ];
 
-const THEME_PRESETS = [
-  { name: 'Cobalt',   surface: '#f0f4f8', panel: '#ffffff',  primary: '#2563eb' },
-  { name: 'Forest',   surface: '#f0faf4', panel: '#ffffff',  primary: '#16a34a' },
-  { name: 'Graphite', surface: '#080e1a', panel: '#0d1424',  primary: '#22d3ee' },
-  { name: 'Amber',    surface: '#fefce8', panel: '#fffef5',  primary: '#b45309' },
-  { name: 'Obsidian', surface: '#09090b', panel: '#0f0f12',  primary: '#6366f1' },
-];
+const THEME_PRESETS = Object.values(THEME_REGISTRY).map(preset => ({
+  ...preset,
+  ...resolveTheme(preset.name as any)
+}));
 
 // ─── Optimized field controls ────────────────────────────────────────────────
 
