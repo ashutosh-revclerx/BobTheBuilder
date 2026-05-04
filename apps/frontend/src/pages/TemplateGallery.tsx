@@ -76,7 +76,7 @@ export default function TemplateGallery() {
                       <span className="template-card-thumbnail-icon">
                         {TEMPLATE_ICONS[saved.originalTemplateId] || '📄'}
                       </span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                         {saved.components.length} components
                       </span>
                     </div>
@@ -142,7 +142,7 @@ export default function TemplateGallery() {
                   <span className="template-card-thumbnail-icon">
                     {TEMPLATE_ICONS[template.id] || '📄'}
                   </span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                     {template.components.length} components
                   </span>
                 </div>
@@ -170,7 +170,7 @@ export default function TemplateGallery() {
             <div className="template-card-thumbnail">
               <div className="template-card-thumbnail-inner">
                 <span className="template-card-thumbnail-icon">➕</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                   Start fresh
                 </span>
               </div>

@@ -1,15 +1,13 @@
-import { useEffect } from 'react';
+import React, { useEffect, Suspense, lazy } from 'react';
 import { executeOnLoadQueries, watchDependencies, resetReactiveState } from '../../engine/queryEngine';
 import { useEditorStore } from '../../store/editorStore';
 import { GridLayer } from './GridLayer';
+import { resolveBackground } from '../../utils/styleUtils';
 
 import StatCard from '../dashboard-components/StatCard';
 import Table from '../dashboard-components/Table';
-import BarChartComponent from '../dashboard-components/BarChart';
-import LineChartComponent from '../dashboard-components/LineChart';
 import StatusBadge from '../dashboard-components/StatusBadge';
 import Button from '../dashboard-components/Button';
-import LogsViewer from '../dashboard-components/LogsViewer';
 import Container from '../dashboard-components/Container';
 import TabbedContainer from '../dashboard-components/TabbedContainer';
 import Text from '../dashboard-components/Text';
@@ -19,6 +17,11 @@ import Select from '../dashboard-components/Select';
 import Image from '../dashboard-components/Image';
 import Embed from '../dashboard-components/Embed';
 import type { ComponentType } from '../../types/template';
+
+// Lazy load heavy components
+const BarChartComponent = lazy(() => import('../dashboard-components/BarChart'));
+const LineChartComponent = lazy(() => import('../dashboard-components/LineChart'));
+const LogsViewer = lazy(() => import('../dashboard-components/LogsViewer'));
 
 const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
   StatCard,
@@ -66,13 +69,18 @@ export default function Canvas({ readOnly = false }: { readOnly?: boolean }) {
     clearCanvasSelection();
   };
 
+  const canvasStyle = useEditorStore((s) => s.canvasStyle);
+
   return (
     <div
       className={`builder-canvas-wrapper${draggingType ? ' drop-active' : ''}`}
       onClick={handleCanvasClick}
+      style={{ background: resolveBackground(canvasStyle as any) }}
     >
       <div className="builder-canvas">
-        <GridLayer parentId="root" componentMap={ComponentMap} readOnly={readOnly} />
+        <Suspense fallback={<div className="canvas-loading-placeholder">Loading components...</div>}>
+          <GridLayer parentId="root" componentMap={ComponentMap} readOnly={readOnly} />
+        </Suspense>
         {components.length === 0 && (
           <div className="canvas-empty">
             <div className="canvas-empty-icon">📊</div>

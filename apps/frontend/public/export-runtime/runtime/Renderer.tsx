@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { executeOnLoadQueries, resetReactiveState, watchDependencies } from '../engine/queryEngine';
 import { useEditorStore } from '../store/editorStore';
 import { GridLayer } from '../components/editor/GridLayer';
+import { resolveBackground } from '../utils/styleUtils';
 
 import StatCard from '../components/dashboard-components/StatCard';
 import Table from '../components/dashboard-components/Table';
@@ -42,6 +43,14 @@ interface RendererProps {
   config: {
     name?: string;
     components: ComponentConfig[];
+    canvasStyle?: {
+      backgroundColor: string;
+      backgroundGradient?: {
+        enabled: boolean;
+        direction: number;
+        stops: Array<{ color: string; position: number }>;
+      };
+    };
   };
   queries?: any[];
 }
@@ -49,9 +58,10 @@ interface RendererProps {
 export default function Renderer({ config, queries = [] }: RendererProps) {
   const components = useEditorStore((state) => state.components);
   const queriesConfig = useEditorStore((state) => state.queriesConfig);
+  const canvasStyle = useEditorStore((state) => state.canvasStyle);
 
   useEffect(() => {
-    useEditorStore.getState().loadTemplate('exported-dashboard', config.name || 'Dashboard', config.components || [], queries);
+    useEditorStore.getState().loadTemplate('exported-dashboard', config.name || 'Dashboard', config.components || [], queries, 'live', null, config.canvasStyle);
   }, [config, queries]);
 
   useEffect(() => {
@@ -68,7 +78,7 @@ export default function Renderer({ config, queries = [] }: RendererProps) {
   }, [queriesConfig]);
 
   return (
-    <div className="builder-canvas-wrapper preview-mode">
+    <div className="builder-canvas-wrapper preview-mode" style={{ background: resolveBackground(canvasStyle as any) || '#f3f4f6' }}>
       <div className="builder-canvas">
         <GridLayer parentId="root" componentMap={ComponentMap} readOnly />
         {components.length === 0 ? (

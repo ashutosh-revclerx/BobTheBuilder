@@ -135,7 +135,7 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
                 dataKey={isHorizontal ? undefined : xKey} 
                 type={isHorizontal ? 'number' : 'category'} 
                 hide={data.showXAxis === false}
-                tick={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#94a3b8' }}
+                tick={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#4b5563' }}
                 stroke={style.xAxisColor || style.axisColor || '#e5e7eb'}
               >
                 {data.xAxisLabel && (
@@ -143,7 +143,7 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
                     value={data.xAxisLabel} 
                     position="insideBottom" 
                     offset={-5} 
-                    style={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#94a3b8', fontWeight: 500 }}
+                    style={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#4b5563', fontWeight: 500 }}
                   />
                 )}
               </XAxis>
@@ -151,7 +151,7 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
                 dataKey={isHorizontal ? xKey : undefined} 
                 type={isHorizontal ? 'category' : 'number'} 
                 hide={data.showYAxis === false}
-                tick={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#94a3b8' }}
+                tick={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#4b5563' }}
                 stroke={style.yAxisColor || style.axisColor || '#e5e7eb'}
               >
                 {data.yAxisLabel && (
@@ -159,7 +159,7 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
                     value={data.yAxisLabel} 
                     angle={-90} 
                     position="insideLeft" 
-                    style={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#94a3b8', fontWeight: 500, textAnchor: 'middle' }}
+                    style={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#4b5563', fontWeight: 500, textAnchor: 'middle' }}
                   />
                 )}
               </YAxis>
@@ -184,7 +184,7 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
                     <LabelList 
                       dataKey={seriesItem.fieldKey} 
                       position={isHorizontal ? 'right' : 'top'} 
-                      style={{ fontSize: style.fontSize || 11, fill: style.textColor || '#666' }}
+                      style={{ fontSize: style.fontSize || 11, fill: style.textColor || '#4b5563' }}
                     />
                   ) : null}
                   {chartData.map((_, cellIndex) => (

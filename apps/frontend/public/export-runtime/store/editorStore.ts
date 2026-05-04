@@ -1,11 +1,34 @@
 import { create } from 'zustand';
-import type { ComponentConfig, ComponentType } from '../types/template';
+
+// Minimal inline types — the full types live in src/types/template.ts in the exported app
+type ComponentType = string;
+type ComponentConfig = {
+  id: string;
+  type: ComponentType;
+  label: string;
+  visible?: string | boolean;
+  visibleForRoles?: string[];
+  style: Record<string, unknown>;
+  data: Record<string, unknown>;
+  parentId?: string;
+  parentTab?: string;
+  layout?: { x: number; y: number; w: number; h: number; minW?: number; minH?: number };
+};
 
 type QueryState = {
   data: unknown;
   status: 'idle' | 'loading' | 'success' | 'error';
   error: string | null;
   lastUpdated: number | null;
+};
+
+type CanvasStyle = {
+  backgroundColor: string;
+  backgroundGradient?: {
+    enabled: boolean;
+    direction: number;
+    stops: Array<{ color: string; position: number }>;
+  };
 };
 
 type EditorState = {
@@ -19,7 +42,8 @@ type EditorState = {
   queryResults: Record<string, QueryState>;
   componentState: Record<string, Record<string, unknown>>;
   activeTabs: Record<string, string>;
-  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[]) => void;
+  canvasStyle: CanvasStyle;
+  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null, canvasStyle?: CanvasStyle) => void;
   selectComponent: (id: string | null) => void;
   clearCanvasSelection: () => void;
   closeRightPanel: () => void;
@@ -47,14 +71,16 @@ export const useEditorStore = create<EditorState>((set) => ({
   queryResults: {},
   componentState: {},
   activeTabs: {},
+  canvasStyle: { backgroundColor: '#f3f4f6' },
 
-  loadTemplate: (_templateId, name, components, queries = []) => set({
+  loadTemplate: (_templateId, name, components, queries = [], _status = 'draft', _publishedAt = null, canvasStyle) => set({
     dashboardName: name,
     components: clone(components || []),
     queriesConfig: clone(queries || []),
     queryResults: {},
     componentState: {},
     activeTabs: {},
+    canvasStyle: canvasStyle || { backgroundColor: '#f3f4f6' },
   }),
 
   selectComponent: () => undefined,
@@ -83,11 +109,12 @@ export const useEditorStore = create<EditorState>((set) => ({
     queryResults: {
       ...state.queryResults,
       [queryName]: {
-        data: null,
-        status: 'idle',
-        error: null,
-        lastUpdated: null,
-        ...state.queryResults[queryName],
+        ...(state.queryResults[queryName] || {
+          data: null,
+          status: 'idle',
+          error: null,
+          lastUpdated: null,
+        }),
         ...queryState,
       },
     },

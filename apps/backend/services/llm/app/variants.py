@@ -444,6 +444,10 @@ def _apply_palette(
     dashboard_type: DashboardType,
 ) -> DashboardConfig:
     cloned = copy.deepcopy(config.model_dump(by_alias=True))
+    cloned["canvasStyle"] = {
+        **(cloned.get("canvasStyle") or {}),
+        "backgroundColor": palette["surface"],
+    }
     cloned["components"] = _apply_profile(cloned["components"], profile)
     cloned["components"] = _apply_archetype_adjustments(
         cloned["components"], dashboard_type, profile

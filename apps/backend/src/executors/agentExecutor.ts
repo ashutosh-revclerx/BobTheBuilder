@@ -7,6 +7,7 @@ export interface AgentExecutorInput {
   endpoint:       string;
   params?:        Record<string, unknown>;
   body?:          Record<string, unknown>;
+  pollUrlTemplate?: string;
 }
 
 const POLL_INTERVAL_MS = 2_000;
@@ -106,11 +107,20 @@ export async function agentExecutor(input: AgentExecutorInput): Promise<Executor
   const startedAt = Date.now();
   const pollUrlFromResponse: string | undefined =
     kickoffJson?.poll_url ?? kickoffJson?.pollUrl ?? kickoffJson?.result_url;
-  const pollUrl = pollUrlFromResponse
-    ? (pollUrlFromResponse.startsWith('http')
-        ? pollUrlFromResponse
-        : `${base}${pollUrlFromResponse.startsWith('/') ? '' : '/'}${pollUrlFromResponse}`)
-    : `${base}/public/result/${encodeURIComponent(jobId)}`;
+    
+  let pollUrl: string;
+  if (pollUrlFromResponse) {
+    pollUrl = pollUrlFromResponse.startsWith('http')
+      ? pollUrlFromResponse
+      : `${base}${pollUrlFromResponse.startsWith('/') ? '' : '/'}${pollUrlFromResponse}`;
+  } else if (input.pollUrlTemplate) {
+    const resolvedTemplate = input.pollUrlTemplate.replace(/\{\{jobId\}\}/g, jobId);
+    pollUrl = resolvedTemplate.startsWith('http')
+      ? resolvedTemplate
+      : `${base}${resolvedTemplate.startsWith('/') ? '' : '/'}${resolvedTemplate}`;
+  } else {
+    pollUrl = `${base}/public/result/${encodeURIComponent(jobId)}`;
+  }
 
   for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt++) {
     if (Date.now() - startedAt >= MAX_TOTAL_MS) {

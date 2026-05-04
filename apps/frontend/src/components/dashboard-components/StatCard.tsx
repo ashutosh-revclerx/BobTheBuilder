@@ -42,11 +42,14 @@ const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
   const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const value = `${data.prefix ?? ''}${typeof rawData === 'string' ? rawData : String(rawData ?? '—')}${data.suffix ?? ''}`;
-  const trendValue = data.trend || null;
-  const trendType = data.trendType || 'positive';
+  
+  const trendValue = data._resolvedBindings?.trend ?? data.trend ?? null;
+  const trendType = data._resolvedBindings?.trendType ?? data.trendType ?? 'positive';
+  const sparklineData = (data._resolvedBindings?.sparklineData ?? data.sparklineData ?? []) as number[];
+
   const isPositive = trendType === 'positive';
   const isNeutral = trendType === 'neutral';
-  const trendColor = style.trendColorOverride || (isNeutral ? '#9ba3af' : isPositive ? '#059669' : '#dc2626');
+  const trendColor = style.trendColorOverride || (isNeutral ? '#4b5563' : isPositive ? '#047857' : '#b91c1c');
 
   return (
     <div
@@ -74,7 +77,7 @@ const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
       }}
     >
       <div className="stat-card-top" style={{ flexShrink: 0 }}>
-        <div className="stat-card-label" style={{ color: style.textColor ? `${style.textColor}88` : undefined }}>
+        <div className="stat-card-label" style={{ color: style.textColor ? `${style.textColor}bb` : '#4b5563' }}>
           {label}
         </div>
         <div className="stat-card-icon">{pickIcon(label)}</div>
@@ -87,9 +90,9 @@ const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
             <div className="stat-card-value" style={{ fontSize: `${style.metricFontSize || 28}px`, color: 'var(--comp-text)' }}>
               {value}
             </div>
-            {data.sparklineData?.length ? (
+            {sparklineData.length ? (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '32px' }}>
-                {data.sparklineData.map((point, index) => (
+                {sparklineData.map((point, index) => (
                   <span
                     key={`${point}-${index}`}
                     style={{
@@ -98,7 +101,7 @@ const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
                       height: `${Math.max(4, point)}px`,
                       borderRadius: '999px',
                       backgroundColor: trendColor,
-                      opacity: 0.6 + (index / (data.sparklineData?.length || 1)) * 0.4,
+                      opacity: 0.6 + (index / (sparklineData.length || 1)) * 0.4,
                     }}
                   />
                 ))}
@@ -112,7 +115,7 @@ const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
           {isNeutral ? '—' : isPositive ? '↑' : '↓'} {trendValue}
         </span>
       )}
-      {data.comparisonValue ? <div style={{ color: '#5c6370', fontSize: '12px', marginTop: '6px' }}>{data.comparisonValue}</div> : null}
+      {data.comparisonValue ? <div style={{ color: '#4b5563', fontSize: '12px', marginTop: '6px' }}>{data.comparisonValue}</div> : null}
     </div>
   );
 });

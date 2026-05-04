@@ -131,7 +131,7 @@ const LineChart = React.memo(function LineChart({ config }: { config: ComponentC
               <XAxis 
                 dataKey={xKey} 
                 hide={data.showXAxis === false}
-                tick={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#94a3b8' }}
+                tick={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#4b5563' }}
                 stroke={style.xAxisColor || style.axisColor || '#e5e7eb'}
               >
                 {data.xAxisLabel && (
@@ -139,13 +139,13 @@ const LineChart = React.memo(function LineChart({ config }: { config: ComponentC
                     value={data.xAxisLabel} 
                     position="insideBottom" 
                     offset={-5} 
-                    style={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#94a3b8', fontWeight: 500 }}
+                    style={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#4b5563', fontWeight: 500 }}
                   />
                 )}
               </XAxis>
               <YAxis 
                 hide={data.showYAxis === false}
-                tick={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#94a3b8' }}
+                tick={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#4b5563' }}
                 stroke={style.yAxisColor || style.axisColor || '#e5e7eb'}
               >
                 {data.yAxisLabel && (
@@ -153,7 +153,7 @@ const LineChart = React.memo(function LineChart({ config }: { config: ComponentC
                     value={data.yAxisLabel} 
                     angle={-90} 
                     position="insideLeft" 
-                    style={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#94a3b8', fontWeight: 500, textAnchor: 'middle' }}
+                    style={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#4b5563', fontWeight: 500, textAnchor: 'middle' }}
                   />
                 )}
               </YAxis>
@@ -186,7 +186,7 @@ const LineChart = React.memo(function LineChart({ config }: { config: ComponentC
                       <LabelList 
                         dataKey={seriesItem.fieldKey} 
                         position="top" 
-                        style={{ fontSize: style.fontSize || 11, fill: style.textColor || '#666' }}
+                        style={{ fontSize: style.fontSize || 11, fill: style.textColor || '#4b5563' }}
                       />
                     ) : null}
                   </Line>

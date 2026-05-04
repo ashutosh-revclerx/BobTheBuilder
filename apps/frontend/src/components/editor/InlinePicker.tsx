@@ -60,7 +60,7 @@ export default function InlinePicker({ onClose, onSelect }: InlinePickerProps) {
                       onClose();
                     }}
                   >
-                    <span className="inline-picker-card-icon">{opt.icon}</span>
+                    <span className="inline-picker-card-icon"><opt.icon /></span>
                     <div className="inline-picker-card-info">
                       <span className="inline-picker-card-label">{opt.label}</span>
                       {opt.description && <span className="inline-picker-card-desc">{opt.description}</span>}

@@ -4,6 +4,7 @@ import sprintTracker from './sprint-tracker';
 import budgetMonitor from './budget-monitor';
 import phase1Testing from './phase1-testing';
 import nexusOperations from './nexus-operations';
+import demoTable from './demo-table';
 
 export const templates: TemplateConfig[] = [
   phase1Testing,
@@ -11,6 +12,7 @@ export const templates: TemplateConfig[] = [
   sprintTracker,
   budgetMonitor,
   nexusOperations,
+  demoTable,
 ];
 
 export function getTemplateById(id: string): TemplateConfig | undefined {

@@ -1,5 +1,7 @@
 import { create } from 'zustand';
+import { type ThemeName, resolveTheme } from '../config/themes';
 import type {
+  CanvasStyle,
   ComponentConfig,
   ComponentData,
   ComponentStyle,
@@ -42,7 +44,7 @@ const createBaseData = (): ComponentData => ({
 
 const createBaseStyle = (): ComponentStyle => ({
   backgroundColor: '#ffffff',
-  textColor: '#0f1117',
+  textColor: '#111827', /* Gray 900 */
   fontFamily: 'Inter',
   fontSize: 14,
   borderRadius: 8,
@@ -71,6 +73,7 @@ const createDefaultConfig = (
           strikethrough: false,
           strikethroughField: '',
           strikethroughValue: '',
+          variant: 'Bordered',
         },
         data: {
           ...createBaseData(),
@@ -95,9 +98,9 @@ const createDefaultConfig = (
       return {
         style: {
           ...createBaseStyle(),
-          backgroundColor: '#2563eb',
+          backgroundColor: '#1d4ed8', /* Blue 700 - Contrast 6.6:1 */
           textColor: '#ffffff',
-          borderColor: '#2563eb',
+          borderColor: '#1d4ed8',
           variant: 'Primary',
           iconLeft: '',
           fullWidth: false,
@@ -194,7 +197,7 @@ const createDefaultConfig = (
       return {
         style: {
           ...createBaseStyle(),
-          textColor: '#2563eb',
+          textColor: '#1d4ed8',
           fontSize: 13,
           borderRadius: 10,
           padding: 16,
@@ -206,11 +209,11 @@ const createDefaultConfig = (
           mockValue: 'Active',
           refreshOn: 'onLoad',
           mapping: {
-            Active: '#059669',
-            Pending: '#d97706',
-            Error: '#dc2626',
+            Active: '#047857',
+            Pending: '#92400e',
+            Error: '#b91c1c',
           },
-          defaultColor: '#9ba3af',
+          defaultColor: '#4b5563',
           showDot: true,
           size: 'Medium',
         },
@@ -370,10 +373,10 @@ const createDefaultConfig = (
           fontSize: 12,
           borderRadius: 6,
           levelColors: {
-            INFO: '#059669',
-            WARN: '#d97706',
-            ERROR: '#dc2626',
-            DEBUG: '#2563eb',
+            INFO: '#047857',
+            WARN: '#92400e',
+            ERROR: '#b91c1c',
+            DEBUG: '#1d4ed8',
           },
         },
         data: {
@@ -544,7 +547,8 @@ interface EditorState {
   isDirty: boolean;
   status: 'draft' | 'live';
   publishedAt: string | null;
-  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null) => void;
+  canvasStyle: CanvasStyle;
+  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null, canvasStyle?: CanvasStyle) => void;
   loadSavedTemplate: (saved: SavedTemplate) => void;
   selectComponent: (id: string | null) => void;
   clearCanvasSelection: () => void;
@@ -568,7 +572,8 @@ interface EditorState {
   removeComponent: (id: string) => void;
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => void;
-  resetToTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[]) => void;
+  resetToTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], canvasStyle?: CanvasStyle) => void;
+  updateCanvasStyle: (patch: Partial<CanvasStyle>) => void;
   resetToDefault: () => void;
   getResolvedComponent: (id: string) => ComponentConfig | undefined;
   renameSavedTemplate: (templateId: string, name: string) => void;
@@ -583,7 +588,7 @@ interface EditorState {
   setRightPanelTab: (tab: 'style' | 'data' | 'theme') => void;
   upsertQuery: (query: Record<string, unknown> & { name: string }) => void;
   setStatus: (status: 'draft' | 'live', publishedAt: string | null) => void;
-  applyThemeToAll: (paletteName: 'Cobalt' | 'Forest' | 'Graphite' | 'Amber' | 'Obsidian') => void;
+  applyThemeToAll: (paletteName: ThemeName) => void;
   duplicateComponent: (id?: string) => void;
   importDashboard: (data: any) => void;
 }
@@ -610,6 +615,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   isDirty: false,
   status: 'draft',
   publishedAt: null,
+  canvasStyle: {
+    backgroundColor: '#f3f4f6',
+  },
 
   setDraggingType: (type) => set({ draggingType: type }),
 
@@ -644,7 +652,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
     })),
 
-  loadTemplate: (templateId, name, components, queries = [], status = 'draft', publishedAt = null) => {
+  loadTemplate: (templateId, name, components, queries = [], status = 'draft', publishedAt = null, canvasStyle) => {
     const normalizedComponents = normalizeComponents(clone(components));
     set({
       activeTemplateId: templateId,
@@ -663,6 +671,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       queryResults: {},
       componentState: {},
       isDirty: false,
+      canvasStyle: canvasStyle || { backgroundColor: '#f3f4f6' },
     });
   },
 
@@ -685,6 +694,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       queryResults: {},
       componentState: {},
       isDirty: false,
+      canvasStyle: saved.canvasStyle || { backgroundColor: '#f3f4f6' },
     });
   },
 
@@ -915,7 +925,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const newCid = newIdMap[comp.id];
         const newParentId = comp.parentId ? newIdMap[comp.parentId] : undefined;
 
-        const layout = clone(comp.layout);
+        const layout = clone(comp.layout) || { x: 0, y: 0, w: 2, h: 2 };
         if (comp.id === targetId) {
           layout.y = (layout.y ?? 0) + (layout.h ?? 2);
           
@@ -924,12 +934,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             newParentId !== undefined ? s.parentId === newParentId : !s.parentId
           );
           
-          let collision = levelSiblings.some(s => 
-            layout.x < (s.layout.x + s.layout.w) && 
-            (layout.x + layout.w) > s.layout.x && 
-            layout.y < (s.layout.y + s.layout.h) && 
-            (layout.y + layout.h) > s.layout.y
-          );
+          let collision = levelSiblings.some(s => {
+            if (!s.layout) return false;
+            return (layout.x ?? 0) < ((s.layout.x ?? 0) + (s.layout.w ?? 2)) && 
+                   ((layout.x ?? 0) + (layout.w ?? 2)) > (s.layout.x ?? 0) && 
+                   (layout.y ?? 0) < ((s.layout.y ?? 0) + (s.layout.h ?? 2)) && 
+                   ((layout.y ?? 0) + (layout.h ?? 2)) > (s.layout.y ?? 0);
+          });
 
           // If collision, push to bottom
           if (collision) {
@@ -977,6 +988,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       queries: clone(state.queriesConfig),
       savedAt: new Date().toISOString(),
       originalTemplateId: state.originalTemplateId!,
+      canvasStyle: state.canvasStyle,
     };
 
     const existing = { ...state.savedTemplates, [activeId]: saved };
@@ -1007,7 +1019,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  resetToTemplate: (templateId, name, components, queries = []) => {
+  resetToTemplate: (templateId, name, components, queries = [], canvasStyle) => {
     const state = get();
     const existing = { ...state.savedTemplates };
     if (state.activeTemplateId) {
@@ -1034,6 +1046,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       componentState: {},
       isDirty: false,
       draggingType: null,
+      canvasStyle: canvasStyle || { backgroundColor: '#f3f4f6' },
     });
   },
 
@@ -1096,6 +1109,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
 
+  updateCanvasStyle: (patch) =>
+    set((state) => ({
+      canvasStyle: { ...state.canvasStyle, ...patch },
+      isDirty: true,
+    })),
+
   upsertQuery: (query) =>
     set((state) => {
       const existingIdx = state.queriesConfig.findIndex((q) => q.name === query.name);
@@ -1128,113 +1147,77 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
 
   applyThemeToAll: (paletteName) => {
-    const THEME_PALETTES: Record<'Cobalt' | 'Forest' | 'Graphite' | 'Amber' | 'Obsidian', Record<string, string>> = {
-      Cobalt: {
-        surface: '#f0f4f8',
-        panel: '#ffffff',
-        border: '#cbd5e1',
-        text: '#0f172a',
-        primary: '#2563eb',
-        card_tint: '#eff6ff',
-        chart_tint: '#dbeafe',
-        table_tint: '#f8fafc',
-        input_tint: '#ffffff',
-        success: '#16a34a',
-        warning: '#d97706',
-        error: '#dc2626',
-      },
-      Forest: {
-        surface: '#f0faf4',
-        panel: '#ffffff',
-        border: '#bbf7d0',
-        text: '#052e16',
-        primary: '#16a34a',
-        card_tint: '#f0fdf4',
-        chart_tint: '#dcfce7',
-        table_tint: '#f7fdf9',
-        input_tint: '#ffffff',
-        success: '#15803d',
-        warning: '#ca8a04',
-        error: '#b91c1c',
-      },
-      Graphite: {
-        surface: '#080e1a',
-        panel: '#0d1424',
-        border: '#1e2d42',
-        text: '#e2e8f0',
-        primary: '#22d3ee',
-        card_tint: '#0d1a2d',
-        chart_tint: '#0a1628',
-        table_tint: '#0a1220',
-        input_tint: '#0d1424',
-        success: '#34d399',
-        warning: '#fbbf24',
-        error: '#f87171',
-      },
-      Amber: {
-        surface: '#fefce8',
-        panel: '#fffef5',
-        border: '#fde68a',
-        text: '#292524',
-        primary: '#b45309',
-        card_tint: '#fefce8',
-        chart_tint: '#fef3c7',
-        table_tint: '#fffef5',
-        input_tint: '#fffef5',
-        success: '#15803d',
-        warning: '#b45309',
-        error: '#b91c1c',
-      },
-      Obsidian: {
-        surface: '#09090b',
-        panel: '#0f0f12',
-        border: '#27272a',
-        text: '#fafafa',
-        primary: '#6366f1',
-        card_tint: '#0f0f14',
-        chart_tint: '#0c0c14',
-        table_tint: '#09090b',
-        input_tint: '#0f0f12',
-        success: '#22c55e',
-        warning: '#f59e0b',
-        error: '#ef4444',
-      },
-    };
-
-    const palette = THEME_PALETTES[paletteName];
+    const palette = resolveTheme(paletteName);
     if (!palette) return;
 
     set((state) => {
+      const canvasStyle = { ...state.canvasStyle, backgroundColor: palette.surface };
       const components = state.components.map((comp) => {
         const style = { ...comp.style };
         const ctype = comp.type;
+
+        const isDark = palette.surface.startsWith('#0') || palette.surface.startsWith('#1');
 
         // Base
         style.backgroundColor = palette.panel;
         style.borderColor = palette.border;
         style.textColor = palette.text;
 
-        // Component-specific
-        if (ctype === 'StatCard' || ctype === 'StatusBadge') {
+        // Component-specific tints and semantic colors
+        if (ctype === 'StatCard') {
           style.backgroundColor = palette.card_tint;
+          style.trendColorOverride = palette.success;
+          style.textColor = palette.text;
+        } else if (ctype === 'StatusBadge') {
+          style.backgroundColor = palette.card_tint;
+          style.textColor = palette.primary;
+          comp.data.mapping = {
+            ...comp.data.mapping,
+            Active: palette.success,
+            Pending: palette.warning,
+            Error: palette.error,
+          };
         } else if (ctype === 'BarChart' || ctype === 'LineChart') {
           style.backgroundColor = palette.chart_tint;
+          style.xAxisColor = isDark ? '#94a3b8' : '#4b5563';
+          style.yAxisColor = style.xAxisColor;
+          style.gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
+          style.axisColor = style.xAxisColor;
+          style.textColor = palette.text;
         } else if (ctype === 'Table') {
           style.backgroundColor = palette.table_tint;
+          style.headerBackgroundColor = palette.surface;
+          style.textColor = palette.text;
+          style.rowAlternateColor = isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc';
+          style.borderColor = palette.border;
+          style.searchBarBackground = palette.surface;
+          style.searchBarTextColor = palette.text;
         } else if (ctype === 'Container' || ctype === 'TabbedContainer') {
           style.backgroundColor = palette.surface;
+          style.textColor = palette.text;
+          if (ctype === 'TabbedContainer') {
+            style.tabHeaderBackground = palette.panel;
+            style.tabHeaderTextColor = isDark ? '#94a3b8' : '#64748b';
+            style.tabHeaderActiveTextColor = palette.primary;
+            style.tabHeaderActiveBackground = palette.panel;
+          }
         } else if (ctype === 'TextInput' || ctype === 'NumberInput' || ctype === 'Select') {
           style.backgroundColor = palette.input_tint;
+          style.textColor = palette.text;
+          style.borderColor = palette.border;
         } else if (ctype === 'Button') {
           style.backgroundColor = palette.primary;
+          style.textColor = palette.primary_text;
+          style.borderColor = palette.primary;
         } else if (ctype === 'Text') {
           style.backgroundColor = 'transparent';
+          style.textColor = palette.text;
         }
 
         return { ...comp, style };
       });
 
-      return { components, isDirty: true };
+      return { components, canvasStyle, isDirty: true };
     });
   },
   
@@ -1258,6 +1241,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dirtyDataMap: {},
       queryResults: {},
       componentState: {},
+      canvasStyle: config.canvasStyle || { backgroundColor: '#f3f4f6' },
     });
   },
 }));

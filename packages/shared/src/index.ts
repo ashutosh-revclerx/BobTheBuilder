@@ -28,7 +28,10 @@ export const QueryConfigSchema = z.object({
   method: z.enum(['GET', 'POST', 'PUT', 'DELETE']).optional().default('POST'),
   trigger: z.enum(['onLoad', 'manual', 'onDependencyChange']).default('onLoad'),
   params: z.record(z.string(), z.any()).optional(),
-  dependsOn: z.array(z.string()).optional()
+  body: z.any().optional(),
+  dependsOn: z.array(z.string()).optional(),
+  responseTransformer: z.string().optional(),
+  pollUrlTemplate: z.string().optional()
 });
 
 export const ResourceConfigSchema = z.object({

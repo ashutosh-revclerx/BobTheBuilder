@@ -2,6 +2,27 @@ import { useEditorStore } from '../../store/editorStore';
 import type { ComponentStyle } from '../../types/template';
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Poppins', 'DM Sans', 'Fira Code', 'system-ui'];
+const TABLE_VARIANT_DEFAULTS: Record<string, Partial<ComponentStyle>> = {
+  Clean: {
+    borderWidth: 0,
+    headerBackgroundColor: '#ffffff',
+    rowAlternateColor: 'transparent',
+    stripeRows: false,
+  },
+  Zebra: {
+    borderWidth: 1,
+    headerBackgroundColor: '#eef2f7',
+    rowAlternateColor: '#f1f5f9',
+    stripeRows: true,
+  },
+  Bordered: {
+    borderWidth: 1,
+    borderColor: '#d7dde8',
+    headerBackgroundColor: '#f8fafc',
+    rowAlternateColor: 'transparent',
+    stripeRows: false,
+  },
+};
 
 function FormField({
   label,
@@ -140,7 +161,7 @@ export default function StyleTab() {
   return (
     <div>
       <ColorField label="Background Color" value={style.backgroundColor || '#ffffff'} onChange={(value) => handleChange('backgroundColor', value)} />
-      <ColorField label="Text Color" value={style.textColor || '#0f1117'} onChange={(value) => handleChange('textColor', value)} />
+      <ColorField label="Text Color" value={style.textColor || '#111827'} onChange={(value) => handleChange('textColor', value)} />
 
       <SelectField
         label="Font Family"
@@ -187,6 +208,15 @@ export default function StyleTab() {
 
       {component.type === 'Table' && (
         <>
+          <SelectField
+            label="Table Variant"
+            value={style.variant || 'Bordered'}
+            onChange={(value) => {
+              const defaults = TABLE_VARIANT_DEFAULTS[value] || {};
+              updateStyle(lastSelectedComponentId!, { variant: value as any, ...defaults });
+            }}
+            options={['Clean', 'Zebra', 'Bordered']}
+          />
           <ColorField
             label="Header Background Color"
             value={style.headerBackgroundColor || '#f2f4f7'}
@@ -204,7 +234,7 @@ export default function StyleTab() {
           />
           <ColorField
             label="Search Bar Text Color"
-            value={style.searchBarTextColor || '#0f1117'}
+            value={style.searchBarTextColor || '#111827'}
             onChange={(value) => handleChange('searchBarTextColor', value)}
           />
           <BooleanField label="Strikethrough" value={style.strikethrough === true} onChange={(value) => handleChange('strikethrough', value)} />
@@ -243,8 +273,8 @@ export default function StyleTab() {
               // The variant property acts as a preset that updates individual style fields in the store.
               const BUTTON_VARIANT_DEFAULTS: Record<string, any> = {
                 Primary: { backgroundColor: '#2563eb', textColor: '#ffffff', borderColor: '#2563eb', hoverBackgroundColor: '#1d4ed8' },
-                Secondary: { backgroundColor: '#f2f4f7', textColor: '#0f1117', borderColor: '#e3e6ec', hoverBackgroundColor: '#e5e7eb' },
-                Danger: { backgroundColor: '#dc2626', textColor: '#ffffff', borderColor: '#dc2626', hoverBackgroundColor: '#b91c1c' },
+                Secondary: { backgroundColor: '#f2f4f7', textColor: '#111827', borderColor: '#e3e6ec', hoverBackgroundColor: '#e5e7eb' },
+                Danger: { backgroundColor: '#b91c1c', textColor: '#ffffff', borderColor: '#b91c1c', hoverBackgroundColor: '#991b1b' },
                 Ghost: { backgroundColor: 'transparent', textColor: '#2563eb', borderColor: '#e3e6ec', hoverBackgroundColor: 'rgba(37, 99, 235, 0.05)' },
               };
               const defaults = BUTTON_VARIANT_DEFAULTS[v] || {};
@@ -326,8 +356,8 @@ export default function StyleTab() {
           <div className="theme-divider" style={{ margin: '12px 0' }} />
           <p className="section-subtitle">Navbar Styling</p>
           <ColorField label="Header Background" value={style.tabHeaderBackground || 'transparent'} onChange={(v) => handleChange('tabHeaderBackground', v)} />
-          <ColorField label="Text Color" value={style.tabHeaderTextColor || '#64748b'} onChange={(v) => handleChange('tabHeaderTextColor', v)} />
-          <ColorField label="Active Text Color" value={style.tabHeaderActiveTextColor || '#2563eb'} onChange={(v) => handleChange('tabHeaderActiveTextColor', v)} />
+          <ColorField label="Text Color" value={style.tabHeaderTextColor || '#4b5563'} onChange={(v) => handleChange('tabHeaderTextColor', v)} />
+          <ColorField label="Active Text Color" value={style.tabHeaderActiveTextColor || '#1d4ed8'} onChange={(v) => handleChange('tabHeaderActiveTextColor', v)} />
         </>
       )}
 
@@ -349,7 +379,7 @@ export default function StyleTab() {
           />
           <ColorField
             label="Trend Color Override"
-            value={style.trendColorOverride || '#059669'}
+            value={style.trendColorOverride || '#047857'}
             onChange={(value) => handleChange('trendColorOverride', value)}
           />
         </>
@@ -381,8 +411,8 @@ export default function StyleTab() {
         <>
           <SliderField label="Bar Radius" value={style.barRadius || 4} min={0} max={8} onChange={(value) => handleChange('barRadius', value)} />
           <BooleanField label="Show Data Labels" value={style.showDataLabels === true} onChange={(value) => handleChange('showDataLabels', value)} />
-          <ColorField label="X-Axis Color" value={style.xAxisColor || '#94a3b8'} onChange={(v) => handleChange('xAxisColor', v)} />
-          <ColorField label="Y-Axis Color" value={style.yAxisColor || '#94a3b8'} onChange={(v) => handleChange('yAxisColor', v)} />
+          <ColorField label="X-Axis Color" value={style.xAxisColor || '#64748b'} onChange={(v) => handleChange('xAxisColor', v)} />
+          <ColorField label="Y-Axis Color" value={style.yAxisColor || '#64748b'} onChange={(v) => handleChange('yAxisColor', v)} />
         </>
       )}
 
@@ -390,8 +420,8 @@ export default function StyleTab() {
         <>
           <SliderField label="Line Width" value={style.lineWidth || 2} min={1} max={6} onChange={(value) => handleChange('lineWidth', value)} />
           <BooleanField label="Show Data Labels" value={style.showDataLabels === true} onChange={(value) => handleChange('showDataLabels', value)} />
-          <ColorField label="X-Axis Color" value={style.xAxisColor || '#94a3b8'} onChange={(v) => handleChange('xAxisColor', v)} />
-          <ColorField label="Y-Axis Color" value={style.yAxisColor || '#94a3b8'} onChange={(v) => handleChange('yAxisColor', v)} />
+          <ColorField label="X-Axis Color" value={style.xAxisColor || '#64748b'} onChange={(v) => handleChange('xAxisColor', v)} />
+          <ColorField label="Y-Axis Color" value={style.yAxisColor || '#64748b'} onChange={(v) => handleChange('yAxisColor', v)} />
         </>
       )}
 

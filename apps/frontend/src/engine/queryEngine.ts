@@ -72,9 +72,21 @@ export async function executeQuery(query: QueryConfig, params: Record<string, un
   store.setQueryState(query.name, { status: 'loading', error: null });
 
   try {
-    const queryWithBody = query as typeof query & { body?: Record<string, unknown> };
-    const resolvedBody = queryWithBody.body
-      ? (resolveJsonTemplate(queryWithBody.body) as Record<string, unknown>)
+    let parsedBody: Record<string, unknown> | undefined;
+    const rawBody = (query as any).body;
+    
+    if (typeof rawBody === 'string' && rawBody.trim()) {
+      try {
+        parsedBody = JSON.parse(rawBody);
+      } catch (e) {
+        console.warn(`Failed to parse body for query ${query.name}:`, e);
+      }
+    } else if (rawBody && typeof rawBody === 'object') {
+      parsedBody = rawBody;
+    }
+
+    const resolvedBody = parsedBody
+      ? (resolveJsonTemplate(parsedBody) as Record<string, unknown>)
       : undefined;
 
     const response = await fetch(BACKEND_URL, {
@@ -88,6 +100,7 @@ export async function executeQuery(query: QueryConfig, params: Record<string, un
           ...resolveParams(query.params),
           ...params,
         },
+        pollUrlTemplate: query.pollUrlTemplate,
         ...(resolvedBody ? { body: resolvedBody } : {}),
       }),
     });
@@ -98,14 +111,24 @@ export async function executeQuery(query: QueryConfig, params: Record<string, un
       throw new Error(json.error || response.statusText || 'Query failed');
     }
 
+    let finalData = json.data;
+    if (query.responseTransformer && query.responseTransformer.trim()) {
+      try {
+        const transformer = new Function('data', query.responseTransformer);
+        finalData = transformer(finalData);
+      } catch (err) {
+        throw new Error(`Transformer error: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
     store.setQueryState(query.name, {
-      data: json.data,
+      data: finalData,
       status: 'success',
       error: null,
       lastUpdated: Date.now(),
     });
 
-    return json.data;
+    return finalData;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Something went wrong';
     store.setQueryState(query.name, {
