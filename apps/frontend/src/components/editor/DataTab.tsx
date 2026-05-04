@@ -72,10 +72,12 @@ function QueryBindingSection({
     // Auto-bind the component so it reads from the query result. For Buttons
     // we use the trigger path so onClick fires the query.
     const bindingPath = trigger === 'manual'
-      ? `queries.${queryName}.trigger`
-      : `queries.${queryName}.data`;
+      ? `{{queries.${queryName}.trigger}}`
+      : `{{queries.${queryName}.data}}`;
     updateData(componentId, { dbBinding: bindingPath } as Partial<ComponentData>);
   };
+
+  const selectedResource = resources.find((r) => r.id === binding.resourceId);
 
   return (
     <div className="form-group query-binding-section">
@@ -96,12 +98,25 @@ function QueryBindingSection({
         ))}
       </select>
 
-      <EndpointPicker
-        resourceId={binding.resourceId ?? null}
-        selectedMethod={binding.method ?? 'GET'}
-        selectedPath={binding.path ?? ''}
-        onChange={(next) => syncQuery({ ...binding, ...next, queryName })}
-      />
+      {selectedResource?.type === 'postgresql' ? (
+        <div className="form-group" style={{ marginTop: '8px' }}>
+          <label className="form-label" style={{ fontSize: '10px', opacity: 0.7 }}>SQL Query</label>
+          <textarea
+            className="form-textarea"
+            style={{ fontFamily: 'monospace', minHeight: '80px' }}
+            placeholder="SELECT * FROM users WHERE id = {{components.input1.value}}"
+            value={binding.path ?? ''}
+            onChange={(e) => syncQuery({ ...binding, method: 'POST', path: e.target.value, queryName })}
+          />
+        </div>
+      ) : (
+        <EndpointPicker
+          resourceId={binding.resourceId ?? null}
+          selectedMethod={binding.method ?? 'GET'}
+          selectedPath={binding.path ?? ''}
+          onChange={(next) => syncQuery({ ...binding, ...next, queryName })}
+        />
+      )}
 
       {binding.path && (
         <select
