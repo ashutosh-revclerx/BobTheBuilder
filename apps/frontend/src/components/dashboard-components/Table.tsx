@@ -244,7 +244,7 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
           <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <thead>
               <tr style={{ borderBottom: style.variant === 'Clean' ? 'none' : '1px solid var(--border)' }}>
-                {visibleColumns.map((column, idx) => (
+                {visibleColumns.map((column) => (
                   <th 
                     key={column.fieldKey} 
                     style={{ 
