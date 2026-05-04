@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { type ThemeName, resolveTheme } from '../config/themes';
 import type {
+  CanvasStyle,
   ComponentConfig,
   ComponentData,
   ComponentStyle,
@@ -545,10 +546,8 @@ interface EditorState {
   isDirty: boolean;
   status: 'draft' | 'live';
   publishedAt: string | null;
-  canvasStyle: {
-    backgroundColor: string;
-  };
-  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null, canvasStyle?: { backgroundColor: string }) => void;
+  canvasStyle: CanvasStyle;
+  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null, canvasStyle?: CanvasStyle) => void;
   loadSavedTemplate: (saved: SavedTemplate) => void;
   selectComponent: (id: string | null) => void;
   clearCanvasSelection: () => void;
@@ -572,7 +571,8 @@ interface EditorState {
   removeComponent: (id: string) => void;
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => void;
-  resetToTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], canvasStyle?: { backgroundColor: string }) => void;
+  resetToTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], canvasStyle?: CanvasStyle) => void;
+  updateCanvasStyle: (patch: Partial<CanvasStyle>) => void;
   resetToDefault: () => void;
   getResolvedComponent: (id: string) => ComponentConfig | undefined;
   renameSavedTemplate: (templateId: string, name: string) => void;
@@ -1107,6 +1107,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPreviewDevice: (device) => set({ previewDevice: device }),
 
   setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
+
+  updateCanvasStyle: (patch) =>
+    set((state) => ({
+      canvasStyle: { ...state.canvasStyle, ...patch },
+      isDirty: true,
+    })),
 
   upsertQuery: (query) =>
     set((state) => {

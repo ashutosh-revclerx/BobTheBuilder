@@ -246,6 +246,15 @@ export interface ComponentConfig {
   };
 }
 
+export interface CanvasStyle {
+  backgroundColor: string;
+  backgroundGradient?: {
+    enabled: boolean;
+    direction: number;
+    stops: Array<{ color: string; position: number }>;
+  };
+}
+
 export interface TemplateConfig {
   id: string;
   name: string;
@@ -253,7 +262,7 @@ export interface TemplateConfig {
   thumbnail?: string;
   components: ComponentConfig[];
   queries?: any[];
-  canvasStyle?: { backgroundColor: string };
+  canvasStyle?: CanvasStyle;
 }
 
 export interface SavedTemplate {
@@ -263,5 +272,5 @@ export interface SavedTemplate {
   queries?: any[];
   savedAt: string;
   originalTemplateId: string;
-  canvasStyle?: { backgroundColor: string };
+  canvasStyle?: CanvasStyle;
 }

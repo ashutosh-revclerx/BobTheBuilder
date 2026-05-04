@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useEditorStore } from '../store/editorStore';
 import { executeOnLoadQueries, watchDependencies, resetReactiveState } from '../engine/queryEngine';
 import { GridLayer } from '../components/editor/GridLayer';
+import { resolveBackground } from '../utils/styleUtils';
 
 import StatCard from '../components/dashboard-components/StatCard';
 import Table from '../components/dashboard-components/Table';
@@ -183,7 +184,7 @@ export default function CustomerView() {
           <img src={logo} alt={`${customer.name} logo`} className="customer-view-logo" />
         </div>
       )}
-      <div className="customer-view-canvas builder-canvas-wrapper" style={{ backgroundColor: canvasStyle.backgroundColor }}>
+      <div className="customer-view-canvas builder-canvas-wrapper" style={{ background: resolveBackground(canvasStyle as any) }}>
         <div className="builder-canvas">
           <GridLayer parentId="root" componentMap={ComponentMap} readOnly />
         </div>
