@@ -17,6 +17,7 @@ const ExecuteSchema = z.object({
   params:      z.record(z.string(), z.unknown()).optional(),
   body:        z.record(z.string(), z.unknown()).optional(),
   dashboardId: z.string().uuid().optional(), // forwarded to query_logs
+  pollUrlTemplate: z.string().optional(),
 });
 
 // ─── Secret resolver ─────────────────────────────────────────────────────────
@@ -71,7 +72,7 @@ router.post('/', async (req, res) => {
     });
   }
 
-  const { resource: resourceName, endpoint, method, params, body, dashboardId } = parsed.data;
+  const { resource: resourceName, endpoint, method, params, body, dashboardId, pollUrlTemplate } = parsed.data;
   const startMs = Date.now();
 
   // 2. Look up the resource — this is the one place secret_ref is read from DB
@@ -132,6 +133,7 @@ router.post('/', async (req, res) => {
           endpoint,
           params,
           body,
+          pollUrlTemplate,
         });
         break;
       }

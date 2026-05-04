@@ -24,6 +24,9 @@ interface QueryBinding {
   parameters?:   unknown[];
   trigger?:      'onLoad' | 'manual' | 'onDependencyChange';
   queryName?:    string;
+  responseTransformer?: string;
+  pollUrlTemplate?: string;
+  body?:         string;
 }
 
 function QueryBindingSection({
@@ -67,6 +70,9 @@ function QueryBindingSection({
       endpoint: next.path,
       method:   next.method ?? 'GET',
       trigger,
+      responseTransformer: next.responseTransformer,
+      pollUrlTemplate: next.pollUrlTemplate,
+      body: next.body,
     });
 
     // Auto-bind the component so it reads from the query result. For Buttons
@@ -128,6 +134,46 @@ function QueryBindingSection({
           <option value="manual">Trigger: manual (e.g. button click)</option>
           <option value="onDependencyChange">Trigger: on dependency change</option>
         </select>
+      )}
+
+      {binding.path && (
+        <div className="form-group" style={{ marginTop: '8px' }}>
+          <label className="form-label" style={{ fontSize: '10px', opacity: 0.7 }}>Response Transformer (JS)</label>
+          <textarea
+            className="form-textarea"
+            style={{ fontFamily: 'monospace', minHeight: '60px' }}
+            placeholder="return data;"
+            value={binding.responseTransformer ?? ''}
+            onChange={(e) => syncQuery({ ...binding, responseTransformer: e.target.value })}
+          />
+        </div>
+      )}
+
+      {binding.path && binding.method && binding.method !== 'GET' && (
+        <div className="form-group" style={{ marginTop: '8px' }}>
+          <label className="form-label" style={{ fontSize: '10px', opacity: 0.7 }}>Request Payload (JSON)</label>
+          <textarea
+            className="form-textarea"
+            style={{ fontFamily: 'monospace', minHeight: '80px' }}
+            placeholder={'{\n  "url": "{{components.input_url.value}}"\n}'}
+            value={binding.body ?? ''}
+            onChange={(e) => syncQuery({ ...binding, body: e.target.value })}
+          />
+        </div>
+      )}
+
+      {binding.path && selectedResource?.type === 'agent' && (
+        <div className="form-group" style={{ marginTop: '8px' }}>
+          <label className="form-label" style={{ fontSize: '10px', opacity: 0.7 }}>Custom Poll URL Template (Optional)</label>
+          <input
+            type="text"
+            className="form-input"
+            style={{ fontFamily: 'monospace' }}
+            placeholder="/api/v1/jobs/{{jobId}}/status"
+            value={binding.pollUrlTemplate ?? ''}
+            onChange={(e) => syncQuery({ ...binding, pollUrlTemplate: e.target.value })}
+          />
+        </div>
       )}
 
       {binding.path && (

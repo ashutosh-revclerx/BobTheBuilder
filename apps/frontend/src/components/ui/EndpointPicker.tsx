@@ -33,6 +33,7 @@ export default function EndpointPicker({
   const [endpoints, setEndpoints] = useState<ImportedEndpoint[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [isOpen, setIsOpen] = useState(!selectedPath);
 
   useEffect(() => {
     if (!resourceId) {
@@ -93,15 +94,54 @@ export default function EndpointPicker({
     );
   }
 
+  if (selectedPath && !isOpen) {
+    return (
+      <div 
+        className="endpoint-picker-collapsed" 
+        style={{ 
+          border: '1px solid var(--border)', 
+          borderRadius: 'var(--radius-md)', 
+          padding: '8px 12px', 
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          background: 'var(--bg-card)',
+          transition: 'border-color 0.15s ease'
+        }}
+        onClick={() => setIsOpen(true)}
+      >
+        <MethodBadge method={selectedMethod} />
+        <span style={{ fontSize: '12px', fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
+          {selectedPath}
+        </span>
+        <span style={{ fontSize: '11px', color: 'var(--blue-600)', fontWeight: 500 }}>✎ Change</span>
+      </div>
+    );
+  }
+
   return (
     <div className="endpoint-picker">
-      <input
-        type="text"
-        className="form-input endpoint-picker-search"
-        placeholder={`Search ${endpoints!.length} endpoints…`}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+        <input
+          type="text"
+          className="form-input endpoint-picker-search"
+          style={{ flex: 1 }}
+          placeholder={`Search ${endpoints!.length} endpoints…`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {selectedPath && (
+          <button 
+            type="button" 
+            className="btn-secondary" 
+            style={{ padding: '0 12px', height: '32px', fontSize: '11px' }} 
+            onClick={() => setIsOpen(false)}
+          >
+            Cancel
+          </button>
+        )}
+      </div>
       <div className="endpoint-picker-list">
         {filtered.length === 0 ? (
           <div className="endpoint-picker-empty">No endpoints match your search</div>
@@ -113,7 +153,10 @@ export default function EndpointPicker({
                 key={ep.id}
                 type="button"
                 className={`endpoint-picker-item${isSelected ? ' selected' : ''}`}
-                onClick={() => onChange({ method: ep.method, path: ep.path, parameters: ep.parameters })}
+                onClick={() => {
+                  onChange({ method: ep.method, path: ep.path, parameters: ep.parameters });
+                  setIsOpen(false);
+                }}
               >
                 <MethodBadge method={ep.method} />
                 <span className="endpoint-picker-path">{ep.path}</span>
