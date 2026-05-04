@@ -410,7 +410,7 @@ export default function DataTab() {
 
       {type === 'StatCard' && (
         <>
-          <TextField label="Trend Value" value={data.trend ?? ''} onChange={(value) => handleDataField('trend', value)} />
+          <TextField label="Trend Value" value={data.trend ?? ''} onChange={(value) => handleDataField('trend', value)} placeholder="{{queries.q.data.trend}}" />
           <SelectField
             label="Trend Type"
             value={data.trendType || 'positive'}
@@ -427,15 +427,20 @@ export default function DataTab() {
           <FormField label="Sparkline data">
             <textarea
               className="form-textarea"
-              value={JSON.stringify(data.sparklineData ?? [], null, 2)}
+              value={typeof data.sparklineData === 'string' ? data.sparklineData : JSON.stringify(data.sparklineData ?? [], null, 2)}
               onChange={(e) => {
-                try {
-                  handleDataField('sparklineData', JSON.parse(e.target.value));
-                } catch {
-                  // Ignore invalid JSON while typing.
+                const val = e.target.value;
+                if (val.startsWith('{{')) {
+                  handleDataField('sparklineData', val);
+                } else {
+                  try {
+                    handleDataField('sparklineData', JSON.parse(val));
+                  } catch {
+                    // Ignore invalid JSON while typing.
+                  }
                 }
               }}
-              placeholder="[10,20,15,30,25]"
+              placeholder="[10,20,15,30,25] or {{query.data}}"
               rows={4}
             />
           </FormField>
@@ -776,7 +781,12 @@ export default function DataTab() {
             </div>
           </FormField>
           <TextField label="Default color" value={data.defaultColor ?? '#9ba3af'} onChange={(value) => handleDataField('defaultColor', value)} />
-          <BooleanField label="Show dot" value={data.showDot !== false} onChange={(value) => handleDataField('showDot', value)} />
+          <SelectField
+            label="Symbol"
+            value={data.symbol || 'Dot'}
+            onChange={(value) => handleDataField('symbol', value)}
+            options={['Dot', 'Check', 'Warning', 'None']}
+          />
           <SelectField
             label="Size"
             value={data.size || 'Medium'}
@@ -872,7 +882,10 @@ export default function DataTab() {
       {type === 'Text' && (
         <>
           <BooleanField label="Dynamic expression" value={data.expression === true} onChange={(value) => handleDataField('expression', value)} />
-          <TextField label="Link URL" value={data.linkTo ?? ''} onChange={(value) => handleDataField('linkTo', value)} />
+          <BooleanField label="Enable Link" value={data.enableLink === true} onChange={(value) => handleDataField('enableLink', value)} />
+          {data.enableLink && (
+            <TextField label="Link URL" value={data.linkTo ?? ''} onChange={(value) => handleDataField('linkTo', value)} />
+          )}
         </>
       )}
 

@@ -48,6 +48,7 @@ const Text = React.memo(function Text({ config }: { config: ComponentConfig }) {
         display: 'flex',
         flexDirection: 'column',
         textAlign: style.textAlign?.toLowerCase() as any,
+        textTransform: style.textTransform ?? 'none',
         lineHeight: style.lineHeight,
         overflow: style.overflow === 'Scroll' ? 'auto' : 'hidden',
         textOverflow: style.overflow === 'Truncate' ? 'ellipsis' : undefined,

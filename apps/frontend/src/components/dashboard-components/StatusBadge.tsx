@@ -80,7 +80,13 @@ const StatusBadge = React.memo(function StatusBadge({ config }: StatusBadgeProps
           padding: size === 'Small' ? '4px 10px' : size === 'Large' ? '8px 16px' : '6px 14px',
         }}
       >
-        {data.showDot !== false ? <span className="status-dot" style={{ backgroundColor: badgeColor }} /> : null}
+        {data.symbol === 'Check' ? (
+          <span className="status-symbol" style={{ marginRight: '6px' }}>✓</span>
+        ) : data.symbol === 'Warning' ? (
+          <span className="status-symbol" style={{ marginRight: '6px' }}>⚠</span>
+        ) : data.symbol === 'None' ? null : (
+          <span className="status-dot" style={{ backgroundColor: badgeColor }} />
+        )}
         {statusStr}
       </span>
       <div className="status-badge-label" style={{ color: `var(--comp-text)88`, flexShrink: 0 }}>

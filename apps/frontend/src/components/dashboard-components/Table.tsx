@@ -178,9 +178,9 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
     }
 
     if (rowIndex % 2 === 1) {
-      if (style.stripeRows && style.rowAlternateColor) return style.rowAlternateColor;
-      if (style.stripeRows) return '#f8fafc';
-      if (style.rowAlternateColor && style.rowAlternateColor !== 'transparent') return style.rowAlternateColor;
+      if (style.variant === 'Zebra' || style.stripeRows) {
+        return style.rowAlternateColor || '#f8fafc';
+      }
     }
 
     return 'transparent';
@@ -203,8 +203,8 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
         background: 'var(--comp-bg)',
         fontFamily: style.fontFamily,
         fontSize: style.fontSize ? `${style.fontSize}px` : undefined,
-        borderColor: 'var(--comp-border)',
-        borderWidth: style.borderWidth ? `${style.borderWidth}px` : undefined,
+        borderColor: style.variant === 'Clean' ? 'transparent' : 'var(--comp-border)',
+        borderWidth: style.variant === 'Clean' ? 0 : (style.borderWidth ? `${style.borderWidth}px` : '1px'),
         borderStyle: 'solid',
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         height: '100%',
@@ -214,8 +214,8 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
         padding: 0,
       }}
     >
-      <div className="table-component-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div className="table-component-title" style={{ color: 'var(--comp-text)' }}>{label}</div>
+      <div className="table-component-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px' }}>
+        <div className="table-component-title" style={{ color: 'var(--comp-text)', fontWeight: 600, whiteSpace: 'normal', wordBreak: 'break-word' }}>{label}</div>
         {data.searchable ? (
           <input 
             className="form-input table-search-input" 
@@ -243,9 +243,17 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
         ) : (
           <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <thead>
-              <tr>
-                {visibleColumns.map((column) => (
-                  <th key={column.fieldKey} style={{ textAlign: 'left', backgroundColor: style.headerBackgroundColor }}>
+              <tr style={{ borderBottom: style.variant === 'Clean' ? 'none' : '1px solid var(--border)' }}>
+                {visibleColumns.map((column, idx) => (
+                  <th 
+                    key={column.fieldKey} 
+                    style={{ 
+                      textAlign: 'left', 
+                      backgroundColor: style.headerBackgroundColor,
+                      borderRight: style.variant === 'Bordered' ? '1px solid var(--border)' : 'none',
+                      padding: '12px 16px',
+                    }}
+                  >
                     {column.name}
                   </th>
                 ))}
@@ -264,7 +272,7 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
                   key={String(rowKey)}
                   onClick={() => handleRowClick(row)}
                   style={{
-                    borderBottom: '1px solid var(--border)',
+                    borderBottom: style.variant === 'Clean' ? 'none' : '1px solid var(--border)',
                     cursor: 'pointer',
                     backgroundColor: resolveRowBackground(row, actualIndex),
                   }}

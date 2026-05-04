@@ -552,6 +552,26 @@ export default function ThemeTab() {
               </>
             )}
 
+            {/* ── Table ── */}
+            {ctype === 'Table' && (
+              <>
+                <OptionGroup
+                  label="Table Variant"
+                  options={['Clean', 'Zebra', 'Bordered']}
+                  value={style.variant || 'Bordered'}
+                  onChange={(v) => set('variant', v)}
+                />
+                <div className="theme-divider" />
+                <LocalColorField
+                  label="Header Background"
+                  componentId={lastSelectedComponentId}
+                  value={style.headerBackgroundColor ?? '#f8fafc'}
+                  onChange={(v) => setDebounced('headerBackgroundColor', v)}
+                />
+                <div className="theme-divider" />
+              </>
+            )}
+
             {/* ── Charts ── */}
             {(ctype === 'BarChart' || ctype === 'LineChart') && (
               <>

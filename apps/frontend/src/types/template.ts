@@ -16,7 +16,7 @@ export interface ComponentStyle {
   fontStyle?: 'normal' | 'italic';
   fontWeight?: number;
   textTransform?: 'none' | 'uppercase' | 'capitalize';
-  variant?: 'Primary' | 'Secondary' | 'Danger' | 'Ghost';
+  variant?: 'Primary' | 'Secondary' | 'Danger' | 'Ghost' | 'Clean' | 'Zebra' | 'Bordered';
   iconLeft?: string;
   fullWidth?: boolean;
   textAlign?: 'Left' | 'Center' | 'Right' | 'Justify';
@@ -139,6 +139,7 @@ export interface ComponentData {
   defaultColor?: string;
   showDot?: boolean;
   size?: 'Small' | 'Medium' | 'Large';
+  symbol?: 'Dot' | 'Check' | 'Warning' | 'None';
 
   levelFilter?: 'all' | 'info' | 'warn' | 'error';
   logSearchable?: boolean;
@@ -201,6 +202,7 @@ export interface ComponentData {
   onErrorAction?: string;
   expression?: boolean;
   linkTo?: string;
+  enableLink?: boolean;
   // Image component
   src?:           string;
   uploadedSrc?:   string;  // base64 data URL when user uploads from disk
