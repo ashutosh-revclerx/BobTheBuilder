@@ -22,12 +22,16 @@ function TruncatedCell({
   isEditorMode,
   onEdit,
   textDecoration,
+  borderRight,
+  borderBottom,
 }: {
   text: string;
   colWidth: number;
   isEditorMode?: boolean;
   onEdit?: (val: string) => void;
   textDecoration?: string;
+  borderRight?: string;
+  borderBottom?: string;
 }) {
   const [hover, setHover] = useState(false);
   const str = String(text ?? '');
@@ -38,19 +42,23 @@ function TruncatedCell({
 
   if (isEditorMode) {
     return (
-      <td
-        contentEditable={true}
-        suppressContentEditableWarning
-        onBlur={(event) => onEdit?.(event.currentTarget.textContent ?? '')}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            event.currentTarget.blur();
-          }
-        }}
-        style={{ textDecoration }}
-      >
-        {str}
+      <td style={{ padding: '0 8px', borderRight, borderBottom }}>
+        <input
+          className="table-cell-input"
+          value={str}
+          onChange={(e) => onEdit?.(e.target.value)}
+          style={{
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            color: 'inherit',
+            fontSize: 'inherit',
+            fontFamily: 'inherit',
+            textDecoration,
+            padding: '8px 0',
+          }}
+        />
       </td>
     );
   }
@@ -59,7 +67,7 @@ function TruncatedCell({
     <td
       onMouseEnter={() => result.isTruncated && setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ position: 'relative', textDecoration }}
+      style={{ position: 'relative', textDecoration, borderRight, borderBottom }}
     >
       {result.display}
       {hover && result.isTruncated ? <div className="cell-tooltip">{result.full}</div> : null}
@@ -89,6 +97,8 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
   const isEditorMode = !readOnly;
   const componentId = id || config.id;
   const { style, data, label } = config;
+  const tableVariant = style.variant ?? 'Bordered';
+  const tableBorder = tableVariant === 'Clean' ? 'none' : '1px solid var(--border)';
   const isEditable = isEditorMode || data.allowAddRows;
   const updateData = useEditorStore((state) => state.updateData);
   const setComponentState = useEditorStore((state) => state.setComponentState);
@@ -178,7 +188,7 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
     }
 
     if (rowIndex % 2 === 1) {
-      if (style.variant === 'Zebra' || style.stripeRows) {
+      if (tableVariant === 'Zebra' || style.stripeRows) {
         return style.rowAlternateColor || '#f8fafc';
       }
     }
@@ -203,8 +213,8 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
         background: 'var(--comp-bg)',
         fontFamily: style.fontFamily,
         fontSize: style.fontSize ? `${style.fontSize}px` : undefined,
-        borderColor: style.variant === 'Clean' ? 'transparent' : 'var(--comp-border)',
-        borderWidth: style.variant === 'Clean' ? 0 : (style.borderWidth ? `${style.borderWidth}px` : '1px'),
+        borderColor: tableVariant === 'Clean' ? 'transparent' : 'var(--comp-border)',
+        borderWidth: tableVariant === 'Clean' ? 0 : (style.borderWidth ? `${style.borderWidth}px` : '1px'),
         borderStyle: 'solid',
         borderRadius: style.borderRadius ? `${style.borderRadius}px` : undefined,
         height: '100%',
@@ -243,14 +253,15 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
         ) : (
           <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <thead>
-              <tr style={{ borderBottom: style.variant === 'Clean' ? 'none' : '1px solid var(--border)' }}>
+              <tr style={{ borderBottom: tableBorder }}>
                 {visibleColumns.map((column) => (
                   <th 
                     key={column.fieldKey} 
                     style={{ 
                       textAlign: 'left', 
                       backgroundColor: style.headerBackgroundColor,
-                      borderRight: style.variant === 'Bordered' ? '1px solid var(--border)' : 'none',
+                      borderRight: tableVariant === 'Bordered' ? '1px solid var(--border)' : 'none',
+                      borderBottom: tableBorder,
                       padding: '12px 16px',
                     }}
                   >
@@ -272,7 +283,7 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
                   key={String(rowKey)}
                   onClick={() => handleRowClick(row)}
                   style={{
-                    borderBottom: style.variant === 'Clean' ? 'none' : '1px solid var(--border)',
+                    borderBottom: tableBorder,
                     cursor: 'pointer',
                     backgroundColor: resolveRowBackground(row, actualIndex),
                   }}
@@ -285,6 +296,8 @@ const Table = React.memo(function Table({ config, id, onRowClick, selectedRowId,
                       isEditorMode={isEditable}
                       onEdit={(value) => handleCellEdit(actualIndex, column.fieldKey, value)}
                       textDecoration={shouldStrikeThrough(row) ? 'line-through' : undefined}
+                      borderRight={tableVariant === 'Bordered' ? '1px solid var(--border)' : 'none'}
+                      borderBottom={tableBorder}
                     />
                   ))}
                 </tr>

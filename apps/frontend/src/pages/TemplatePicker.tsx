@@ -7,6 +7,9 @@ const API_BASE = 'http://localhost:3001';
 interface DashboardConfig {
   components: Array<Record<string, any>>;
   queries:    Array<Record<string, any>>;
+  canvasStyle?: {
+    backgroundColor?: string;
+  };
 }
 
 interface GeneratedVariant {
@@ -30,7 +33,7 @@ function paletteFromConfig(config: DashboardConfig): {
   const first  = styles.find((s) => s.backgroundColor) ?? {};
   const accent = styles.find((s) => s.borderColor && s.borderColor !== first.borderColor) ?? {};
   return {
-    background: first.backgroundColor ?? '#ffffff',
+    background: config.canvasStyle?.backgroundColor ?? first.backgroundColor ?? '#ffffff',
     border:     first.borderColor ?? '#e5e7eb',
     primary:    accent.borderColor ?? first.borderColor ?? '#6366f1',
     text:       first.textColor ?? '#0f1117',

@@ -18,6 +18,27 @@ const BUTTON_VARIANT_DEFAULTS: Record<string, Partial<ComponentStyle>> = {
   Danger: { backgroundColor: '#dc2626', textColor: '#ffffff', borderColor: '#dc2626', hoverBackgroundColor: '#b91c1c' },
   Ghost: { backgroundColor: 'transparent', textColor: '#2563eb', borderColor: '#e3e6ec', hoverBackgroundColor: '#eff6ff' },
 };
+const TABLE_VARIANT_DEFAULTS: Record<string, Partial<ComponentStyle>> = {
+  Clean: {
+    borderWidth: 0,
+    headerBackgroundColor: '#ffffff',
+    rowAlternateColor: 'transparent',
+    stripeRows: false,
+  },
+  Zebra: {
+    borderWidth: 1,
+    headerBackgroundColor: '#eef2f7',
+    rowAlternateColor: '#f1f5f9',
+    stripeRows: true,
+  },
+  Bordered: {
+    borderWidth: 1,
+    borderColor: '#d7dde8',
+    headerBackgroundColor: '#f8fafc',
+    rowAlternateColor: 'transparent',
+    stripeRows: false,
+  },
+};
 const LINE_HEIGHTS        = [1.2, 1.4, 1.6, 1.8];
 const FONT_WEIGHT_OPTIONS = [
   { label: 'Normal', value: 400 },
@@ -559,7 +580,10 @@ export default function ThemeTab() {
                   label="Table Variant"
                   options={['Clean', 'Zebra', 'Bordered']}
                   value={style.variant || 'Bordered'}
-                  onChange={(v) => set('variant', v)}
+                  onChange={(v) => {
+                    const defaults = TABLE_VARIANT_DEFAULTS[v as string] || {};
+                    updateStyle(lastSelectedComponentId, { variant: v as any, ...defaults });
+                  }}
                 />
                 <div className="theme-divider" />
                 <LocalColorField

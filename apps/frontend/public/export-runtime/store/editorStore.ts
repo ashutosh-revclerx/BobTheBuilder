@@ -22,6 +22,15 @@ type QueryState = {
   lastUpdated: number | null;
 };
 
+type CanvasStyle = {
+  backgroundColor: string;
+  backgroundGradient?: {
+    enabled: boolean;
+    direction: number;
+    stops: Array<{ color: string; position: number }>;
+  };
+};
+
 type EditorState = {
   dashboardName: string;
   components: ComponentConfig[];
@@ -33,8 +42,8 @@ type EditorState = {
   queryResults: Record<string, QueryState>;
   componentState: Record<string, Record<string, unknown>>;
   activeTabs: Record<string, string>;
-  canvasStyle: { backgroundColor: string };
-  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null, canvasStyle?: { backgroundColor: string }) => void;
+  canvasStyle: CanvasStyle;
+  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null, canvasStyle?: CanvasStyle) => void;
   selectComponent: (id: string | null) => void;
   clearCanvasSelection: () => void;
   closeRightPanel: () => void;

@@ -73,6 +73,7 @@ const createDefaultConfig = (
           strikethrough: false,
           strikethroughField: '',
           strikethroughValue: '',
+          variant: 'Bordered',
         },
         data: {
           ...createBaseData(),
