@@ -71,6 +71,7 @@ export default function CustomerView() {
   const location = useLocation();
   const loadTemplate = useEditorStore((s) => s.loadTemplate);
   const queriesConfig = useEditorStore((s) => s.queriesConfig);
+  const canvasStyle = useEditorStore((s) => s.canvasStyle);
 
   const [state, setState] = useState<FetchState>({ status: 'loading' });
 
@@ -115,6 +116,9 @@ export default function CustomerView() {
           payload.dashboard.name,
           payload.dashboard.config?.components ?? [],
           payload.dashboard.config?.queries ?? [],
+          'live',
+          null,
+          payload.dashboard.config?.canvasStyle
         );
         setState({ status: 'ready', data: payload });
       } catch (err) {
@@ -179,7 +183,7 @@ export default function CustomerView() {
           <img src={logo} alt={`${customer.name} logo`} className="customer-view-logo" />
         </div>
       )}
-      <div className="customer-view-canvas builder-canvas-wrapper">
+      <div className="customer-view-canvas builder-canvas-wrapper" style={{ backgroundColor: canvasStyle.backgroundColor }}>
         <div className="builder-canvas">
           <GridLayer parentId="root" componentMap={ComponentMap} readOnly />
         </div>

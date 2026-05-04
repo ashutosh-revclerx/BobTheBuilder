@@ -80,15 +80,18 @@ const TabbedContainer = React.memo(function TabbedContainer({ config, componentM
           borderStyle: 'solid',
         }}
       >
-        {tabs.map((tab) => {
-          const isActive = currentTab === tab;
+        {tabs.map((tab, idx) => {
+          const tabLabel = typeof tab === 'object' && tab !== null ? (tab as any).label || `Tab ${idx + 1}` : String(tab);
+          const tabId = typeof tab === 'object' && tab !== null ? (tab as any).id || tabLabel : tabLabel;
+          const isActive = currentTab === tabId;
+
           return (
             <button
-              key={tab}
+              key={`${tabId}-${idx}`}
               className={`tabbed-header-btn ${isActive ? 'active' : ''}`}
               onClick={(e) => {
                 e.stopPropagation();
-                handleTabChange(tab);
+                handleTabChange(tabId);
               }}
               style={{
                 backgroundColor: isActive 
@@ -101,7 +104,7 @@ const TabbedContainer = React.memo(function TabbedContainer({ config, componentM
                 fontWeight: isActive ? 600 : (style.fontWeight || 400),
               }}
             >
-              {tab}
+              {tabLabel}
             </button>
           );
         })}
@@ -121,7 +124,7 @@ const TabbedContainer = React.memo(function TabbedContainer({ config, componentM
         <div style={{ padding: '0 12px 12px' }}>
           <button className="container-add-trigger" onClick={() => setShowPicker(true)}>
             <span className="container-add-plus">+</span>
-            <span>Add component to {currentTab}</span>
+            <span>Add component to {typeof currentTab === 'object' && currentTab !== null ? (currentTab as any).label || 'this tab' : String(currentTab)}</span>
           </button>
         </div>
       )}

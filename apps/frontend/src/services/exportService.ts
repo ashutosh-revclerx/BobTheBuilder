@@ -117,7 +117,8 @@ export const downloadAsCode = async (dashboardState: any) => {
   const dashboardName = dashboardState.dashboardName || 'Untitled Dashboard';
   const dashboardConfig = {
     name: dashboardName,
-    components: dashboardState.components || []
+    components: dashboardState.components || [],
+    canvasStyle: dashboardState.canvasStyle
   };
   const queriesConfig = dashboardState.queriesConfig || [];
   

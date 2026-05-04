@@ -238,6 +238,7 @@ export default function BuilderPage() {
           config: onlyName ? undefined : {
             components: state.components,
             queries:    state.queriesConfig,
+            canvasStyle: state.canvasStyle,
           },
         }),
       });
@@ -263,6 +264,7 @@ export default function BuilderPage() {
           config: {
             components: state.components,
             queries:    state.queriesConfig,
+            canvasStyle: state.canvasStyle,
           },
         }),
       });

@@ -253,6 +253,7 @@ export interface TemplateConfig {
   thumbnail?: string;
   components: ComponentConfig[];
   queries?: any[];
+  canvasStyle?: { backgroundColor: string };
 }
 
 export interface SavedTemplate {
@@ -262,4 +263,5 @@ export interface SavedTemplate {
   queries?: any[];
   savedAt: string;
   originalTemplateId: string;
+  canvasStyle?: { backgroundColor: string };
 }
