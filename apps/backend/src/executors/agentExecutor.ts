@@ -99,27 +99,27 @@ export async function agentExecutor(input: AgentExecutorInput): Promise<Executor
   }
 
   // ── 2. Poll for completion ──────────────────────────────────────────────────
-  // Prefer poll_url / result_url from the kickoff response. If the agent
-  // service doesn't provide one, fall back to a generic convention.
-  // Currently our only agent (Nexus) uses `/public/result/<id>`.
-  // If you add a second agent with a different convention, make sure its
-  // kickoff response includes a `poll_url` field so this fallback never fires.
   const startedAt = Date.now();
   const pollUrlFromResponse: string | undefined =
     kickoffJson?.poll_url ?? kickoffJson?.pollUrl ?? kickoffJson?.result_url;
-    
+
+  console.log(`[agentExecutor] kickoff response:`, JSON.stringify(kickoffJson));
+
   let pollUrl: string;
   if (pollUrlFromResponse) {
     pollUrl = pollUrlFromResponse.startsWith('http')
       ? pollUrlFromResponse
       : `${base}${pollUrlFromResponse.startsWith('/') ? '' : '/'}${pollUrlFromResponse}`;
+    console.log(`[agentExecutor] poll_url from response → ${pollUrl}`);
   } else if (input.pollUrlTemplate) {
     const resolvedTemplate = input.pollUrlTemplate.replace(/\{\{jobId\}\}/g, jobId);
     pollUrl = resolvedTemplate.startsWith('http')
       ? resolvedTemplate
       : `${base}${resolvedTemplate.startsWith('/') ? '' : '/'}${resolvedTemplate}`;
+    console.log(`[agentExecutor] poll_url from template → ${pollUrl}`);
   } else {
     pollUrl = `${base}/public/result/${encodeURIComponent(jobId)}`;
+    console.log(`[agentExecutor] poll_url fallback → ${pollUrl}`);
   }
 
   for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt++) {
@@ -137,9 +137,23 @@ export async function agentExecutor(input: AgentExecutorInput): Promise<Executor
     }
 
     if (!pollResponse.ok) {
+      let pollDetail = '';
+      try {
+        const raw = await pollResponse.text();
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            pollDetail = parsed?.detail || parsed?.error || parsed?.message || JSON.stringify(parsed).slice(0, 200);
+          } catch {
+            pollDetail = raw.slice(0, 200);
+          }
+        }
+      } catch { /* ignore */ }
       return {
         success: false,
-        error:   `Agent poll returned ${pollResponse.status} ${pollResponse.statusText}`,
+        error:   pollDetail
+          ? `Agent poll returned ${pollResponse.status} ${pollResponse.statusText} (url: ${pollUrl}) — ${pollDetail}`
+          : `Agent poll returned ${pollResponse.status} ${pollResponse.statusText} (url: ${pollUrl})`,
       };
     }
 
