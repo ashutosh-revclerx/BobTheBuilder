@@ -17,6 +17,10 @@ from fastapi import FastAPI, HTTPException
 from .archetypes import classify_prompt
 from .design_enrichment import enrich_config
 from .gemini_client import GeminiError, generate_dashboard_config
+from .openai_client import (
+    OpenAIError,
+    generate_dashboard_config as generate_dashboard_config_openai,
+)
 from .prompts import SYSTEM_PROMPT_VERSION, build_system_prompt, build_user_prompt
 from .schemas import GenerateRequest, GenerateResponse
 from .variants import derive_variants
@@ -34,8 +38,12 @@ app = FastAPI(title="BTB LLM Service", version="0.1.0")
 def health() -> dict:
     return {
         "status": "ok",
-        "model":  os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        "has_api_key": bool(os.getenv("GEMINI_API_KEY")),
+        "primary_provider":  "gemini",
+        "primary_model":     os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        "has_gemini_key":    bool(os.getenv("GEMINI_API_KEY")),
+        "fallback_provider": "openai",
+        "fallback_model":    os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        "has_openai_key":    bool(os.getenv("OPENAI_API_KEY")),
     }
 
 
@@ -45,6 +53,10 @@ def generate(req: GenerateRequest) -> GenerateResponse:
     Build the prompt, call Gemini once for a base config, then derive
     palette variants programmatically. Returns up to `variant_count`
     candidate dashboards.
+
+    Provider strategy: Gemini first; on GeminiError (key expired, quota,
+    network, schema-twice) fall back to OpenAI. If both fail, return 502
+    with a combined error message so the frontend knows which keys to fix.
     """
     logger.info(
         "generate request: prompt_v=%s prompt_len=%d resources=%d variants=%d",
@@ -64,11 +76,25 @@ def generate(req: GenerateRequest) -> GenerateResponse:
     system_prompt = build_system_prompt()
     user_prompt = build_user_prompt(req, archetype.dashboard_type, archetype.confidence)
 
+    base_config = None
+    gemini_err: GeminiError | None = None
     try:
         base_config = generate_dashboard_config(system_prompt, user_prompt)
+        logger.info("generated config via gemini")
     except GeminiError as e:
-        logger.error("Gemini failure: %s", e)
-        raise HTTPException(status_code=502, detail=str(e))
+        gemini_err = e
+        logger.warning("Gemini failed (%s) — attempting OpenAI fallback", e)
+
+    if base_config is None:
+        try:
+            base_config = generate_dashboard_config_openai(system_prompt, user_prompt)
+            logger.info("generated config via openai fallback")
+        except OpenAIError as oe:
+            logger.error("Both providers failed: gemini=%s openai=%s", gemini_err, oe)
+            raise HTTPException(
+                status_code=502,
+                detail=f"Gemini failed ({gemini_err}); OpenAI fallback also failed ({oe})",
+            )
 
     base_config = enrich_config(base_config)
 

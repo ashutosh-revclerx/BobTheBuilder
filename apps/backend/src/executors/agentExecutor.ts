@@ -1,4 +1,7 @@
 import type { ExecutorResult } from './restExecutor.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('agentExec');
 
 export interface AgentExecutorInput {
   baseUrl:        string;
@@ -48,7 +51,7 @@ export async function agentExecutor(input: AgentExecutorInput): Promise<Executor
   const headers = buildAuthHeaders(authType, resolvedSecret);
 
   // ── 1. Kick off the job ─────────────────────────────────────────────────────
-  console.log(`[agentExecutor] kickoff → ${kickUrl.toString()}`);
+  log.info(`kickoff → ${kickUrl.toString()}`);
   let kickoffResponse: Response;
   try {
     kickoffResponse = await fetch(kickUrl.toString(), {
@@ -103,23 +106,23 @@ export async function agentExecutor(input: AgentExecutorInput): Promise<Executor
   const pollUrlFromResponse: string | undefined =
     kickoffJson?.poll_url ?? kickoffJson?.pollUrl ?? kickoffJson?.result_url;
 
-  console.log(`[agentExecutor] kickoff response:`, JSON.stringify(kickoffJson));
+  log.info('kickoff response:', kickoffJson);
 
   let pollUrl: string;
   if (pollUrlFromResponse) {
     pollUrl = pollUrlFromResponse.startsWith('http')
       ? pollUrlFromResponse
       : `${base}${pollUrlFromResponse.startsWith('/') ? '' : '/'}${pollUrlFromResponse}`;
-    console.log(`[agentExecutor] poll_url from response → ${pollUrl}`);
+    log.info(`poll_url from response → ${pollUrl}`);
   } else if (input.pollUrlTemplate) {
     const resolvedTemplate = input.pollUrlTemplate.replace(/\{\{jobId\}\}/g, jobId);
     pollUrl = resolvedTemplate.startsWith('http')
       ? resolvedTemplate
       : `${base}${resolvedTemplate.startsWith('/') ? '' : '/'}${resolvedTemplate}`;
-    console.log(`[agentExecutor] poll_url from template → ${pollUrl}`);
+    log.info(`poll_url from template → ${pollUrl}`);
   } else {
     pollUrl = `${base}/public/result/${encodeURIComponent(jobId)}`;
-    console.log(`[agentExecutor] poll_url fallback → ${pollUrl}`);
+    log.warn(`poll_url fallback → ${pollUrl} (consider configuring pollUrlTemplate)`);
   }
 
   for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt++) {
