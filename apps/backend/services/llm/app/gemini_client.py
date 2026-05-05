@@ -127,19 +127,27 @@ def _call_gemini_once(
             contents=contents,
             config=types.GenerateContentConfig(**config_kwargs),
         )
-        candidate_count = len(response.candidates or [])
-        logger.info(
-            "gemini.call.ok model=%s with_tools=%s candidates=%d has_text=%s",
-            DEFAULT_MODEL,
-            with_tools,
-            candidate_count,
-            bool(response.text),
-        )
-        return response
     except Exception as exc:
         # Normalize SDK/network failures into GeminiError so FastAPI returns a
         # controlled 502 instead of an unhandled 500.
         raise GeminiError(_format_sdk_error(exc)) from exc
+
+    # response.text raises if the candidate has only function_call parts. Read
+    # it defensively so logging never crashes a successful tool-calling turn.
+    try:
+        has_text = bool(response.text)
+    except Exception:
+        has_text = False
+
+    candidate_count = len(response.candidates or [])
+    logger.info(
+        "gemini.call.ok model=%s with_tools=%s candidates=%d has_text=%s",
+        DEFAULT_MODEL,
+        with_tools,
+        candidate_count,
+        has_text,
+    )
+    return response
 
 
 def _response_text(response: types.GenerateContentResponse) -> str:

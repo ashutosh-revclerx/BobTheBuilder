@@ -2,7 +2,11 @@
 Deterministic design enrichment pass.
 
 Runs after Gemini returns valid JSON and before variants are derived.
-Uses setdefault throughout — fills gaps only, never overrides AI decisions.
+Two-phase enrichment:
+  1. setdefault polish — fills gaps without overriding AI decisions
+  2. quality floor — enforces minimum sizes, shadows, hero gradient,
+     consistent radii. These are guard-rails: the LLM frequently produces
+     cramped or flat-looking layouts; this pass guarantees a baseline.
 """
 
 from __future__ import annotations
@@ -15,6 +19,33 @@ from .schemas import DashboardConfig
 
 HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}\b")
 
+# Modern-dashboard size floors. Tables/charts need real estate to breathe;
+# StatCards look anemic at h<6. Below these floors the result feels cramped
+# regardless of palette quality.
+MIN_HEIGHTS = {
+    "StatCard":        6,
+    "StatusBadge":     4,
+    "BarChart":        12,
+    "LineChart":       12,
+    "Table":           14,
+    "LogsViewer":      12,
+    "Container":       8,
+    "TabbedContainer": 12,
+    "Text":            4,
+    "TextInput":       4,
+    "NumberInput":     4,
+    "Select":          4,
+    "Image":           8,
+    "Embed":           10,
+    "Button":          3,
+}
+
+# Subtle elevation. Two layers: a tight 1px and a softer ambient drop.
+# Looks premium without being heavy. Light theme by default; variant
+# repaint may swap to dark-theme equivalents.
+SHADOW_LIGHT = "0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.06)"
+SHADOW_HERO  = "0 4px 12px rgba(37, 99, 235, 0.18), 0 12px 32px rgba(37, 99, 235, 0.12)"
+
 
 def enrich_config(config: DashboardConfig, prompt: str | None = None) -> DashboardConfig:
     """
@@ -25,6 +56,13 @@ def enrich_config(config: DashboardConfig, prompt: str | None = None) -> Dashboa
     _enrich_canvas_style(raw, prompt or "")
     for component in raw.get("components", []):
         _enrich_component(component)
+
+    # Quality-floor pass — runs after the per-type setdefaults so it
+    # catches anything Gemini didn't explicitly set.
+    _enforce_size_floor(raw.get("components", []))
+    _apply_hero_gradient(raw.get("components", []))
+    _apply_visual_polish(raw.get("components", []))
+
     return DashboardConfig.model_validate(raw)
 
 
@@ -65,13 +103,15 @@ def _enrich_canvas_style(raw: dict[str, Any], prompt: str) -> None:
     primary_role = _extract_role_color(prompt, "primary")
 
     if not palette and not background_role and not primary_role:
-        canvas.setdefault("backgroundColor", "#f3f4f6")
+        # No prompt-derived palette — give the canvas a soft neutral instead
+        # of the legacy #f3f4f6 grey-flat which looks cheap.
+        canvas.setdefault("backgroundColor", "#f8fafc")
         return
 
     if not _is_default_canvas(canvas):
         return
 
-    bg_color = background_role or primary_role or (palette[0] if palette else "#f3f4f6")
+    bg_color = background_role or primary_role or (palette[0] if palette else "#f8fafc")
     canvas["backgroundColor"] = bg_color
 
     gradient_stops = palette[:3] if len(palette) >= 2 else []
@@ -117,44 +157,149 @@ def _enrich_component(component: dict[str, Any]) -> None:
     data:  dict[str, Any] = component.setdefault("data", {})
 
     if ctype == "StatCard":
-        style.setdefault("metricFontSize", 28)
-        style.setdefault("labelFontSize", 12)
+        style.setdefault("metricFontSize", 32)
+        style.setdefault("labelFontSize", 13)
         style.setdefault("borderLeftWidth", 4)
-        style.setdefault("borderRadius", 12)
-        style.setdefault("padding", 20)
+        style.setdefault("borderRadius", 14)
+        style.setdefault("padding", 22)
+        style.setdefault("fontWeight", 700)
 
     elif ctype == "Table":
         data.setdefault("searchable", True)
         data.setdefault("pagination", True)
         style.setdefault("stripeRows", True)
-        style.setdefault("borderRadius", 10)
+        style.setdefault("borderRadius", 12)
+        style.setdefault("padding", 0)
 
     elif ctype in {"BarChart", "LineChart"}:
         data.setdefault("showGrid", True)
         data.setdefault("showLegend", True)
-        style.setdefault("borderRadius", 10)
+        if ctype == "LineChart":
+            data.setdefault("smooth", True)
+        style.setdefault("borderRadius", 12)
+        style.setdefault("padding", 18)
 
     elif ctype == "LogsViewer":
         style.setdefault("fontFamily", "Fira Code")
         style.setdefault("fontSize", 12)
         style.setdefault("lineHeight", 1.6)
+        style.setdefault("borderRadius", 12)
 
     elif ctype == "Button":
-        style.setdefault("fontWeight", 600)
-        style.setdefault("borderRadius", 8)
+        style.setdefault("fontWeight", 700)
+        style.setdefault("borderRadius", 10)
         style.setdefault("padding", 14)
         data.setdefault("loadingState", True)
 
     elif ctype in {"TextInput", "NumberInput", "Select"}:
-        style.setdefault("borderRadius", 8)
-        style.setdefault("padding", 10)
+        style.setdefault("borderRadius", 10)
+        style.setdefault("padding", 12)
 
     elif ctype == "Text":
         style.setdefault("lineHeight", 1.6)
         style.setdefault("overflow", "Wrap")
 
     elif ctype in {"Container", "TabbedContainer"}:
-        style.setdefault("borderRadius", 12)
-        style.setdefault("padding", 16)
+        style.setdefault("borderRadius", 14)
+        style.setdefault("padding", 20)
         if ctype == "TabbedContainer":
             _normalize_tabs(data)
+
+
+# ─── Quality-floor passes ────────────────────────────────────────────────────
+
+
+def _enforce_size_floor(components: list[dict[str, Any]]) -> None:
+    """
+    Bump any component that's smaller than the modern-dashboard floor.
+    Width is left alone (LLM picked a layout); only height grows so the
+    user doesn't see a tiny crammed widget that the preview made look bigger.
+    """
+    for c in components:
+        layout = c.setdefault("layout", {})
+        ctype = c.get("type")
+        floor = MIN_HEIGHTS.get(ctype)
+        if floor is None:
+            continue
+        try:
+            current = int(layout.get("h", 0) or 0)
+        except (TypeError, ValueError):
+            current = 0
+        if current < floor:
+            layout["h"] = floor
+
+
+def _apply_hero_gradient(components: list[dict[str, Any]]) -> None:
+    """
+    Pick the first StatCard (by render order) and give it a hero gradient if
+    it doesn't already have one. Modern dashboards have one feature component
+    that draws the eye — without this, every card looks identical.
+    """
+    stat_cards = [c for c in components if c.get("type") == "StatCard"]
+    if not stat_cards:
+        return
+
+    # Sort by canvas position so the "hero" is whatever appears first visually.
+    stat_cards.sort(
+        key=lambda c: (
+            c.get("layout", {}).get("y", 0),
+            c.get("layout", {}).get("x", 0),
+        )
+    )
+    hero = stat_cards[0]
+    style = hero.setdefault("style", {})
+
+    if style.get("backgroundGradient"):
+        return  # LLM already chose a gradient — respect it.
+
+    primary = style.get("borderLeftColor") or style.get("borderColor") or "#2563eb"
+    style["backgroundGradient"] = {
+        "enabled":   True,
+        "direction": 135,
+        "stops": [
+            {"color": primary, "position": 0},
+            {"color": _darken(primary, 0.3), "position": 100},
+        ],
+    }
+    # White text reads on every brand color — safer default for hero card.
+    style.setdefault("textColor", "#ffffff")
+    style.setdefault("metricFontSize", 36)
+
+
+def _apply_visual_polish(components: list[dict[str, Any]]) -> None:
+    """
+    Apply box-shadow and consistent border-radius across all components.
+    These are setdefault calls — nothing the LLM explicitly set is overridden.
+    """
+    for c in components:
+        style = c.setdefault("style", {})
+        ctype = c.get("type")
+
+        # Text and StatusBadge are inherently transparent / inline — shadow
+        # would look weird. Buttons get their own pop via color.
+        if ctype not in {"Text", "StatusBadge", "Button"}:
+            style.setdefault("boxShadow", SHADOW_LIGHT)
+
+        # Modern radius floor — anything below 10 looks dated.
+        if "borderRadius" not in style:
+            style["borderRadius"] = 12
+
+        # Hero stat card gets the heavier accent shadow.
+        if ctype == "StatCard" and style.get("backgroundGradient"):
+            style["boxShadow"] = SHADOW_HERO
+
+
+def _darken(hex_color: str, amount: float) -> str:
+    """Darken a #rrggbb hex by `amount` (0..1). Used for gradient end-stops."""
+    color = hex_color.lstrip("#")
+    if len(color) != 6:
+        return hex_color
+    try:
+        r, g, b = int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
+    except ValueError:
+        return hex_color
+    factor = max(0.0, 1.0 - amount)
+    r = max(0, min(255, int(r * factor)))
+    g = max(0, min(255, int(g * factor)))
+    b = max(0, min(255, int(b * factor)))
+    return f"#{r:02x}{g:02x}{b:02x}"

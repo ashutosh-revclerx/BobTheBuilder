@@ -31,9 +31,17 @@ export default function BuilderPage() {
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
-  
+
   // Left panel toggle state
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
+
+  // True only when this dashboard came from a recent /generate run AND the
+  // stash is still in sessionStorage. Lets us offer "switch template" without
+  // re-running the (slow, paid) generation.
+  const [hasStashedGeneration, setHasStashedGeneration] = useState(false);
+  useEffect(() => {
+    setHasStashedGeneration(!!sessionStorage.getItem('btb:lastGeneration'));
+  }, []);
 
   const isPreviewMode = useEditorStore((s) => s.isPreviewMode);
   const togglePreviewMode = useEditorStore((s) => s.togglePreviewMode);
@@ -178,6 +186,7 @@ export default function BuilderPage() {
             dashboard.config?.queries ?? [],
             dashboard.status,
             dashboard.published_at,
+            dashboard.config?.canvasStyle,
           );
         } catch {
           if (!cancelled) navigate('/');
@@ -195,13 +204,21 @@ export default function BuilderPage() {
 
       if (id === 'blank') {
         const blank = getBlankTemplate();
-        loadTemplate(blank.id, blank.name, blank.components);
+        loadTemplate(blank.id, blank.name, blank.components, [], 'draft', null, blank.canvasStyle);
         return;
       }
 
       const template = getTemplateById(id);
       if (template) {
-        loadTemplate(template.id, template.name, template.components, template.queries ?? []);
+        loadTemplate(
+          template.id,
+          template.name,
+          template.components,
+          template.queries ?? [],
+          'draft',
+          null,
+          template.canvasStyle,
+        );
         return;
       }
 
@@ -420,6 +437,16 @@ export default function BuilderPage() {
               <button className="confirm-yes" onClick={handleReset}>Yes</button>
               <button className="confirm-no" onClick={() => setShowResetConfirm(false)}>No</button>
             </div>
+          )}
+
+          {!isPreviewMode && hasStashedGeneration && (
+            <button
+              className="btn-topbar"
+              onClick={() => navigate('/new/pick')}
+              title="Go back to the template picker for the prompt that created this dashboard"
+            >
+              ↺ Try another template
+            </button>
           )}
 
           {!isPreviewMode && (
