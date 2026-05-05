@@ -89,10 +89,10 @@ def gemini_tools() -> list[types.Tool]:
                     name="get_component_capabilities",
                     description="Fetch style and data properties for a UI component",
                     parameters=types.Schema(
-                        type=types.Type.OBJECT,
+                        type="OBJECT",
                         properties={
                             "component_type": types.Schema(
-                                type=types.Type.STRING,
+                                type="STRING",
                                 description="Component name like StatCard, Table",
                             )
                         },

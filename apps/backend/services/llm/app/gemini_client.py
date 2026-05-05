@@ -13,8 +13,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from pydantic import ValidationError
@@ -23,6 +25,10 @@ from .schemas import DashboardConfig
 from .tools import execute_tool, gemini_tools
 
 logger = logging.getLogger("llm.gemini")
+
+
+SERVICE_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(SERVICE_ENV_PATH, override=True)
 
 DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 MAX_TOOL_CALL_TURNS = int(os.getenv("GEMINI_MAX_TOOL_CALL_TURNS", "4"))
@@ -99,17 +105,29 @@ def _call_gemini_once(
     *,
     with_tools: bool,
 ) -> types.GenerateContentResponse:
+    config_kwargs: dict[str, Any] = {
+        "system_instruction": system_prompt,
+        "temperature": 0.7,
+        "tools": gemini_tools() if with_tools else None,
+    }
+    if not with_tools:
+        config_kwargs["response_mime_type"] = "application/json"
+
     try:
-        return client.models.generate_content(
+        response = client.models.generate_content(
             model=DEFAULT_MODEL,
             contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                response_mime_type="application/json",
-                temperature=0.7,
-                tools=gemini_tools() if with_tools else None,
-            ),
+            config=types.GenerateContentConfig(**config_kwargs),
         )
+        candidate_count = len(response.candidates or [])
+        logger.info(
+            "gemini.call.ok model=%s with_tools=%s candidates=%d has_text=%s",
+            DEFAULT_MODEL,
+            with_tools,
+            candidate_count,
+            bool(response.text),
+        )
+        return response
     except Exception as exc:
         # Normalize SDK/network failures into GeminiError so FastAPI returns a
         # controlled 502 instead of an unhandled 500.
@@ -120,6 +138,28 @@ def _response_text(response: types.GenerateContentResponse) -> str:
     if response.text:
         return response.text
     raise GeminiError("Gemini returned an empty response")
+
+
+def _parse_dashboard_json(raw: str) -> Any:
+    """Parse JSON even when the model wraps it in a markdown code fence."""
+    text = raw.strip()
+    original_len = len(text)
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+
+    if not text.startswith("{"):
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            text = text[start : end + 1]
+
+    logger.info("gemini.parse_json length_before=%d length_after=%d", original_len, len(text))
+    return json.loads(text)
 
 
 def _call_gemini(system_prompt: str, user_prompt: str) -> str:
@@ -138,10 +178,12 @@ def _call_gemini(system_prompt: str, user_prompt: str) -> str:
     """
     client = _client()
     contents = [_content_from_text(user_prompt)]
+    logger.info("gemini.call.start model=%s max_tool_turns=%d", DEFAULT_MODEL, MAX_TOOL_CALL_TURNS)
     response = _call_gemini_once(client, system_prompt, contents, with_tools=True)
 
-    for _ in range(MAX_TOOL_CALL_TURNS):
+    for turn in range(MAX_TOOL_CALL_TURNS):
         function_calls = _extract_function_calls(response)
+        logger.info("gemini.tool_turn turn=%d function_calls=%d", turn + 1, len(function_calls))
         if not function_calls:
             return _response_text(response)
 
@@ -152,7 +194,7 @@ def _call_gemini(system_prompt: str, user_prompt: str) -> str:
             name = function_call.name or ""
             args: dict[str, Any] = function_call.args or {}
             result = execute_tool(name, args)
-            logger.info("Gemini tool call: %s args=%s", name, args)
+            logger.info("gemini.tool_call name=%s args=%s", name, args)
             tool_parts.append(
                 types.Part.from_function_response(name=name, response=result)
             )
@@ -180,9 +222,10 @@ def generate_dashboard_config(system_prompt: str, user_prompt: str) -> Dashboard
     """
     raw = _call_gemini(system_prompt, user_prompt)
     try:
-        return DashboardConfig.model_validate(json.loads(raw))
+        return DashboardConfig.model_validate(_parse_dashboard_json(raw))
     except (ValidationError, json.JSONDecodeError) as first_error:
-        logger.warning("First Gemini response failed validation: %s", first_error)
+        preview = raw[:200].replace("\n", "\\n")
+        logger.warning("gemini.validation.first_fail error=%s raw_preview=%s", first_error, preview)
         # Retry once with the validator's complaint included in the prompt —
         # gives the model concrete feedback about what to fix.
         repair_prompt = (
@@ -193,9 +236,10 @@ def generate_dashboard_config(system_prompt: str, user_prompt: str) -> Dashboard
         )
         raw = _call_gemini(system_prompt, repair_prompt)
         try:
-            return DashboardConfig.model_validate(json.loads(raw))
+            return DashboardConfig.model_validate(_parse_dashboard_json(raw))
         except (ValidationError, json.JSONDecodeError) as second_error:
-            logger.error("Second Gemini response also failed: %s", second_error)
+            preview = raw[:200].replace("\n", "\\n")
+            logger.error("gemini.validation.second_fail error=%s raw_preview=%s", second_error, preview)
             raise GeminiError(
                 f"Gemini returned invalid config twice. Last error: {second_error}"
             ) from second_error
