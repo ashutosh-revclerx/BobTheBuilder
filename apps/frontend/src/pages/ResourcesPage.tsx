@@ -248,6 +248,7 @@ export default function ResourcesPage() {
                 value={swaggerUrl}
                 onChange={(e) => setSwaggerUrl(e.target.value)}
               />
+              <span className="form-help">Link to the raw JSON spec, not the Swagger UI HTML page. (Tip: in Swagger UI, DevTools → Network shows the real spec URL.)</span>
             </label>
 
             <label className="form-group">
@@ -259,6 +260,7 @@ export default function ResourcesPage() {
                 value={resourceName}
                 onChange={(e) => setResourceName(e.target.value)}
               />
+              <span className="form-help">Short identifier you'll reference in dashboard queries.</span>
             </label>
 
             <label className="form-group">
@@ -270,6 +272,7 @@ export default function ResourcesPage() {
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
               />
+              <span className="form-help">Where your API lives. No trailing slash.</span>
             </label>
 
             <label className="form-group">
@@ -280,10 +283,11 @@ export default function ResourcesPage() {
                 onChange={(e) => setAuthType(e.target.value as AuthType)}
               >
                 <option value="none">None</option>
-                <option value="bearer">Bearer Token</option>
-                <option value="api_key">API Key</option>
-                <option value="basic">Basic</option>
+                <option value="bearer">Bearer Token (Authorization: Bearer …)</option>
+                <option value="api_key">API Key (X-API-Key header)</option>
+                <option value="basic">Basic (Authorization: Basic …)</option>
               </select>
+              <span className="form-help">How we authenticate every outgoing request to this backend.</span>
             </label>
 
             {authType !== 'none' && (
@@ -296,6 +300,7 @@ export default function ResourcesPage() {
                   value={secretRef}
                   onChange={(e) => setSecretRef(e.target.value)}
                 />
+                <span className="form-help">Use <code>{`{{env.YOUR_VAR_NAME}}`}</code> — never paste the raw key.</span>
               </label>
             )}
 
@@ -362,6 +367,7 @@ export default function ResourcesPage() {
                   value={manualName}
                   onChange={(e) => setManualName(e.target.value)}
                 />
+                <span className="form-help">A short identifier you'll use to reference this backend in dashboard queries (e.g. <code>nexus-scrape</code>).</span>
               </label>
 
               <label className="form-group">
@@ -371,10 +377,21 @@ export default function ResourcesPage() {
                   value={manualType}
                   onChange={(e) => setManualType(e.target.value as ResourceType)}
                 >
-                  <option value="REST">REST</option>
-                  <option value="agent">Agent (async / poll)</option>
-                  <option value="postgresql">PostgreSQL (read-only)</option>
+                  <option value="REST">REST — synchronous API</option>
+                  <option value="agent">Agent — async job (kickoff + poll)</option>
+                  <option value="postgresql">PostgreSQL — read-only DB</option>
                 </select>
+                <span className="form-help">
+                  {manualType === 'REST' && (
+                    <>Pick this if the API returns the result directly. Example: <code>POST /api/users</code> → returns <code>[{`{ id, name }`}]</code> in the same response.</>
+                  )}
+                  {manualType === 'agent' && (
+                    <>Pick this if the API kicks off a background job. Example: <code>POST /scrape</code> → returns <code>{`{ job_id }`}</code>, then we poll for the result. Per-query you can set a custom <code>pollUrlTemplate</code> in the dashboard builder if your API doesn't return a <code>poll_url</code> field.</>
+                  )}
+                  {manualType === 'postgresql' && (
+                    <>Pick this for direct DB queries. The query text IS the SQL — keep this user read-only at the DB level.</>
+                  )}
+                </span>
               </label>
 
               {(manualType === 'REST' || manualType === 'agent') && (
@@ -387,6 +404,7 @@ export default function ResourcesPage() {
                     value={manualBaseUrl}
                     onChange={(e) => setManualBaseUrl(e.target.value)}
                   />
+                  <span className="form-help">Where your API lives. No trailing slash. Endpoint paths are appended per-query.</span>
                 </label>
               )}
 
@@ -399,10 +417,11 @@ export default function ResourcesPage() {
                     onChange={(e) => setManualAuthType(e.target.value as AuthType)}
                   >
                     <option value="none">None</option>
-                    <option value="bearer">Bearer Token</option>
-                    <option value="api_key">API Key</option>
-                    <option value="basic">Basic</option>
+                    <option value="bearer">Bearer Token (Authorization: Bearer …)</option>
+                    <option value="api_key">API Key (X-API-Key header)</option>
+                    <option value="basic">Basic (Authorization: Basic …)</option>
                   </select>
+                  <span className="form-help">How we authenticate every outgoing request to this backend.</span>
                 </label>
               )}
 
@@ -418,7 +437,33 @@ export default function ResourcesPage() {
                     value={manualSecretRef}
                     onChange={(e) => setManualSecretRef(e.target.value)}
                   />
+                  <span className="form-help">
+                    Use <code>{`{{env.YOUR_VAR_NAME}}`}</code> to reference a backend env var. Never paste the raw key here — it's stored as-is.
+                  </span>
                 </label>
+              )}
+
+              {manualType === 'agent' && (
+                <div
+                  className="form-group"
+                  style={{
+                    background: 'var(--surface-muted, #f8f9fb)',
+                    border: '1px solid var(--border, #e3e6ec)',
+                    borderRadius: 8,
+                    padding: '10px 12px',
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    color: 'var(--text-muted, #5c6370)',
+                  }}
+                >
+                  <strong style={{ color: 'var(--text-primary, #0f1117)' }}>How polling works for agent resources</strong>
+                  <ol style={{ margin: '6px 0 0 16px', padding: 0 }}>
+                    <li>We POST to your endpoint to kick off the job.</li>
+                    <li>We read <code>job_id</code> (or <code>jobId</code>) from the response.</li>
+                    <li>If the response has <code>poll_url</code> / <code>pollUrl</code>, we poll there. Otherwise we use <code>pollUrlTemplate</code> from the query, or fall back to <code>{`{baseUrl}/public/result/{jobId}`}</code>.</li>
+                    <li>We poll every 2s until <code>status</code> is <code>done</code> / <code>complete</code> / <code>success</code>, or 60s elapses.</li>
+                  </ol>
+                </div>
               )}
 
               <button

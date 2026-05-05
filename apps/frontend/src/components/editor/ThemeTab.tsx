@@ -18,6 +18,27 @@ const BUTTON_VARIANT_DEFAULTS: Record<string, Partial<ComponentStyle>> = {
   Danger: { backgroundColor: '#dc2626', textColor: '#ffffff', borderColor: '#dc2626', hoverBackgroundColor: '#b91c1c' },
   Ghost: { backgroundColor: 'transparent', textColor: '#2563eb', borderColor: '#e3e6ec', hoverBackgroundColor: '#eff6ff' },
 };
+const TABLE_VARIANT_DEFAULTS: Record<string, Partial<ComponentStyle>> = {
+  Clean: {
+    borderWidth: 0,
+    headerBackgroundColor: '#ffffff',
+    rowAlternateColor: 'transparent',
+    stripeRows: false,
+  },
+  Zebra: {
+    borderWidth: 1,
+    headerBackgroundColor: '#eef2f7',
+    rowAlternateColor: '#f1f5f9',
+    stripeRows: true,
+  },
+  Bordered: {
+    borderWidth: 1,
+    borderColor: '#d7dde8',
+    headerBackgroundColor: '#f8fafc',
+    rowAlternateColor: 'transparent',
+    stripeRows: false,
+  },
+};
 const LINE_HEIGHTS        = [1.2, 1.4, 1.6, 1.8];
 const FONT_WEIGHT_OPTIONS = [
   { label: 'Normal', value: 400 },
@@ -305,30 +326,36 @@ export default function ThemeTab() {
 
   const debouncedUpdateStyle = useDebouncedStyle(lastSelectedComponentId || '', 150);
 
-  const [expandedSection, setExpandedSection] = useState<'component' | 'presets' | ''>('component');
+  const [expandedSection, setExpandedSection] = useState<'component' | 'dashboard' | 'presets' | ''>('component');
+
+  const canvasStyle     = useEditorStore((s) => s.canvasStyle);
+  const updateCanvasStyle = useEditorStore((s) => s.updateCanvasStyle);
 
   const component = components.find((c) => c.id === lastSelectedComponentId);
-  if (!component || !lastSelectedComponentId) return null;
 
-  const { style, data } = component;
-  const ctype = component.type;
+  const { style, data } = component || { style: {} as any, data: {} as any };
+  const ctype = component?.type;
 
   const set = (key: keyof ComponentStyle, value: unknown) => {
-    updateStyle(lastSelectedComponentId, { [key]: value } as Partial<ComponentStyle>);
+    if (lastSelectedComponentId) {
+      updateStyle(lastSelectedComponentId, { [key]: value } as Partial<ComponentStyle>);
+    }
   };
 
   const setDebounced = (key: keyof ComponentStyle, value: unknown) => {
-    debouncedUpdateStyle(key, value);
+    if (lastSelectedComponentId) {
+      debouncedUpdateStyle(key, value);
+    }
   };
 
-  const toggle = (section: 'component' | 'presets') =>
+  const toggle = (section: 'component' | 'dashboard' | 'presets') =>
     setExpandedSection((s) => (s === section ? '' : section));
 
   const seriesCount = Math.min(
-    Math.max(data.series?.length ?? 2, 1),
+    Math.max(data?.series?.length ?? 2, 1),
     MAX_SERIES_COLORS,
   );
-  const currentSeriesColors = style.seriesColors ?? Array.from({ length: seriesCount }, (_, i) =>
+  const currentSeriesColors = style?.seriesColors ?? Array.from({ length: seriesCount }, (_, i) =>
     ['#2563eb', '#7c3aed', '#0891b2', '#059669', '#d97706'][i] ?? '#2563eb',
   );
 
@@ -336,18 +363,19 @@ export default function ThemeTab() {
     <div className="theme-tab">
 
       {/* ── SECTION A: Component-level overrides ── */}
-      <div className="theme-section">
-        <button
-          className={`theme-section-header ${expandedSection === 'component' ? 'expanded' : ''}`}
-          onClick={() => toggle('component')}
-        >
-          <span className="section-icon">🎨</span>
-          <span className="section-title">Component Overrides</span>
-          <span className="section-toggle">{expandedSection === 'component' ? '−' : '+'}</span>
-        </button>
+      {component && lastSelectedComponentId && (
+        <div className="theme-section">
+          <button
+            className={`theme-section-header ${expandedSection === 'component' ? 'expanded' : ''}`}
+            onClick={() => toggle('component')}
+          >
+            <span className="section-icon">🎨</span>
+            <span className="section-title">Component Overrides</span>
+            <span className="section-toggle">{expandedSection === 'component' ? '−' : '+'}</span>
+          </button>
 
-        {expandedSection === 'component' && (
-          <div className="theme-section-content">
+          {expandedSection === 'component' && (
+            <div className="theme-section-content">
 
             {/* Item 3: Label Editor */}
             <FormField label="Component Label">
@@ -545,6 +573,29 @@ export default function ThemeTab() {
               </>
             )}
 
+            {/* ── Table ── */}
+            {ctype === 'Table' && (
+              <>
+                <OptionGroup
+                  label="Table Variant"
+                  options={['Clean', 'Zebra', 'Bordered']}
+                  value={style.variant || 'Bordered'}
+                  onChange={(v) => {
+                    const defaults = TABLE_VARIANT_DEFAULTS[v as string] || {};
+                    updateStyle(lastSelectedComponentId, { variant: v as any, ...defaults });
+                  }}
+                />
+                <div className="theme-divider" />
+                <LocalColorField
+                  label="Header Background"
+                  componentId={lastSelectedComponentId}
+                  value={style.headerBackgroundColor ?? '#f8fafc'}
+                  onChange={(v) => setDebounced('headerBackgroundColor', v)}
+                />
+                <div className="theme-divider" />
+              </>
+            )}
+
             {/* ── Charts ── */}
             {(ctype === 'BarChart' || ctype === 'LineChart') && (
               <>
@@ -726,12 +777,35 @@ export default function ThemeTab() {
                 />
               </>
             )}
+          </div>
+        )}
+      </div>
+    )}
 
+      {/* ── SECTION B: Dashboard Background ── */}
+      <div className="theme-section">
+        <button
+          className={`theme-section-header ${expandedSection === 'dashboard' ? 'expanded' : ''}`}
+          onClick={() => setExpandedSection(s => s === 'dashboard' ? '' : 'dashboard')}
+        >
+          <span className="section-icon">🖼️</span>
+          <span className="section-title">Dashboard Background</span>
+          <span className="section-toggle">{expandedSection === 'dashboard' ? '−' : '+'}</span>
+        </button>
+
+        {expandedSection === 'dashboard' && (
+          <div className="theme-section-content">
+            <GradientEditor 
+              style={canvasStyle as any} 
+              componentId="canvas" 
+              onChange={(key, val) => updateCanvasStyle({ [key]: val })} 
+              onToggle={(key, val) => updateCanvasStyle({ [key]: val })}
+            />
           </div>
         )}
       </div>
 
-      {/* ── SECTION B: Dashboard-level theme presets ── */}
+      {/* ── SECTION C: Dashboard-level theme presets ── */}
       <div className="theme-section">
         <button
           className={`theme-section-header ${expandedSection === 'presets' ? 'expanded' : ''}`}

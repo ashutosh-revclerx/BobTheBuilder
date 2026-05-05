@@ -30,6 +30,13 @@ const TextInput = React.memo(function TextInput({ config }: { config: ComponentC
 
   const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
 
+  const updateData = useEditorStore((s) => s.updateData);
+  const isReadOnly = useEditorStore((s) => s.isPreviewMode);
+
+  const handleLabelEdit = (newLabel: string) => {
+    updateData(config.id, { label: newLabel });
+  };
+
   const handleChange = (value: string) => {
     setComponentState(config.id, 'value', value);
     runAction(data.onChangeAction, value);
@@ -47,8 +54,18 @@ const TextInput = React.memo(function TextInput({ config }: { config: ComponentC
   };
 
   return (
-    <div className="atomic-input-wrapper" style={{ height: '100%', display: 'flex', flexDirection: style.labelPosition === 'Left' ? 'row' : 'column', justifyContent: 'center', gap: '8px' }}>
-      {data.label && style.labelPosition !== 'Hidden' ? <label className="atomic-input-label">{data.label}</label> : null}
+    <div className="atomic-input-wrapper" style={{ height: '100%', display: 'flex', flexDirection: style.labelPosition === 'Left' ? 'row' : 'column', justifyContent: style.labelPosition === 'Left' ? 'flex-start' : 'center', alignItems: style.labelPosition === 'Left' ? 'center' : 'stretch', gap: '8px' }}>
+      {data.label && style.labelPosition !== 'Hidden' ? (
+        <label 
+          className="atomic-input-label"
+          contentEditable={!isReadOnly}
+          suppressContentEditableWarning
+          onBlur={(e) => handleLabelEdit(e.currentTarget.textContent || '')}
+          style={{ cursor: !isReadOnly ? 'text' : 'default', minWidth: style.labelPosition === 'Left' ? '100px' : 'auto' }}
+        >
+          {data.label}
+        </label>
+      ) : null}
       <input
         type={inputType}
         className="atomic-text-input"

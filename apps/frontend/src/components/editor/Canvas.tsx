@@ -2,6 +2,7 @@ import React, { useEffect, Suspense, lazy } from 'react';
 import { executeOnLoadQueries, watchDependencies, resetReactiveState } from '../../engine/queryEngine';
 import { useEditorStore } from '../../store/editorStore';
 import { GridLayer } from './GridLayer';
+import { resolveBackground } from '../../utils/styleUtils';
 
 import StatCard from '../dashboard-components/StatCard';
 import Table from '../dashboard-components/Table';
@@ -74,7 +75,7 @@ export default function Canvas({ readOnly = false }: { readOnly?: boolean }) {
     <div
       className={`builder-canvas-wrapper${draggingType ? ' drop-active' : ''}`}
       onClick={handleCanvasClick}
-      style={{ backgroundColor: canvasStyle.backgroundColor }}
+      style={{ background: resolveBackground(canvasStyle as any) }}
     >
       <div className="builder-canvas">
         <Suspense fallback={<div className="canvas-loading-placeholder">Loading components...</div>}>

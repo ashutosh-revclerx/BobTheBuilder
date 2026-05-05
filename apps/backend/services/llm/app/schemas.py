@@ -74,9 +74,15 @@ class DashboardQuery(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class CanvasStyle(BaseModel):
+    backgroundColor: str = "#f3f4f6"
+    backgroundGradient: dict[str, Any] | None = None
+
+
 class DashboardConfig(BaseModel):
     components: list[DashboardComponent]
     queries: list[DashboardQuery]
+    canvasStyle: CanvasStyle | None = None
 
 
 class GeneratedVariant(BaseModel):

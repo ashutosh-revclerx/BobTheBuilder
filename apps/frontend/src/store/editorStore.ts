@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { type ThemeName, resolveTheme } from '../config/themes';
 import type {
+  CanvasStyle,
   ComponentConfig,
   ComponentData,
   ComponentStyle,
@@ -72,6 +73,7 @@ const createDefaultConfig = (
           strikethrough: false,
           strikethroughField: '',
           strikethroughValue: '',
+          variant: 'Bordered',
         },
         data: {
           ...createBaseData(),
@@ -545,10 +547,8 @@ interface EditorState {
   isDirty: boolean;
   status: 'draft' | 'live';
   publishedAt: string | null;
-  canvasStyle: {
-    backgroundColor: string;
-  };
-  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null) => void;
+  canvasStyle: CanvasStyle;
+  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null, canvasStyle?: CanvasStyle) => void;
   loadSavedTemplate: (saved: SavedTemplate) => void;
   selectComponent: (id: string | null) => void;
   clearCanvasSelection: () => void;
@@ -572,7 +572,8 @@ interface EditorState {
   removeComponent: (id: string) => void;
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => void;
-  resetToTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[]) => void;
+  resetToTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], canvasStyle?: CanvasStyle) => void;
+  updateCanvasStyle: (patch: Partial<CanvasStyle>) => void;
   resetToDefault: () => void;
   getResolvedComponent: (id: string) => ComponentConfig | undefined;
   renameSavedTemplate: (templateId: string, name: string) => void;
@@ -651,7 +652,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
     })),
 
-  loadTemplate: (templateId, name, components, queries = [], status = 'draft', publishedAt = null) => {
+  loadTemplate: (templateId, name, components, queries = [], status = 'draft', publishedAt = null, canvasStyle) => {
     const normalizedComponents = normalizeComponents(clone(components));
     set({
       activeTemplateId: templateId,
@@ -670,6 +671,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       queryResults: {},
       componentState: {},
       isDirty: false,
+      canvasStyle: canvasStyle || { backgroundColor: '#f3f4f6' },
     });
   },
 
@@ -692,6 +694,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       queryResults: {},
       componentState: {},
       isDirty: false,
+      canvasStyle: saved.canvasStyle || { backgroundColor: '#f3f4f6' },
     });
   },
 
@@ -985,6 +988,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       queries: clone(state.queriesConfig),
       savedAt: new Date().toISOString(),
       originalTemplateId: state.originalTemplateId!,
+      canvasStyle: state.canvasStyle,
     };
 
     const existing = { ...state.savedTemplates, [activeId]: saved };
@@ -1015,7 +1019,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  resetToTemplate: (templateId, name, components, queries = []) => {
+  resetToTemplate: (templateId, name, components, queries = [], canvasStyle) => {
     const state = get();
     const existing = { ...state.savedTemplates };
     if (state.activeTemplateId) {
@@ -1042,6 +1046,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       componentState: {},
       isDirty: false,
       draggingType: null,
+      canvasStyle: canvasStyle || { backgroundColor: '#f3f4f6' },
     });
   },
 
@@ -1103,6 +1108,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPreviewDevice: (device) => set({ previewDevice: device }),
 
   setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
+
+  updateCanvasStyle: (patch) =>
+    set((state) => ({
+      canvasStyle: { ...state.canvasStyle, ...patch },
+      isDirty: true,
+    })),
 
   upsertQuery: (query) =>
     set((state) => {
@@ -1230,6 +1241,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dirtyDataMap: {},
       queryResults: {},
       componentState: {},
+      canvasStyle: config.canvasStyle || { backgroundColor: '#f3f4f6' },
     });
   },
 }));

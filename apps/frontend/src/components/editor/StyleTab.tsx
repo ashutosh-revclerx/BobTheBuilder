@@ -2,6 +2,27 @@ import { useEditorStore } from '../../store/editorStore';
 import type { ComponentStyle } from '../../types/template';
 
 const FONT_OPTIONS = ['Inter', 'Roboto', 'Poppins', 'DM Sans', 'Fira Code', 'system-ui'];
+const TABLE_VARIANT_DEFAULTS: Record<string, Partial<ComponentStyle>> = {
+  Clean: {
+    borderWidth: 0,
+    headerBackgroundColor: '#ffffff',
+    rowAlternateColor: 'transparent',
+    stripeRows: false,
+  },
+  Zebra: {
+    borderWidth: 1,
+    headerBackgroundColor: '#eef2f7',
+    rowAlternateColor: '#f1f5f9',
+    stripeRows: true,
+  },
+  Bordered: {
+    borderWidth: 1,
+    borderColor: '#d7dde8',
+    headerBackgroundColor: '#f8fafc',
+    rowAlternateColor: 'transparent',
+    stripeRows: false,
+  },
+};
 
 function FormField({
   label,
@@ -187,6 +208,15 @@ export default function StyleTab() {
 
       {component.type === 'Table' && (
         <>
+          <SelectField
+            label="Table Variant"
+            value={style.variant || 'Bordered'}
+            onChange={(value) => {
+              const defaults = TABLE_VARIANT_DEFAULTS[value] || {};
+              updateStyle(lastSelectedComponentId!, { variant: value as any, ...defaults });
+            }}
+            options={['Clean', 'Zebra', 'Bordered']}
+          />
           <ColorField
             label="Header Background Color"
             value={style.headerBackgroundColor || '#f2f4f7'}

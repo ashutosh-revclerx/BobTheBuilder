@@ -17,10 +17,15 @@ from .schemas import DashboardConfig, GeneratedVariant
 
 DashboardType = Literal["analytics", "crud_admin", "monitoring", "form_workflow", "logs"]
 
-PALETTES: list[dict[str, str]] = [
+SHADOW_LIGHT_THEME = "0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.06)"
+SHADOW_DARK_THEME  = "0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35)"
+
+
+PALETTES: list[dict[str, Any]] = [
     {
         "name": "Cobalt",
         "philosophy": "Clean enterprise — high contrast, trustworthy blue, generous whitespace",
+        "is_dark": False,
         # Surfaces
         "surface": "#f0f4f8",
         "panel": "#ffffff",
@@ -45,6 +50,7 @@ PALETTES: list[dict[str, str]] = [
         # Component tints
         "card_tint": "#eff6ff",
         "card_accent": "#2563eb",
+        "card_gradient": ["#1e40af", "#2563eb"],
         "chart_tint": "#dbeafe",
         "chart_colors": ["#2563eb", "#7c3aed", "#0891b2", "#059669", "#d97706"],
         "table_tint": "#f8fafc",
@@ -58,6 +64,8 @@ PALETTES: list[dict[str, str]] = [
     {
         "name": "Forest",
         "philosophy": "Calm & natural — muted greens, earthy tones, easy on the eyes",
+        "is_dark": False,
+        "card_gradient": ["#15803d", "#16a34a"],
         "surface": "#f0faf4",
         "panel": "#ffffff",
         "panel_elevated": "#f7fdf9",
@@ -89,6 +97,8 @@ PALETTES: list[dict[str, str]] = [
     {
         "name": "Graphite",
         "philosophy": "Dark ops — deep navy blacks, cyan accent, terminal aesthetic",
+        "is_dark": True,
+        "card_gradient": ["#0c2331", "#22d3ee"],
         "surface": "#080e1a",
         "panel": "#0d1424",
         "panel_elevated": "#111c2e",
@@ -120,6 +130,8 @@ PALETTES: list[dict[str, str]] = [
     {
         "name": "Amber",
         "philosophy": "Warm editorial — golden tones, readable serif-friendly text, editorial data journalism aesthetic",
+        "is_dark": False,
+        "card_gradient": ["#92400e", "#d97706"],
         "surface": "#fefce8",
         "panel": "#fffef5",
         "panel_elevated": "#fffdf0",
@@ -151,6 +163,8 @@ PALETTES: list[dict[str, str]] = [
     {
         "name": "Obsidian",
         "philosophy": "Pure dark — true blacks, indigo/violet accent, premium SaaS",
+        "is_dark": True,
+        "card_gradient": ["#1e1b4b", "#6366f1"],
         "surface": "#09090b",
         "panel": "#0f0f12",
         "panel_elevated": "#141418",
@@ -182,18 +196,19 @@ PALETTES: list[dict[str, str]] = [
 ]
 
 
-def _repaint_component(component: dict[str, Any], palette: dict[str, str]) -> dict[str, Any]:
+def _repaint_component(component: dict[str, Any], palette: dict[str, Any]) -> dict[str, Any]:
     """Apply palette + baseline style consistency to one component."""
     style = component.setdefault("style", {})
     ctype = component.get("type")
+    shadow = SHADOW_DARK_THEME if palette.get("is_dark") else SHADOW_LIGHT_THEME
 
     # Base — every component
     style["backgroundColor"] = palette["panel"]
     style["borderColor"] = palette["border"]
     style["textColor"] = palette["text"]
     style.setdefault("borderWidth", 1)
-    style.setdefault("borderRadius", 10)
-    style.setdefault("padding", 12)
+    style.setdefault("borderRadius", 12)
+    style.setdefault("padding", 16)
 
     if ctype in {"StatCard", "StatusBadge"}:
         style["backgroundColor"] = palette["card_tint"]
@@ -201,6 +216,10 @@ def _repaint_component(component: dict[str, Any], palette: dict[str, str]) -> di
         style.setdefault("borderLeftWidth", 4)
         style["textColor"] = palette["text"]
         style["mutedColor"] = palette["text_muted"]
+        style.setdefault("metricFontSize", 32)
+        style.setdefault("labelFontSize", 13)
+        style.setdefault("padding", 22)
+        style.setdefault("borderRadius", 14)
 
     elif ctype in {"LineChart", "BarChart"}:
         style["backgroundColor"] = palette["chart_tint"]
@@ -212,6 +231,7 @@ def _repaint_component(component: dict[str, Any], palette: dict[str, str]) -> di
     elif ctype == "Table":
         style["backgroundColor"] = palette["table_tint"]
         style["headerBackgroundColor"] = palette.get("table_header", palette["panel"])
+        style["headerTextColor"] = palette["text"]
         style["borderColor"] = palette["border_subtle"]
         style["rowHoverColor"] = palette.get("primary_subtle", palette["primary"] + "22")
         style["textColor"] = palette["text"]
@@ -226,16 +246,22 @@ def _repaint_component(component: dict[str, Any], palette: dict[str, str]) -> di
         style["warnColor"] = palette.get("log_warn", palette["warning"])
         style["errorColor"] = palette.get("log_error", palette["error"])
         style.setdefault("fontFamily", "Fira Code")
+        style.setdefault("fontSize", 12)
+        style.setdefault("lineHeight", 1.6)
 
     elif ctype in {"TextInput", "NumberInput", "Select"}:
         style["backgroundColor"] = palette["input_tint"]
         style["borderColor"] = palette["border"]
         style["textColor"] = palette["text"]
         style["focusBorderColor"] = palette["primary"]
+        style.setdefault("borderRadius", 10)
+        style.setdefault("padding", 12)
 
     elif ctype in {"Container", "TabbedContainer"}:
         style["backgroundColor"] = palette["surface"]
         style["borderColor"] = palette.get("border_subtle", palette["border"])
+        style.setdefault("borderRadius", 14)
+        style.setdefault("padding", 20)
 
     elif ctype == "StatusBadge":
         style["backgroundColor"] = palette.get("badge_bg", palette["panel"])
@@ -245,16 +271,60 @@ def _repaint_component(component: dict[str, Any], palette: dict[str, str]) -> di
         style["backgroundColor"] = "transparent"
         style["textColor"] = palette["text"]
         style["mutedColor"] = palette["text_muted"]
+        style.setdefault("lineHeight", 1.6)
 
     if ctype == "Button":
         style["backgroundColor"] = palette["primary"]
         style["borderColor"] = palette["primary"]
         style["textColor"] = palette["primary_text"]
         style["hoverBackgroundColor"] = palette.get("primary_hover", palette["primary"])
-        style.setdefault("fontWeight", 600)
+        style.setdefault("fontWeight", 700)
         style.setdefault("padding", 14)
+        style.setdefault("borderRadius", 10)
+
+    # Shadow elevation — skip for inherently transparent / inline components.
+    if ctype not in {"Text", "StatusBadge", "Button"}:
+        style["boxShadow"] = shadow
 
     return component
+
+
+def _apply_hero_gradient(components: list[dict[str, Any]], palette: dict[str, Any]) -> None:
+    """
+    Pick the first StatCard (top-left) and apply the palette's hero gradient.
+    Always overrides — the palette is the source of truth for variants, so
+    we want a consistent hero look per palette.
+    """
+    stat_cards = [c for c in components if c.get("type") == "StatCard"]
+    if not stat_cards:
+        return
+    stat_cards.sort(
+        key=lambda c: (
+            c.get("layout", {}).get("y", 0),
+            c.get("layout", {}).get("x", 0),
+        )
+    )
+    hero = stat_cards[0]
+    style = hero.setdefault("style", {})
+    stops = palette.get("card_gradient") or [palette["primary"], palette.get("primary_hover", palette["primary"])]
+    style["backgroundGradient"] = {
+        "enabled":   True,
+        "direction": 135,
+        "stops": [
+            {"color": stops[0], "position": 0},
+            {"color": stops[1], "position": 100},
+        ],
+    }
+    # Override base palette colors for hero — gradient + white text reads better.
+    style["textColor"] = "#ffffff"
+    style["mutedColor"] = "rgba(255,255,255,0.75)"
+    style["borderLeftColor"] = stops[1]
+    style["metricFontSize"] = 36
+    # Heavier shadow tinted in the brand color.
+    style["boxShadow"] = (
+        f"0 4px 16px {stops[1]}33, "
+        f"0 16px 36px {stops[0]}26"
+    )
 
 
 def _score_component(component: dict[str, Any]) -> int:
@@ -317,15 +387,15 @@ def _overview_transform(components: list[dict[str, Any]]) -> list[dict[str, Any]
         ctype = clone.get("type")
         if ctype == "StatCard":
             clone["layout"]["w"] = 3
-            clone["layout"]["h"] = 5
+            clone["layout"]["h"] = 7
         elif ctype in {"LineChart", "BarChart"}:
             clone["layout"]["w"] = 6
-            clone["layout"]["h"] = 10
+            clone["layout"]["h"] = 13
         elif ctype in {"Table", "LogsViewer"}:
             clone["layout"]["w"] = 12
-            clone["layout"]["h"] = 11
+            clone["layout"]["h"] = 14
         transformed.append(clone)
-    return _pack_rows(transformed, height_scale=0.95)
+    return _pack_rows(transformed, height_scale=1.0)
 
 
 def _detailed_transform(components: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -336,13 +406,13 @@ def _detailed_transform(components: list[dict[str, Any]]) -> list[dict[str, Any]
         ctype = clone.get("type")
         if ctype in {"Table", "LogsViewer"}:
             clone["layout"]["w"] = 12
-            clone["layout"]["h"] = 14
+            clone["layout"]["h"] = 16
         elif ctype in {"LineChart", "BarChart"}:
             clone["layout"]["w"] = 8
-            clone["layout"]["h"] = 11
+            clone["layout"]["h"] = 13
         elif ctype == "StatCard":
             clone["layout"]["w"] = 4
-            clone["layout"]["h"] = 5
+            clone["layout"]["h"] = 7
         transformed.append(clone)
     return _pack_rows(transformed, height_scale=1.15)
 
@@ -355,13 +425,13 @@ def _visual_transform(components: list[dict[str, Any]]) -> list[dict[str, Any]]:
         ctype = clone.get("type")
         if ctype in {"LineChart", "BarChart"}:
             clone["layout"]["w"] = 12
-            clone["layout"]["h"] = 12
+            clone["layout"]["h"] = 14
         elif ctype == "StatCard":
             clone["layout"]["w"] = 3
-            clone["layout"]["h"] = 5
+            clone["layout"]["h"] = 7
         elif ctype in {"Table", "LogsViewer", "Text"}:
             clone["layout"]["w"] = 12
-            clone["layout"]["h"] = 8
+            clone["layout"]["h"] = 10
         transformed.append(clone)
     return _pack_rows(transformed, height_scale=1.0)
 
@@ -439,16 +509,62 @@ def _apply_profile(components: list[dict[str, Any]], profile: str) -> list[dict[
 
 def _apply_palette(
     config: DashboardConfig,
-    palette: dict[str, str],
+    palette: dict[str, Any],
     profile: str,
     dashboard_type: DashboardType,
 ) -> DashboardConfig:
     cloned = copy.deepcopy(config.model_dump(by_alias=True))
+    cloned["canvasStyle"] = {
+        **(cloned.get("canvasStyle") or {}),
+        "backgroundColor": palette["surface"],
+    }
+    # Drop any prompt-driven canvas gradient — variants own the canvas look
+    # so each palette feels distinct in the picker.
+    cloned["canvasStyle"].pop("backgroundGradient", None)
+
     cloned["components"] = _apply_profile(cloned["components"], profile)
     cloned["components"] = _apply_archetype_adjustments(
         cloned["components"], dashboard_type, profile
     )
     cloned["components"] = [_repaint_component(c, palette) for c in cloned["components"]]
+    _apply_hero_gradient(cloned["components"], palette)
+    return DashboardConfig.model_validate(cloned)
+
+
+# Default polish palette for the "Original" variant. We keep it the same
+# Cobalt theme as variant #2 in spirit but with neutrals tuned to match
+# whatever the LLM produced — just enough to guarantee a coherent look
+# without overriding the LLM's structural choices.
+DEFAULT_POLISH_PALETTE = PALETTES[0]
+
+
+def _polish_original(
+    config: DashboardConfig, dashboard_type: DashboardType
+) -> DashboardConfig:
+    """
+    Apply visual polish to the Gemini-generated config WITHOUT relayouting it.
+    Goal: never ship a raw LLM-coloured first option. The user's default pick
+    should still look professional.
+
+    We reuse `_repaint_component` + the hero gradient pass with a default
+    palette, but skip the layout transforms — the LLM's structural choices
+    are preserved.
+    """
+    cloned = copy.deepcopy(config.model_dump(by_alias=True))
+    palette = DEFAULT_POLISH_PALETTE
+
+    canvas = cloned.setdefault("canvasStyle", {}) or {}
+    canvas.setdefault("backgroundColor", palette["surface"])
+    cloned["canvasStyle"] = canvas
+
+    # Pack rows to fix any LLM-introduced overlap, but keep the LLM's relative
+    # ordering and width preferences (no profile transform here).
+    cloned["components"] = _pack_rows(cloned["components"], height_scale=1.0)
+    cloned["components"] = _apply_archetype_adjustments(
+        cloned["components"], dashboard_type, profile="Original"
+    )
+    cloned["components"] = [_repaint_component(c, palette) for c in cloned["components"]]
+    _apply_hero_gradient(cloned["components"], palette)
     return DashboardConfig.model_validate(cloned)
 
 
@@ -458,16 +574,19 @@ def derive_variants(
     count: int,
     dashboard_type: DashboardType = "analytics",
 ) -> list[GeneratedVariant]:
-    """Returns up to `count` variants: original + profile/style alternatives."""
+    """Returns up to `count` variants: polished-original + style alternatives."""
     variants: list[GeneratedVariant] = [
         GeneratedVariant(
             name=f"{base_name} - Original",
-            philosophy="Original generated layout and styling.",
-            config=base,
+            philosophy="Original layout, polished with the platform's default design system.",
+            config=_polish_original(base, dashboard_type),
         )
     ]
     profiles = ["Overview", "Detailed", "Visual"]
-    for i, palette in enumerate(PALETTES[: max(0, count - 1)]):
+    # Skip palette[0] (Cobalt) since the Original variant already uses it as
+    # its polish palette — otherwise the first two variants look identical.
+    alt_palettes = PALETTES[1:]
+    for i, palette in enumerate(alt_palettes[: max(0, count - 1)]):
         profile = profiles[i % len(profiles)]
         variants.append(
             GeneratedVariant(

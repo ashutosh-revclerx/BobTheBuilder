@@ -42,8 +42,11 @@ const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
   const isBound = data._resolvedBindings?.dbBinding;
   const rawData = isBound ? data.dbBinding : data.mockValue;
   const value = `${data.prefix ?? ''}${typeof rawData === 'string' ? rawData : String(rawData ?? '—')}${data.suffix ?? ''}`;
-  const trendValue = data.trend || null;
-  const trendType = data.trendType || 'positive';
+  
+  const trendValue = data._resolvedBindings?.trend ?? data.trend ?? null;
+  const trendType = data._resolvedBindings?.trendType ?? data.trendType ?? 'positive';
+  const sparklineData = (data._resolvedBindings?.sparklineData ?? data.sparklineData ?? []) as number[];
+
   const isPositive = trendType === 'positive';
   const isNeutral = trendType === 'neutral';
   const trendColor = style.trendColorOverride || (isNeutral ? '#4b5563' : isPositive ? '#047857' : '#b91c1c');
@@ -87,9 +90,9 @@ const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
             <div className="stat-card-value" style={{ fontSize: `${style.metricFontSize || 28}px`, color: 'var(--comp-text)' }}>
               {value}
             </div>
-            {data.sparklineData?.length ? (
+            {sparklineData.length ? (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '32px' }}>
-                {data.sparklineData.map((point, index) => (
+                {sparklineData.map((point, index) => (
                   <span
                     key={`${point}-${index}`}
                     style={{
@@ -98,7 +101,7 @@ const StatCard = React.memo(function StatCard({ config }: StatCardProps) {
                       height: `${Math.max(4, point)}px`,
                       borderRadius: '999px',
                       backgroundColor: trendColor,
-                      opacity: 0.6 + (index / (data.sparklineData?.length || 1)) * 0.4,
+                      opacity: 0.6 + (index / (sparklineData.length || 1)) * 0.4,
                     }}
                   />
                 ))}

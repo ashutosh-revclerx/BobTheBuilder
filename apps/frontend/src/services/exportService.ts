@@ -81,7 +81,7 @@ const exportedShellCss = `
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.exported-dashboard-main .builder-canvas-wrapper { min-height: calc(100vh - 52px); }
+.exported-dashboard-main .builder-canvas-wrapper { min-height: 100vh; }
 `;
 
 const sourceRuntimeFiles: Record<string, string> = {
@@ -117,7 +117,8 @@ export const downloadAsCode = async (dashboardState: any) => {
   const dashboardName = dashboardState.dashboardName || 'Untitled Dashboard';
   const dashboardConfig = {
     name: dashboardName,
-    components: dashboardState.components || []
+    components: dashboardState.components || [],
+    canvasStyle: dashboardState.canvasStyle
   };
   const queriesConfig = dashboardState.queriesConfig || [];
   

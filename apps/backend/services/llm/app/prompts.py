@@ -6,11 +6,15 @@ Versioning: bump SYSTEM_PROMPT_VERSION whenever you make a material change.
 The version is logged on each call — useful when output quality regresses.
 """
 
+import re
+
 from .archetypes import ARCHETYPE_RULES, DashboardType
 from .component_capabilities import format_capabilities_for_prompt
 from .schemas import GenerateRequest, ResourceContext
 
 SYSTEM_PROMPT_VERSION = "v4.0"
+
+HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}\b")
 
 
 # ─── Schema description (human-friendly, complements response_schema) ────────
@@ -19,7 +23,19 @@ SYSTEM_PROMPT_VERSION = "v4.0"
 # with a concrete worked example. Both layers run together.
 
 SCHEMA_RULES = """
-You output a single JSON object: { "components": [...], "queries": [...] }.
+You output a single JSON object: { "components": [...], "queries": [...], "canvasStyle": {...} }.
+
+# canvasStyle — global dashboard background theme
+
+REQUIRED:
+  - canvasStyle.backgroundColor  #hex
+OPTIONAL:
+  - canvasStyle.backgroundGradient
+    { "enabled": true, "direction": 135,
+      "stops": [
+        { "color": "#0f172a", "position": 0 },
+        { "color": "#1e293b", "position": 100 }
+      ] }
 
 # components[] — one object per visual element
 
@@ -330,6 +346,11 @@ def build_system_prompt() -> str:
         "Design a production-quality dashboard, then output ONE valid JSON config.\n\n"
         f"{SCHEMA_RULES}\n\n"
         f"{format_capabilities_for_prompt()}\n\n"
+        "## Component capability tool\n"
+        "A tool named `get_component_capabilities` is available. Prefer calling it\n"
+        "before configuring a component type when you are unsure which style/data\n"
+        "properties are supported. Treat the tool result and the component reference\n"
+        "above as the source of truth; do not invent component-specific properties.\n\n"
         "## Design quality rules — follow these on every generation\n"
         "- Use at least 3 component-specific style/data properties per component.\n"
         "- Do NOT generate identical-looking components (same bg, no accent, no data config).\n"
@@ -360,6 +381,10 @@ def build_system_prompt() -> str:
         "- Get the {{ }} binding rules right — Buttons NO braces, Tables/StatCards/Text WITH braces.\n"
         "- Use kebab-case ids that don't conflict (`stat-total`, `tbl-orders`, etc).\n"
         "- Pick a coherent design system: one accent color, neutral backgrounds, subtle borders.\n"
+        "- Always include canvasStyle.backgroundColor.\n"
+        "- For premium visual quality, prefer canvasStyle.backgroundGradient with 2-3 stops.\n"
+        "- If the user provides brand/palette colors, those colors are a hard constraint.\n"
+        "  Prefer them over default palette choices and carry them through canvasStyle and key components.\n"
         "- Maintain clear visual hierarchy and consistent spacing.\n"
         "- Components must not overlap on the grid (sum of x..x+w should not collide on the same row).\n"
         "\n"
@@ -403,6 +428,35 @@ def build_system_prompt() -> str:
     )
 
 
+def _extract_hex_colors(text: str) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for match in HEX_COLOR_RE.findall(text):
+        normalized = match.lower()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        ordered.append(normalized)
+    return ordered[:8]
+
+
+def _extract_named_color_roles(text: str) -> dict[str, str]:
+    lowered = text.lower()
+    roles: dict[str, str] = {}
+    role_patterns = {
+        "primary": r"(?:primary(?:\s+color)?\s*[:=]?\s*)(#[0-9a-fA-F]{6})",
+        "secondary": r"(?:secondary(?:\s+color)?\s*[:=]?\s*)(#[0-9a-fA-F]{6})",
+        "accent": r"(?:accent(?:\s+color)?\s*[:=]?\s*)(#[0-9a-fA-F]{6})",
+        "background": r"(?:background(?:\s+color)?\s*[:=]?\s*)(#[0-9a-fA-F]{6})",
+        "text": r"(?:text(?:\s+color)?\s*[:=]?\s*)(#[0-9a-fA-F]{6})",
+    }
+    for role, pattern in role_patterns.items():
+        m = re.search(pattern, lowered, re.IGNORECASE)
+        if m:
+            roles[role] = m.group(1).lower()
+    return roles
+
+
 def build_user_prompt(req: GenerateRequest, dashboard_type: DashboardType, confidence: float) -> str:
     sections = [f"## What the user wants\n{req.prompt.strip()}\n"]
     sections.append(
@@ -418,6 +472,30 @@ def build_user_prompt(req: GenerateRequest, dashboard_type: DashboardType, confi
         "- Every button should trigger a manual query.\n"
         "- Prefer predictable layouts over random placement.\n"
     )
+
+    palette = _extract_hex_colors(req.prompt)
+    color_roles = _extract_named_color_roles(req.prompt)
+    if palette or color_roles:
+        sections.append("## Color and brand constraints")
+        if palette:
+            sections.append(
+                "Use this user-provided palette as the source of truth: "
+                + ", ".join(palette)
+            )
+        if color_roles:
+            role_lines = [f"- {role}: {color}" for role, color in color_roles.items()]
+            sections.append("Respect these explicit role mappings:\n" + "\n".join(role_lines))
+        sections.append(
+            "Apply these colors consistently across canvasStyle, StatCards, chart series/colors, button accents, and gradients. "
+            "Do not replace them with unrelated defaults."
+        )
+        sections.append(
+            "At least one hero component must use backgroundGradient built from the provided palette."
+        )
+        sections.append(
+            "Set canvasStyle.backgroundColor from this palette and, when possible, set "
+            "canvasStyle.backgroundGradient using 2-3 palette stops."
+        )
 
     if req.resources:
         sections.append("## Available resources & endpoints")

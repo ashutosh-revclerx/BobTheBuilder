@@ -25,7 +25,7 @@ const DEFAULT_SIZES: Record<string, {w:number, h:number}> = {
 
 function FloatingLabel({ text }: { text: string }) {
   return (
-    <span className="canvas-component-label">
+    <span className="canvas-component-label" style={{ whiteSpace: 'normal', wordBreak: 'break-word', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: '1.2' }}>
       {text}
     </span>
   );

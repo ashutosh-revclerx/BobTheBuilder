@@ -24,6 +24,9 @@ interface QueryBinding {
   parameters?:   unknown[];
   trigger?:      'onLoad' | 'manual' | 'onDependencyChange';
   queryName?:    string;
+  responseTransformer?: string;
+  pollUrlTemplate?: string;
+  body?:         string;
 }
 
 function QueryBindingSection({
@@ -67,15 +70,20 @@ function QueryBindingSection({
       endpoint: next.path,
       method:   next.method ?? 'GET',
       trigger,
+      responseTransformer: next.responseTransformer,
+      pollUrlTemplate: next.pollUrlTemplate,
+      body: next.body,
     });
 
     // Auto-bind the component so it reads from the query result. For Buttons
     // we use the trigger path so onClick fires the query.
     const bindingPath = trigger === 'manual'
-      ? `queries.${queryName}.trigger`
-      : `queries.${queryName}.data`;
+      ? `{{queries.${queryName}.trigger}}`
+      : `{{queries.${queryName}.data}}`;
     updateData(componentId, { dbBinding: bindingPath } as Partial<ComponentData>);
   };
+
+  const selectedResource = resources.find((r) => r.id === binding.resourceId);
 
   return (
     <div className="form-group query-binding-section">
@@ -96,12 +104,25 @@ function QueryBindingSection({
         ))}
       </select>
 
-      <EndpointPicker
-        resourceId={binding.resourceId ?? null}
-        selectedMethod={binding.method ?? 'GET'}
-        selectedPath={binding.path ?? ''}
-        onChange={(next) => syncQuery({ ...binding, ...next, queryName })}
-      />
+      {selectedResource?.type === 'postgresql' ? (
+        <div className="form-group" style={{ marginTop: '8px' }}>
+          <label className="form-label" style={{ fontSize: '10px', opacity: 0.7 }}>SQL Query</label>
+          <textarea
+            className="form-textarea"
+            style={{ fontFamily: 'monospace', minHeight: '80px' }}
+            placeholder="SELECT * FROM users WHERE id = {{components.input1.value}}"
+            value={binding.path ?? ''}
+            onChange={(e) => syncQuery({ ...binding, method: 'POST', path: e.target.value, queryName })}
+          />
+        </div>
+      ) : (
+        <EndpointPicker
+          resourceId={binding.resourceId ?? null}
+          selectedMethod={binding.method ?? 'GET'}
+          selectedPath={binding.path ?? ''}
+          onChange={(next) => syncQuery({ ...binding, ...next, queryName })}
+        />
+      )}
 
       {binding.path && (
         <select
@@ -113,6 +134,46 @@ function QueryBindingSection({
           <option value="manual">Trigger: manual (e.g. button click)</option>
           <option value="onDependencyChange">Trigger: on dependency change</option>
         </select>
+      )}
+
+      {binding.path && (
+        <div className="form-group" style={{ marginTop: '8px' }}>
+          <label className="form-label" style={{ fontSize: '10px', opacity: 0.7 }}>Response Transformer (JS)</label>
+          <textarea
+            className="form-textarea"
+            style={{ fontFamily: 'monospace', minHeight: '60px' }}
+            placeholder="return data;"
+            value={binding.responseTransformer ?? ''}
+            onChange={(e) => syncQuery({ ...binding, responseTransformer: e.target.value })}
+          />
+        </div>
+      )}
+
+      {binding.path && binding.method && binding.method !== 'GET' && (
+        <div className="form-group" style={{ marginTop: '8px' }}>
+          <label className="form-label" style={{ fontSize: '10px', opacity: 0.7 }}>Request Payload (JSON)</label>
+          <textarea
+            className="form-textarea"
+            style={{ fontFamily: 'monospace', minHeight: '80px' }}
+            placeholder={'{\n  "url": "{{components.input_url.value}}"\n}'}
+            value={binding.body ?? ''}
+            onChange={(e) => syncQuery({ ...binding, body: e.target.value })}
+          />
+        </div>
+      )}
+
+      {binding.path && selectedResource?.type === 'agent' && (
+        <div className="form-group" style={{ marginTop: '8px' }}>
+          <label className="form-label" style={{ fontSize: '10px', opacity: 0.7 }}>Custom Poll URL Template (Optional)</label>
+          <input
+            type="text"
+            className="form-input"
+            style={{ fontFamily: 'monospace' }}
+            placeholder="/api/v1/jobs/{{jobId}}/status"
+            value={binding.pollUrlTemplate ?? ''}
+            onChange={(e) => syncQuery({ ...binding, pollUrlTemplate: e.target.value })}
+          />
+        </div>
       )}
 
       {binding.path && (
@@ -395,7 +456,7 @@ export default function DataTab() {
 
       {type === 'StatCard' && (
         <>
-          <TextField label="Trend Value" value={data.trend ?? ''} onChange={(value) => handleDataField('trend', value)} />
+          <TextField label="Trend Value" value={data.trend ?? ''} onChange={(value) => handleDataField('trend', value)} placeholder="{{queries.q.data.trend}}" />
           <SelectField
             label="Trend Type"
             value={data.trendType || 'positive'}
@@ -412,15 +473,20 @@ export default function DataTab() {
           <FormField label="Sparkline data">
             <textarea
               className="form-textarea"
-              value={JSON.stringify(data.sparklineData ?? [], null, 2)}
+              value={typeof data.sparklineData === 'string' ? data.sparklineData : JSON.stringify(data.sparklineData ?? [], null, 2)}
               onChange={(e) => {
-                try {
-                  handleDataField('sparklineData', JSON.parse(e.target.value));
-                } catch {
-                  // Ignore invalid JSON while typing.
+                const val = e.target.value;
+                if (val.startsWith('{{')) {
+                  handleDataField('sparklineData', val);
+                } else {
+                  try {
+                    handleDataField('sparklineData', JSON.parse(val));
+                  } catch {
+                    // Ignore invalid JSON while typing.
+                  }
                 }
               }}
-              placeholder="[10,20,15,30,25]"
+              placeholder="[10,20,15,30,25] or {{query.data}}"
               rows={4}
             />
           </FormField>
@@ -761,7 +827,12 @@ export default function DataTab() {
             </div>
           </FormField>
           <TextField label="Default color" value={data.defaultColor ?? '#9ba3af'} onChange={(value) => handleDataField('defaultColor', value)} />
-          <BooleanField label="Show dot" value={data.showDot !== false} onChange={(value) => handleDataField('showDot', value)} />
+          <SelectField
+            label="Symbol"
+            value={data.symbol || 'Dot'}
+            onChange={(value) => handleDataField('symbol', value)}
+            options={['Dot', 'Check', 'Warning', 'None']}
+          />
           <SelectField
             label="Size"
             value={data.size || 'Medium'}
@@ -857,7 +928,10 @@ export default function DataTab() {
       {type === 'Text' && (
         <>
           <BooleanField label="Dynamic expression" value={data.expression === true} onChange={(value) => handleDataField('expression', value)} />
-          <TextField label="Link URL" value={data.linkTo ?? ''} onChange={(value) => handleDataField('linkTo', value)} />
+          <BooleanField label="Enable Link" value={data.enableLink === true} onChange={(value) => handleDataField('enableLink', value)} />
+          {data.enableLink && (
+            <TextField label="Link URL" value={data.linkTo ?? ''} onChange={(value) => handleDataField('linkTo', value)} />
+          )}
         </>
       )}
 

@@ -5,7 +5,9 @@ import { restExecutor }  from '../executors/restExecutor.js';
 import { dbExecutor }    from '../executors/dbExecutor.js';
 import { agentExecutor } from '../executors/agentExecutor.js';
 import type { ExecutorResult } from '../executors/restExecutor.js';
+import { createLogger }  from '../utils/logger.js';
 
+const log = createLogger('execute');
 const router = Router();
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -17,6 +19,7 @@ const ExecuteSchema = z.object({
   params:      z.record(z.string(), z.unknown()).optional(),
   body:        z.record(z.string(), z.unknown()).optional(),
   dashboardId: z.string().uuid().optional(), // forwarded to query_logs
+  pollUrlTemplate: z.string().optional(),
 });
 
 // ─── Secret resolver ─────────────────────────────────────────────────────────
@@ -44,7 +47,7 @@ function logQuery(
     `INSERT INTO query_logs (dashboard_id, resource_name, endpoint, status, duration_ms)
      VALUES ($1, $2, $3, $4, $5)`,
     [dashboardId ?? null, resourceName, endpoint, status, durationMs],
-  ).catch((err) => console.error('[execute] log error:', err));
+  ).catch((err) => log.error('query_log insert failed:', err));
 }
 
 // ─── DB row type ──────────────────────────────────────────────────────────────
@@ -71,7 +74,7 @@ router.post('/', async (req, res) => {
     });
   }
 
-  const { resource: resourceName, endpoint, method, params, body, dashboardId } = parsed.data;
+  const { resource: resourceName, endpoint, method, params, body, dashboardId, pollUrlTemplate } = parsed.data;
   const startMs = Date.now();
 
   // 2. Look up the resource — this is the one place secret_ref is read from DB
@@ -91,7 +94,7 @@ router.post('/', async (req, res) => {
     }
     resource = rows[0];
   } catch (err) {
-    console.error('[execute] resource lookup:', err);
+    log.error('resource lookup failed:', err);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 
@@ -132,6 +135,7 @@ router.post('/', async (req, res) => {
           endpoint,
           params,
           body,
+          pollUrlTemplate,
         });
         break;
       }

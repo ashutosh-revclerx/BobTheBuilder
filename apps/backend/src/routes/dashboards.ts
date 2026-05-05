@@ -148,6 +148,7 @@ router.get('/', async (_req, res) => {
 // decides which variant to persist.
 
 router.post('/generate', async (req, res) => {
+  const startedAt = Date.now();
   const parsed = GenerateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -156,6 +157,13 @@ router.post('/generate', async (req, res) => {
     });
   }
   const { prompt, resourceIds, docsUrls, variantCount } = parsed.data;
+  console.info(
+    '[dashboards] generate request prompt_len=%d resource_ids=%d docs=%d variants=%d',
+    prompt.length,
+    resourceIds.length,
+    docsUrls.length,
+    variantCount,
+  );
 
   // Hydrate the resource IDs into the shape the LLM service expects.
   let resourcesPayload: Array<{
@@ -209,6 +217,7 @@ router.post('/generate', async (req, res) => {
   const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
 
   try {
+    const upstreamStartedAt = Date.now();
     const response = await fetch(`${LLM_SERVICE_URL}/generate`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -224,18 +233,37 @@ router.post('/generate', async (req, res) => {
     const text = await response.text();
     let json: unknown = null;
     try { json = JSON.parse(text); } catch { /* keep raw text for error path */ }
+    const upstreamDurationMs = Date.now() - upstreamStartedAt;
 
     if (!response.ok) {
       const detail = (json && typeof json === 'object' && 'detail' in json)
         ? String((json as Record<string, unknown>).detail)
         : text || `LLM service returned ${response.status}`;
+      console.error(
+        '[dashboards] generate upstream_error status=%d duration_ms=%d detail=%s',
+        response.status,
+        upstreamDurationMs,
+        detail.slice(0, 500),
+      );
       return res.status(502).json({ error: detail });
     }
 
+    const totalDurationMs = Date.now() - startedAt;
+    console.info(
+      '[dashboards] generate success upstream_status=%d upstream_ms=%d total_ms=%d',
+      response.status,
+      upstreamDurationMs,
+      totalDurationMs,
+    );
     return res.json(json);
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
       const seconds = Math.round(LLM_TIMEOUT_MS / 1000);
+      console.error(
+        '[dashboards] generate timeout timeout_ms=%d llm_url=%s',
+        LLM_TIMEOUT_MS,
+        `${LLM_SERVICE_URL}/generate`,
+      );
       return res.status(504).json({ error: `LLM service took longer than ${seconds} seconds` });
     }
     console.error('[dashboards] generate proxy error:', err);
