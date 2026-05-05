@@ -150,7 +150,7 @@ def generate(req: GenerateRequest, request: Request) -> GenerateResponse:
                 detail=f"Gemini failed ({gemini_err}); OpenAI fallback also failed ({exc})",
             )
 
-    base_config = enrich_config(base_config)
+    base_config = enrich_config(base_config, req.prompt)
 
     base_name = req.prompt.strip().splitlines()[0][:40].strip() or "Untitled"
     variants = derive_variants(
