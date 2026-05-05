@@ -26,13 +26,41 @@ logger = logging.getLogger("llm.gemini")
 
 DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 MAX_TOOL_CALL_TURNS = int(os.getenv("GEMINI_MAX_TOOL_CALL_TURNS", "4"))
+PROXY_ENV_VARS = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+)
 
 
 class GeminiError(Exception):
     """Raised when Gemini cannot produce a valid DashboardConfig."""
 
 
+def _disable_ambient_proxies() -> None:
+    """Avoid broken shell proxy vars hijacking Gemini API calls in local dev."""
+    if os.getenv("LLM_ALLOW_PROXY", "").lower() in {"1", "true", "yes"}:
+        return
+
+    removed = [name for name in PROXY_ENV_VARS if os.environ.pop(name, None)]
+    if removed:
+        logger.info("Ignoring proxy env vars for Gemini calls: %s", ", ".join(removed))
+
+
+def _format_sdk_error(exc: Exception) -> str:
+    text = str(exc)
+    if "API key expired" in text:
+        return "Gemini API key expired. Renew GEMINI_API_KEY in the LLM service env."
+    if "API_KEY_INVALID" in text:
+        return "Gemini API key is invalid. Check GEMINI_API_KEY in the LLM service env."
+    return f"Gemini API call failed: {text}"
+
+
 def _client() -> genai.Client:
+    _disable_ambient_proxies()
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise GeminiError("GEMINI_API_KEY is not set in the LLM service env")
@@ -71,16 +99,21 @@ def _call_gemini_once(
     *,
     with_tools: bool,
 ) -> types.GenerateContentResponse:
-    return client.models.generate_content(
-        model=DEFAULT_MODEL,
-        contents=contents,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            response_mime_type="application/json",
-            temperature=0.7,
-            tools=gemini_tools() if with_tools else None,
-        ),
-    )
+    try:
+        return client.models.generate_content(
+            model=DEFAULT_MODEL,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                temperature=0.7,
+                tools=gemini_tools() if with_tools else None,
+            ),
+        )
+    except Exception as exc:
+        # Normalize SDK/network failures into GeminiError so FastAPI returns a
+        # controlled 502 instead of an unhandled 500.
+        raise GeminiError(_format_sdk_error(exc)) from exc
 
 
 def _response_text(response: types.GenerateContentResponse) -> str:
