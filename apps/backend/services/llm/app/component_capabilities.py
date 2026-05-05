@@ -1,252 +1,386 @@
 """
-Structured catalog of every supported component's available style and data properties.
-Injected into the system prompt so Gemini knows what properties exist per component type.
+Structured catalog of supported dashboard component capabilities.
+
+This mirrors the current frontend implementation in:
+  - apps/frontend/src/types/template.ts
+  - apps/frontend/src/components/dashboard-components/*
+
+The registry is injected into the prompt and exposed through the LLM tool layer,
+so keep it conservative: include properties the current components actually
+accept/render, and avoid aspirational keys that the UI ignores.
 """
 
 from __future__ import annotations
 
+COMMON_CARD_STYLE = [
+    "backgroundColor",      # hex color solid background
+    "backgroundGradient",   # { enabled, direction, stops: [{ color, position }] }
+    "textColor",            # hex color for primary text
+    "fontFamily",           # CSS font family
+    "fontSize",             # number in px
+    "borderRadius",         # number in px
+    "borderColor",          # hex color
+    "borderWidth",          # number in px
+    "padding",              # number in px
+]
+
+COMMON_VISIBILITY_DATA = [
+    "visible",              # boolean or expression string
+    "visibleForRoles",      # string[] role allow-list
+    "mockValue",            # fallback display/input value
+    "dbBinding",            # display binding, usually {{queries.name.data}}
+]
+
+INPUT_STYLE = [
+    "backgroundColor",
+    "backgroundGradient",
+    "textColor",
+    "fontFamily",
+    "fontSize",
+    "borderRadius",
+    "borderColor",
+    "borderWidth",
+    "padding",
+    "labelPosition",        # "Top" | "Left" | "Hidden"
+    "focusBorderColor",     # editor-supported focus accent
+]
+
+CHART_STYLE = COMMON_CARD_STYLE + [
+    "seriesColors",         # string[] of hex colors
+    "gridColor",            # chart grid stroke color
+    "axisColor",            # fallback axis/tick color
+    "xAxisColor",           # x-axis/tick color override
+    "yAxisColor",           # y-axis/tick color override
+    "showDataLabels",       # boolean; renders value labels
+]
+
+
 COMPONENT_CAPABILITIES: dict[str, dict] = {
     "StatCard": {
-        "visual_role": "Top-level KPI metric card — highest visual priority on any dashboard",
-        "style": [
-            "backgroundGradient",       # gradient fill: { enabled, direction, stops: [{color, position}] }
-            "borderLeftColor",          # accent stripe color on the left edge
-            "borderLeftWidth",          # width of the left accent stripe (px)
-            "metricFontSize",           # font size of the primary metric number (px, e.g. 28-40)
-            "labelFontSize",            # font size of the card label/title (px, e.g. 11-14)
-            "metricColor",              # color override for the metric value
-            "mutedColor",               # color for secondary/label text
-            "trendColorOverride",       # override the auto red/green trend color
-            "padding",
-            "borderRadius",
+        "description": "Top KPI card showing a single metric, trend, and optional sparkline.",
+        "visual_role": "Top-level KPI metric card with the highest dashboard priority.",
+        "style": COMMON_CARD_STYLE + [
+            "metricFontSize",          # number in px for primary metric
+            "labelFontSize",           # supported in editor/types for label sizing
+            "borderLeftColor",         # variant/editor accent stripe color
+            "borderLeftWidth",         # variant/editor accent stripe width in px
+            "trendColorOverride",      # hex color override for trend text/sparkline
+            "mutedColor",              # variant-generated muted text color
         ],
-        "data": [
-            "mockValue",                # fallback display value before data loads
-            "fieldName",                # key to extract from bound data object
-            "prefix",                   # e.g. "$" prepended to metric
-            "suffix",                   # e.g. "%" appended to metric
-            "trend",                    # e.g. "+12%" shown below metric
-            "trendType",                # "positive" | "negative" | "neutral"
-            "sparklineData",            # small inline chart array
-            "dbBinding",
+        "data": COMMON_VISIBILITY_DATA + [
+            "fieldName",               # key to extract from bound object
+            "prefix",                  # text before value, e.g. "$"
+            "suffix",                  # text after value, e.g. "%"
+            "trend",                   # trend text, e.g. "+12%"
+            "trendType",               # "positive" | "negative" | "neutral"
+            "comparisonValue",         # secondary comparison caption
+            "sparklineData",           # number[] rendered as small bars
         ],
+        "required": {
+            "style": ["metricFontSize", "borderLeftColor", "borderLeftWidth"],
+            "data": ["dbBinding"],
+        },
     },
     "Table": {
-        "visual_role": "Dense data exploration — rows, columns, search, pagination",
-        "style": [
-            "headerBackgroundColor",    # background of the column header row
-            "headerTextColor",          # text color of column headers
-            "rowAlternateColor",        # alternating row background (if stripeRows true)
-            "stripeRows",               # true | false — zebra striping
-            "selectedRowColor",         # background of the currently selected row
-            "rowHoverColor",            # row background on mouse hover
-            "searchBarBackground",      # background of the search input
+        "description": "Tabular data display with optional search, pagination, row selection, and inline rows.",
+        "visual_role": "Dense data exploration and source-of-truth row display.",
+        "style": COMMON_CARD_STYLE + [
+            "variant",                 # "Clean" | "Zebra" | "Bordered"
+            "headerBackgroundColor",   # header row background
+            "rowAlternateColor",       # alternating row background
+            "selectedRowColor",        # selected row background
+            "stripeRows",              # boolean zebra striping
+            "strikethrough",           # boolean row text decoration rule
+            "strikethroughField",      # row field used for strike rule
+            "strikethroughValue",      # row value used for strike rule
+            "searchBarBackground",     # search input background
+            "searchBarTextColor",      # search input text
+            "searchBarBorderColor",    # search input border
+        ],
+        "data": COMMON_VISIBILITY_DATA + [
+            "columns",                 # [{ name, fieldKey }]
+            "rows",                    # local fallback/editable rows
+            "searchable",              # boolean
+            "pagination",              # boolean
+            "allowAddRows",            # boolean; enables add row in editor/runtime
+            "conditionalRowColor",     # [{ field, operator, value, color }]
+            "columnVisibility",        # { fieldKey: boolean }
+            "onRowSelectAction",       # action name
+        ],
+        "required": {
+            "style": ["headerBackgroundColor", "stripeRows"],
+            "data": ["columns", "dbBinding"],
+        },
+    },
+    "BarChart": {
+        "description": "Categorical comparison chart using vertical or horizontal bars.",
+        "visual_role": "Compares discrete categories or series.",
+        "style": CHART_STYLE + [
+            "barRadius",               # number in px
+        ],
+        "data": COMMON_VISIBILITY_DATA + [
+            "xField",                  # category field
+            "yField",                  # single value field shortcut
+            "series",                  # [{ name, fieldKey }]
+            "showLegend",              # boolean
+            "showGrid",                # boolean
+            "xAxisLabel",              # label string
+            "yAxisLabel",              # label string
+            "showXAxis",               # boolean
+            "showYAxis",               # boolean
+            "colorScheme",             # "Blue" | "Green" | "Amber" | "Multi"
+            "orientation",             # "Vertical" | "Horizontal"
+            "stacked",                 # boolean
+            "onBarClickAction",        # action name
+        ],
+        "required": {
+            "style": ["seriesColors", "gridColor", "axisColor"],
+            "data": ["xField", "series", "dbBinding"],
+        },
+    },
+    "LineChart": {
+        "description": "Time-series or ordered trend chart with optional area fill and point actions.",
+        "visual_role": "Shows trends and movement over time or ordered categories.",
+        "style": CHART_STYLE + [
+            "lineWidth",               # number in px
+        ],
+        "data": COMMON_VISIBILITY_DATA + [
+            "xField",
+            "yField",
+            "series",
+            "showLegend",
+            "showGrid",
+            "xAxisLabel",
+            "yAxisLabel",
+            "showXAxis",
+            "showYAxis",
+            "colorScheme",
+            "smooth",                  # boolean; false uses linear segments
+            "showDots",                # boolean
+            "fillArea",                # boolean
+            "onPointClickAction",      # action name
+        ],
+        "required": {
+            "style": ["seriesColors", "gridColor", "axisColor", "lineWidth"],
+            "data": ["xField", "series", "dbBinding"],
+        },
+    },
+    "LogsViewer": {
+        "description": "Scrollable log stream with level colors, search, filtering, and auto-scroll.",
+        "visual_role": "Terminal-like event/log inspection surface.",
+        "style": COMMON_CARD_STYLE + [
+            "lineHeight",
+            "levelColors",             # { INFO, WARN, ERROR, DEBUG }
+            "searchBarBackground",
             "searchBarTextColor",
             "searchBarBorderColor",
         ],
-        "data": [
-            "columns",                  # [{ name, fieldKey }]
-            "searchable",               # true | false
-            "pagination",               # true | false
-            "conditionalRowColor",      # { fieldKey, rules: [{value, color}] }
-            "columnVisibility",         # { fieldKey: true|false }
-            "dbBinding",
+        "data": COMMON_VISIBILITY_DATA + [
+            "levelFilter",             # "all" | "info" | "warn" | "error"
+            "logSearchable",           # boolean
+            "maxLines",                # number
+            "autoScroll",              # boolean
+            "timestampField",          # field name
+            "levelField",              # field name
+            "messageField",            # field name
+            "wrapLines",               # boolean
         ],
-    },
-    "BarChart": {
-        "visual_role": "Categorical comparison — bars representing discrete values",
-        "style": [
-            "seriesColors",             # array of hex colors, one per series
-            "gridColor",                # color of background grid lines
-            "axisColor",                # color of axis lines and tick labels
-            "axisLabelColor",
-            "legendColor",
-            "barRadius",                # corner radius on bars (px)
-            "barGap",                   # gap between bar groups
-        ],
-        "data": [
-            "showGrid",                 # true | false
-            "showLegend",               # true | false
-            "xField",                   # field name for the X axis
-            "series",                   # [{ name, fieldKey }] fields to plot
-            "stacked",                  # true | false — stacked bars
-            "dbBinding",
-        ],
-    },
-    "LineChart": {
-        "visual_role": "Time-series trends — connected data points over time",
-        "style": [
-            "seriesColors",
-            "gridColor",
-            "axisColor",
-            "axisLabelColor",
-            "legendColor",
-            "lineWidth",                # stroke width (px)
-            "areaFill",                 # true | false — fill area under line
-            "dotSize",                  # size of data point dots (px)
-        ],
-        "data": [
-            "showGrid",
-            "showLegend",
-            "xField",
-            "series",
-            "smooth",                   # true | false — curved lines
-            "dbBinding",
-        ],
-    },
-    "LogsViewer": {
-        "visual_role": "Scrollable log stream — entries colored by log level",
-        "style": [
-            "infoColor",                # color for INFO level entries
-            "warnColor",                # color for WARN level entries
-            "errorColor",               # color for ERROR level entries
-            "debugColor",               # color for DEBUG level entries
-            "levelColors",              # { info, warn, error, debug } override map
-            "fontFamily",               # e.g. "Fira Code" for monospace look
-            "fontSize",
-            "lineHeight",
-        ],
-        "data": [
-            "messageField",             # field name for the log message
-            "levelField",               # field name for the log level
-            "timestampField",           # field name for the timestamp
-            "dbBinding",
-        ],
+        "required": {
+            "style": ["fontFamily", "levelColors"],
+            "data": ["messageField", "levelField", "timestampField", "dbBinding"],
+        },
     },
     "Button": {
-        "visual_role": "Trigger action — fires a query or navigates",
+        "description": "Action button that can trigger a query with loading, confirmation, and callbacks.",
+        "visual_role": "Primary interaction trigger.",
         "style": [
-            "variant",                  # "Primary" | "Secondary" | "Ghost" | "Danger"
-            "hoverBackgroundColor",
-            "activeBackgroundColor",
+            "backgroundColor",
+            "backgroundGradient",
+            "textColor",
+            "fontFamily",
+            "fontStyle",
             "fontWeight",
-            "fullWidth",                # true | false — stretches to container width
-            "iconLeft",                 # icon name shown before label
-            "iconRight",                # icon name shown after label
-            "shape",                    # "Rounded" | "Pill" | "Square"
+            "letterSpacing",
+            "textTransform",
+            "borderRadius",
+            "borderColor",
+            "borderWidth",
+            "padding",
+            "fullWidth",
+            "iconLeft",
+            "hoverBackgroundColor",
+            "variant",
+            "shape",
         ],
-        "data": [
-            "dbBinding",                # "queries.X.trigger" — NO braces
-            "loadingState",             # true | false — shows spinner while query runs
-            "confirmationDialog",       # true | false — ask before firing
+        "data": COMMON_VISIBILITY_DATA + [
+            "disabled",                # boolean expression string
+            "loadingState",            # boolean
+            "confirmationDialog",      # boolean
+            "confirmationMessage",     # string
+            "confirmLabel",            # string
+            "cancelLabel",             # string
+            "onSuccessAction",         # action name
+            "onErrorAction",           # action name
         ],
+        "required": {
+            "style": ["variant", "fontWeight", "hoverBackgroundColor"],
+            "data": ["dbBinding"],
+        },
     },
     "TextInput": {
-        "visual_role": "Single-line text entry — feeds into query params or body",
-        "style": [
-            "focusBorderColor",
-            "placeholderColor",
-        ],
-        "data": [
+        "description": "Single-line text input that writes to componentState[id].value.",
+        "visual_role": "User text entry for query params or request bodies.",
+        "style": INPUT_STYLE,
+        "data": COMMON_VISIBILITY_DATA + [
+            "label",
             "placeholder",
-            "type",                     # "Text" | "URL" | "Email"
-            "defaultValue",
+            "type",                    # "Text" | "Email" | "Password" | "URL" | "Search"
+            "required",
+            "regex",
+            "errorMessage",
+            "maxLength",
+            "onChangeAction",
+            "onSubmitAction",          # query trigger binding/action
         ],
+        "required": {"style": [], "data": ["placeholder", "type"]},
     },
     "NumberInput": {
-        "visual_role": "Numeric entry with optional min/max constraints",
-        "style": [
-            "focusBorderColor",
+        "description": "Numeric input with min/max validation, step size, and formatted helper output.",
+        "visual_role": "User numeric entry for filters, params, and workflow inputs.",
+        "style": INPUT_STYLE + [
+            "showStepper",             # false hides formatted helper
         ],
-        "data": [
-            "placeholder",
+        "data": COMMON_VISIBILITY_DATA + [
+            "label",
             "min",
             "max",
             "step",
-            "defaultValue",
+            "required",
+            "prefix",
+            "suffix",
+            "formatter",               # "None" | "Currency" | "Percentage" | "Compact"
+            "errorMessage",
+            "onChangeAction",
         ],
+        "required": {"style": [], "data": []},
     },
     "Select": {
-        "visual_role": "Dropdown picker — feeds selected value into queries",
-        "style": [
-            "focusBorderColor",
-            "optionBackgroundColor",
-            "optionHoverColor",
+        "description": "Dropdown or multi-select input with static or query-derived options.",
+        "visual_role": "Option picker for filters and workflow inputs.",
+        "style": INPUT_STYLE,
+        "data": COMMON_VISIBILITY_DATA + [
+            "label",
+            "options",                 # string[]
+            "optionsList",             # [{ label, value }]
+            "multiSelect",
+            "optionsSource",           # "Static" | "From query"
+            "labelField",              # dynamic option label field
+            "valueField",              # dynamic option value field
+            "required",
+            "onChangeAction",
         ],
-        "data": [
-            "options",                  # [{ label, value }]
-            "placeholder",
-            "defaultValue",
-            "dbBinding",
-        ],
+        "required": {"style": [], "data": ["options"]},
     },
     "Container": {
-        "visual_role": "Layout wrapper — groups related components visually",
-        "style": [
-            "gap",
-            "direction",                # "row" | "column"
-            "headerBackgroundColor",
-            "headerTextColor",
-            "headerBorderColor",
+        "description": "Layout wrapper that hosts child components on a nested grid.",
+        "visual_role": "Groups related components and controls nested layout spacing.",
+        "style": COMMON_CARD_STYLE + [
+            "alignItems",              # "Start" | "Center" | "End" | "Stretch"
+            "justifyContent",          # "Start" | "Center" | "End" | "Space Between" | "Space Around"
         ],
-        "data": [],
+        "data": [
+            "containerLayout",         # editor-supported "vertical" | "horizontal"
+            "gap",                     # nested grid gap
+            "scrollable",              # boolean
+            "divider",                 # boolean top divider inside container
+            "visible",
+            "visibleForRoles",
+        ],
+        "required": {"style": [], "data": []},
     },
     "TabbedContainer": {
-        "visual_role": "Tabbed layout — organises multiple views in one panel",
-        "style": [
+        "description": "Tabbed layout wrapper that hosts child components per tab.",
+        "visual_role": "Organizes multiple views in one bounded area.",
+        "style": COMMON_CARD_STYLE + [
+            "tabPosition",             # "Top" | "Bottom" | "Left"
+            "tabStyle",                # "Underline" | "Pills" | "Boxed"
             "tabHeaderBackground",
-            "tabHeaderActiveBackground",  # background of the active tab button
             "tabHeaderTextColor",
+            "tabHeaderActiveBackground",
             "tabHeaderActiveTextColor",
-            "tabBorderColor",
-            "tabStyle",                   # "underline" | "pill" | "boxed"
+            "tabHeaderBorderColor",
         ],
         "data": [
-            "tabs",                       # string[] — plain tab names e.g. ["Overview","Details","Settings"]
-            "defaultTab",                 # must match one of the tab name strings
+            "tabs",                    # string[]
+            "defaultTab",              # must match a tab string
+            "onTabChangeAction",
+            "tabStyles",               # { tabName: Partial<ComponentStyle> }
+            "gap",
+            "visible",
+            "visibleForRoles",
         ],
+        "required": {
+            "style": ["tabHeaderActiveBackground", "tabStyle"],
+            "data": ["tabs"],
+        },
     },
     "Text": {
-        "visual_role": "Read-only text display — markdown, labels, or bound string values",
-        "style": [
-            "fontSize",
-            "fontFamily",
+        "description": "Read-only text block for labels, long content, JSON, or bound values.",
+        "visual_role": "Displays static or bound text/content.",
+        "style": COMMON_CARD_STYLE + [
             "fontWeight",
             "lineHeight",
-            "overflow",                 # "Wrap" | "Scroll" | "Truncate"
-            "textAlign",                # "Left" | "Center" | "Right"
+            "overflow",                # "Wrap" | "Truncate" | "Scroll"
+            "textAlign",               # "Left" | "Center" | "Right" | "Justify"
+            "textTransform",           # "none" | "uppercase" | "capitalize"
         ],
-        "data": [
-            "dbBinding",
-            "mockValue",
-            "markdown",                 # true | false — render as markdown
+        "data": COMMON_VISIBILITY_DATA + [
+            "expression",              # boolean; evaluate string expression
+            "linkTo",                  # URL opened on click
+            "enableLink",              # editor-supported link toggle
         ],
+        "required": {"style": [], "data": []},
     },
     "StatusBadge": {
-        "visual_role": "Inline status chip — maps string values to colors",
-        "style": [
-            "badgeRadius",
-            "fontSize",
+        "description": "Status chip with value-to-color mapping and optional symbol.",
+        "visual_role": "Compact health/status indicator.",
+        "style": COMMON_CARD_STYLE + [
+            "shape",                   # "Rounded" | "Pill" | "Square"
             "fontWeight",
         ],
-        "data": [
-            "mapping",                  # { "ok": "#22c55e", "error": "#ef4444" }
+        "data": COMMON_VISIBILITY_DATA + [
+            "mapping",                 # { statusValue: hexColor }
             "defaultColor",
-            "dbBinding",
+            "showDot",                 # editor-supported
+            "size",                    # "Small" | "Medium" | "Large"
+            "symbol",                  # "Dot" | "Check" | "Warning" | "None"
         ],
+        "required": {
+            "style": ["shape"],
+            "data": ["dbBinding", "mapping"],
+        },
     },
     "Image": {
-        "visual_role": "Static or dynamic image — logo, chart screenshot, preview",
-        "style": [
-            "objectFit",                # "cover" | "contain" | "fill"
-            "borderRadius",
-        ],
-        "data": [
-            "src",                      # static image URL
+        "description": "Static or uploaded image with optional outbound link.",
+        "visual_role": "Visual media, logo, preview, or screenshot.",
+        "style": COMMON_CARD_STYLE,
+        "data": COMMON_VISIBILITY_DATA + [
+            "src",                     # image URL
+            "uploadedSrc",             # base64 data URL
             "alt",
-            "dbBinding",                # dynamic URL from a query
+            "fit",                     # "contain" | "cover" | "fill" | "none" | "scale-down"
+            "linkTo",
         ],
+        "required": {"style": [], "data": ["src"]},
     },
     "Embed": {
-        "visual_role": "Iframe embed — external URL, report, or tool",
-        "style": [
-            "borderRadius",
+        "description": "Sandboxed iframe embed for YouTube, Vimeo, Loom, reports, or iframe-friendly URLs.",
+        "visual_role": "External interactive/media embed.",
+        "style": COMMON_CARD_STYLE,
+        "data": COMMON_VISIBILITY_DATA + [
+            "src",                     # URL to embed; YouTube/Vimeo/Loom are normalized
         ],
-        "data": [
-            "url",                      # static URL to embed
-            "dbBinding",                # dynamic URL from a query
-            "allowFullscreen",
-        ],
+        "required": {"style": [], "data": ["src"]},
     },
 }
 
@@ -257,14 +391,22 @@ def format_capabilities_for_prompt() -> str:
         "## Component-specific style & data properties",
         "",
         "Use these aggressively to create polished, visually distinct dashboards.",
-        "Do NOT only set backgroundColor / textColor / borderColor on every component.",
+        "Most components support backgroundGradient:",
+        "{ enabled: true, direction: 90, stops: [{ color: '#hex', position: 0 }, { color: '#hex', position: 100 }] }.",
+        "Do NOT invent properties outside this registry.",
         "",
     ]
     for ctype, cap in COMPONENT_CAPABILITIES.items():
-        style_str = ", ".join(cap["style"]) if cap["style"] else "(none beyond base)"
-        data_str  = ", ".join(cap["data"])  if cap["data"]  else "(none beyond dbBinding)"
-        lines.append(f"{ctype} — {cap['visual_role']}")
+        style_str = ", ".join(cap["style"]) if cap["style"] else "(none)"
+        data_str = ", ".join(cap["data"]) if cap["data"] else "(none)"
+        required = cap.get("required", {"style": [], "data": []})
+        required_style = ", ".join(required.get("style", [])) or "(none)"
+        required_data = ", ".join(required.get("data", [])) or "(none)"
+
+        lines.append(f"{ctype} - {cap['visual_role']}")
         lines.append(f"  style: {style_str}")
         lines.append(f"  data:  {data_str}")
+        lines.append(f"  required.style: {required_style}")
+        lines.append(f"  required.data:  {required_data}")
         lines.append("")
     return "\n".join(lines)

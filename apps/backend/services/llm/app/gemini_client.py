@@ -13,16 +13,19 @@ from __future__ import annotations
 import json
 import logging
 import os
+from typing import Any
 
 from google import genai
 from google.genai import types
 from pydantic import ValidationError
 
 from .schemas import DashboardConfig
+from .tools import execute_tool, gemini_tools
 
 logger = logging.getLogger("llm.gemini")
 
 DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+MAX_TOOL_CALL_TURNS = int(os.getenv("GEMINI_MAX_TOOL_CALL_TURNS", "4"))
 
 
 class GeminiError(Exception):
@@ -36,8 +39,58 @@ def _client() -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
+def _content_from_text(text: str) -> types.Content:
+    return types.Content(role="user", parts=[types.Part.from_text(text=text)])
+
+
+def _extract_function_calls(response: types.GenerateContentResponse) -> list[types.FunctionCall]:
+    """Return any function calls from the first candidate."""
+    if not response.candidates:
+        return []
+
+    content = response.candidates[0].content
+    if not content or not content.parts:
+        return []
+
+    return [part.function_call for part in content.parts if part.function_call]
+
+
+def _append_model_response(
+    contents: list[types.Content],
+    response: types.GenerateContentResponse,
+) -> None:
+    """Preserve the model turn before appending function responses."""
+    if response.candidates and response.candidates[0].content:
+        contents.append(response.candidates[0].content)
+
+
+def _call_gemini_once(
+    client: genai.Client,
+    system_prompt: str,
+    contents: str | list[types.Content],
+    *,
+    with_tools: bool,
+) -> types.GenerateContentResponse:
+    return client.models.generate_content(
+        model=DEFAULT_MODEL,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            response_mime_type="application/json",
+            temperature=0.7,
+            tools=gemini_tools() if with_tools else None,
+        ),
+    )
+
+
+def _response_text(response: types.GenerateContentResponse) -> str:
+    if response.text:
+        return response.text
+    raise GeminiError("Gemini returned an empty response")
+
+
 def _call_gemini(system_prompt: str, user_prompt: str) -> str:
-    """Single call. Returns raw response text.
+    """Call Gemini. Returns raw response text.
 
     NOTE: We deliberately do NOT pass `response_schema=DashboardConfig` here.
     The Gemini SDK can't translate open-ended `dict[str, Any]` fields (used
@@ -51,18 +104,41 @@ def _call_gemini(system_prompt: str, user_prompt: str) -> str:
     schema after the fact, with a 1-shot repair retry on failure.
     """
     client = _client()
-    response = client.models.generate_content(
-        model=DEFAULT_MODEL,
-        contents=user_prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            response_mime_type="application/json",
-            temperature=0.7,
-        ),
+    contents = [_content_from_text(user_prompt)]
+    response = _call_gemini_once(client, system_prompt, contents, with_tools=True)
+
+    for _ in range(MAX_TOOL_CALL_TURNS):
+        function_calls = _extract_function_calls(response)
+        if not function_calls:
+            return _response_text(response)
+
+        _append_model_response(contents, response)
+        tool_parts: list[types.Part] = []
+
+        for function_call in function_calls:
+            name = function_call.name or ""
+            args: dict[str, Any] = function_call.args or {}
+            result = execute_tool(name, args)
+            logger.info("Gemini tool call: %s args=%s", name, args)
+            tool_parts.append(
+                types.Part.from_function_response(name=name, response=result)
+            )
+
+        contents.append(types.Content(role="user", parts=tool_parts))
+        response = _call_gemini_once(client, system_prompt, contents, with_tools=True)
+
+    logger.warning(
+        "Gemini exceeded max tool-call turns (%d); asking for final JSON without tools",
+        MAX_TOOL_CALL_TURNS,
     )
-    if not response.text:
-        raise GeminiError("Gemini returned an empty response")
-    return response.text
+    contents.append(
+        _content_from_text(
+            "Return the final dashboard config JSON now using the tool results above. "
+            "No prose, no markdown."
+        )
+    )
+    response = _call_gemini_once(client, system_prompt, contents, with_tools=False)
+    return _response_text(response)
 
 
 def generate_dashboard_config(system_prompt: str, user_prompt: str) -> DashboardConfig:
