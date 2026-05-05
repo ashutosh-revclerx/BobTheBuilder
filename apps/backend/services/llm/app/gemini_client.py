@@ -78,15 +78,23 @@ def _content_from_text(text: str) -> types.Content:
 
 
 def _extract_function_calls(response: types.GenerateContentResponse) -> list[types.FunctionCall]:
-    """Return any function calls from the first candidate."""
-    if not response.candidates:
-        return []
+    """Return any function calls from candidates and SDK AFC history."""
+    calls: list[types.FunctionCall] = []
 
-    content = response.candidates[0].content
-    if not content or not content.parts:
-        return []
+    for candidate in response.candidates or []:
+        content = candidate.content
+        if not content or not content.parts:
+            continue
+        calls.extend(part.function_call for part in content.parts if part.function_call)
 
-    return [part.function_call for part in content.parts if part.function_call]
+    # Some SDK versions keep tool calls in automatic_function_calling_history.
+    for entry in getattr(response, "automatic_function_calling_history", []) or []:
+        for part in getattr(entry, "parts", []) or []:
+            function_call = getattr(part, "function_call", None)
+            if function_call:
+                calls.append(function_call)
+
+    return calls
 
 
 def _append_model_response(
@@ -135,8 +143,33 @@ def _call_gemini_once(
 
 
 def _response_text(response: types.GenerateContentResponse) -> str:
-    if response.text:
-        return response.text
+    # response.text may raise if the candidate has only function_call parts.
+    try:
+        if response.text:
+            return response.text
+    except Exception as exc:
+        logger.debug("gemini.response_text fallback due to exception: %s", exc)
+
+    text_parts: list[str] = []
+    for candidate in response.candidates or []:
+        content = candidate.content
+        if not content or not content.parts:
+            continue
+        for part in content.parts:
+            text = getattr(part, "text", None)
+            if text:
+                text_parts.append(text)
+
+    if text_parts:
+        return "\n".join(text_parts)
+
+    calls = _extract_function_calls(response)
+    if calls:
+        names = ",".join(sorted({call.name or "unknown" for call in calls}))
+        raise GeminiError(
+            f"Gemini returned only tool calls ({names}) without final text response"
+        )
+
     raise GeminiError("Gemini returned an empty response")
 
 
