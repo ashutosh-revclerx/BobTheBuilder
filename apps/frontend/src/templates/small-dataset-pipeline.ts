@@ -1,9 +1,16 @@
 import type { TemplateConfig } from '../types/template';
 
+// Resource name placeholder. After importing, open the Queries panel and
+// change `resource` on every query to the actual name of your imported
+// data-layer-services resource. Same for FileUpload.data.resourceId
+// (must be the resource UUID).
+const RESOURCE = 'data-layer-services';
+
 const smallDatasetPipeline: TemplateConfig = {
   id: 'small-dataset-pipeline',
   name: 'Small Dataset Pipeline',
-  description: 'Upload Excel sheets, visualize column relations as a node graph, and chat with your data using RAG',
+  description:
+    'Upload Excel/CSV/PDF docs → automatic relationship detection → node-graph viz + RAG chat. Session-based: upload returns a session_id that drives every other call.',
   components: [
     // ─── Header ─────────────────────────────────────────────────────────
     {
@@ -45,37 +52,59 @@ const smallDatasetPipeline: TemplateConfig = {
         borderRadius: 8,
         padding: 8,
         textColor: '#22d3ee',
-        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.06)',
       },
       data: { mockValue: '● Pipeline Ready' },
     },
 
-    // ─── Upload + Stats Row ────────────────────────────────────────────
+    // ─── Upload + Session Display ──────────────────────────────────────
     {
       id: 'upload-zone',
       type: 'FileUpload',
       label: 'Upload Datasets',
-      layout: { x: 0, y: 2, w: 4, h: 8 },
+      layout: { x: 0, y: 2, w: 4, h: 6 },
       style: {
         backgroundColor: '#111c2e',
         borderColor: '#22d3ee',
         textColor: '#e2e8f0',
         borderRadius: 14,
         padding: 18,
-        boxShadow: '0 4px 12px rgba(34, 211, 238, 0.1), 0 12px 32px rgba(34, 211, 238, 0.05)',
+        boxShadow: '0 4px 12px rgba(34, 211, 238, 0.1)',
       },
       data: {
         mockValue: '',
         ...({
           accept: '.xlsx,.xls,.csv,.pdf,.docx,.txt',
           multiple: true,
-          uploadUrl: '',
-          fieldName: 'file',
-          resourceId: '',
-          endpointPath: '',
+          fieldName: 'files', // most FastAPI multi-file handlers expect "files"
+          resourceId: '', // ← USER MUST FILL: UUID of imported data-layer-services resource
+          endpointPath: '/api/v1/pipelines/small-dataset/upload',
         } as any),
       },
     },
+    {
+      id: 'session-display',
+      type: 'Text',
+      label: 'Active Session',
+      layout: { x: 0, y: 8, w: 4, h: 2 },
+      style: {
+        backgroundColor: '#0c2331',
+        borderColor: '#22d3ee',
+        borderWidth: 1,
+        borderRadius: 10,
+        padding: 12,
+        fontSize: 12,
+        fontFamily: 'Fira Code',
+        textColor: '#22d3ee',
+        overflow: 'Truncate',
+      },
+      data: {
+        mockValue: '⏳ Upload files to start a session…',
+        dbBinding: '{{componentState.upload-zone.sessionId}}',
+        expression: false,
+      },
+    },
+
+    // ─── Stat Cards ────────────────────────────────────────────────────
     {
       id: 'stat-docs',
       type: 'StatCard',
@@ -90,7 +119,7 @@ const smallDatasetPipeline: TemplateConfig = {
         textColor: '#ffffff',
         metricFontSize: 32,
         labelFontSize: 13,
-        boxShadow: '0 4px 12px rgba(34, 211, 238, 0.15), 0 12px 32px rgba(34, 211, 238, 0.08)',
+        boxShadow: '0 4px 12px rgba(34, 211, 238, 0.15)',
         backgroundGradient: {
           enabled: true,
           direction: 135,
@@ -100,7 +129,10 @@ const smallDatasetPipeline: TemplateConfig = {
           ],
         },
       },
-      data: { mockValue: '12' },
+      data: {
+        mockValue: '0',
+        dbBinding: '{{queries.get-tables.data.length}}',
+      },
     },
     {
       id: 'stat-relations',
@@ -116,14 +148,17 @@ const smallDatasetPipeline: TemplateConfig = {
         textColor: '#ffffff',
         metricFontSize: 32,
         labelFontSize: 13,
-        boxShadow: '0 4px 12px rgba(168, 85, 247, 0.15), 0 12px 32px rgba(168, 85, 247, 0.08)',
+        boxShadow: '0 4px 12px rgba(168, 85, 247, 0.15)',
       },
-      data: { mockValue: '34' },
+      data: {
+        mockValue: '0',
+        dbBinding: '{{queries.get-relationships.data.length}}',
+      },
     },
     {
-      id: 'stat-columns',
+      id: 'stat-tables',
       type: 'StatCard',
-      label: 'Total Columns Indexed',
+      label: 'Tables Parsed',
       layout: { x: 4, y: 6, w: 4, h: 4 },
       style: {
         backgroundColor: '#111c2e',
@@ -134,14 +169,17 @@ const smallDatasetPipeline: TemplateConfig = {
         textColor: '#ffffff',
         metricFontSize: 32,
         labelFontSize: 13,
-        boxShadow: '0 4px 12px rgba(52, 211, 153, 0.12), 0 12px 32px rgba(52, 211, 153, 0.06)',
+        boxShadow: '0 4px 12px rgba(52, 211, 153, 0.12)',
       },
-      data: { mockValue: '187' },
+      data: {
+        mockValue: '0',
+        dbBinding: '{{queries.get-tables.data.length}}',
+      },
     },
     {
       id: 'stat-rag',
       type: 'StatCard',
-      label: 'RAG Queries (24h)',
+      label: 'Chat Messages',
       layout: { x: 8, y: 6, w: 4, h: 4 },
       style: {
         backgroundColor: '#111c2e',
@@ -152,17 +190,60 @@ const smallDatasetPipeline: TemplateConfig = {
         textColor: '#ffffff',
         metricFontSize: 32,
         labelFontSize: 13,
-        boxShadow: '0 4px 12px rgba(251, 191, 36, 0.12), 0 12px 32px rgba(251, 191, 36, 0.06)',
+        boxShadow: '0 4px 12px rgba(251, 191, 36, 0.12)',
       },
-      data: { mockValue: '128' },
+      data: {
+        mockValue: '0',
+        dbBinding: '{{queries.get-chat-history.data.length}}',
+      },
     },
 
-    // ─── Node Graph + Chat Row ─────────────────────────────────────────
+    // ─── Action Buttons (manual triggers) ──────────────────────────────
+    {
+      id: 'btn-detect',
+      type: 'Button',
+      label: '🔍 Detect Relationships',
+      layout: { x: 0, y: 10, w: 2, h: 3 },
+      style: {
+        backgroundColor: '#a855f7',
+        borderColor: '#a855f7',
+        textColor: '#ffffff',
+        borderRadius: 10,
+        padding: 12,
+        fontWeight: 600,
+        hoverBackgroundColor: '#9333ea',
+      },
+      data: {
+        dbBinding: 'queries.detect-relationships.trigger',
+        loadingState: true,
+      },
+    },
+    {
+      id: 'btn-refresh',
+      type: 'Button',
+      label: '🔄 Refresh Graph',
+      layout: { x: 2, y: 10, w: 2, h: 3 },
+      style: {
+        backgroundColor: '#0ea5e9',
+        borderColor: '#0ea5e9',
+        textColor: '#ffffff',
+        borderRadius: 10,
+        padding: 12,
+        fontWeight: 600,
+        hoverBackgroundColor: '#0284c7',
+      },
+      data: {
+        dbBinding: 'queries.get-relationships.trigger',
+        loadingState: true,
+      },
+    },
+
+    // ─── Node Graph + Chat ─────────────────────────────────────────────
     {
       id: 'relations-graph',
       type: 'NodeGraph',
       label: 'Dataset Relationships',
-      layout: { x: 0, y: 10, w: 8, h: 14 },
+      layout: { x: 0, y: 13, w: 8, h: 13 },
       style: {
         backgroundColor: '#0d1424',
         borderColor: '#22d3ee',
@@ -170,53 +251,50 @@ const smallDatasetPipeline: TemplateConfig = {
         borderRadius: 14,
         borderWidth: 1,
         padding: 0,
-        boxShadow: '0 4px 12px rgba(34, 211, 238, 0.1), 0 12px 32px rgba(34, 211, 238, 0.05)',
+        boxShadow: '0 4px 12px rgba(34, 211, 238, 0.1)',
       },
       data: {
+        dbBinding: '{{queries.get-relationships.data}}',
+        // Fallback when no session yet
         mockValue: {
           nodes: [
-            { id: 'customers', label: '👥 customers.xlsx', type: 'sheet' },
-            { id: 'orders',    label: '📋 orders.xlsx',    type: 'sheet' },
-            { id: 'products',  label: '📦 products.xlsx',  type: 'sheet' },
-            { id: 'invoices',  label: '🧾 invoices.xlsx',  type: 'sheet' },
-            { id: 'shipments', label: '🚚 shipments.xlsx', type: 'sheet' },
+            { id: 'customers', label: '👥 customers.xlsx' },
+            { id: 'orders',    label: '📋 orders.xlsx' },
+            { id: 'products',  label: '📦 products.xlsx' },
           ],
           edges: [
-            { source: 'customers', target: 'orders',    label: 'customer_id' },
-            { source: 'orders',    target: 'products',  label: 'product_id' },
-            { source: 'orders',    target: 'invoices',  label: 'order_id' },
-            { source: 'orders',    target: 'shipments', label: 'order_id' },
-            { source: 'invoices',  target: 'customers', label: 'customer_id' },
+            { source: 'customers', target: 'orders',   label: 'customer_id' },
+            { source: 'orders',    target: 'products', label: 'product_id' },
           ],
         },
-        refreshOn: 'onLoad',
       },
     },
     {
       id: 'rag-chat',
       type: 'ChatBox',
       label: 'Ask Your Data',
-      layout: { x: 8, y: 10, w: 4, h: 14 },
+      layout: { x: 8, y: 10, w: 4, h: 16 },
       style: {
         backgroundColor: '#111c2e',
         borderColor: '#a855f7',
         textColor: '#e2e8f0',
         borderRadius: 14,
         padding: 14,
-        boxShadow: '0 4px 12px rgba(168, 85, 247, 0.1), 0 12px 32px rgba(168, 85, 247, 0.05)',
+        boxShadow: '0 4px 12px rgba(168, 85, 247, 0.1)',
       },
       data: {
         placeholder: 'Ask about your datasets...',
+        dbBinding: '{{queries.ask-rag.data}}',
         mockValue: '',
       },
     },
 
-    // ─── Relations Table ───────────────────────────────────────────────
+    // ─── Tables Table ──────────────────────────────────────────────────
     {
-      id: 'relations-table',
+      id: 'tables-table',
       type: 'Table',
-      label: 'Detected Column Relations',
-      layout: { x: 0, y: 24, w: 12, h: 7 },
+      label: 'Parsed Tables',
+      layout: { x: 0, y: 26, w: 12, h: 7 },
       style: {
         backgroundColor: '#0d1424',
         borderColor: '#1e2d42',
@@ -225,31 +303,90 @@ const smallDatasetPipeline: TemplateConfig = {
         borderRadius: 12,
         padding: 0,
         stripeRows: true,
-        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.06)',
       },
       data: {
         searchable: true,
         pagination: true,
         columns: [
-          { name: 'Source Sheet',  fieldKey: 'source' },
-          { name: 'Target Sheet',  fieldKey: 'target' },
-          { name: 'Common Column', fieldKey: 'column' },
-          { name: 'Match Type',    fieldKey: 'matchType' },
-          { name: 'Confidence',    fieldKey: 'confidence' },
+          { name: 'Table ID',     fieldKey: 'table_id' },
+          { name: 'Name',         fieldKey: 'name' },
+          { name: 'Source File',  fieldKey: 'source_file' },
+          { name: 'Rows',         fieldKey: 'row_count' },
+          { name: 'Columns',      fieldKey: 'column_count' },
         ],
-        rows: [
-          { source: 'customers.xlsx', target: 'orders.xlsx',    column: 'customer_id', matchType: 'Exact',    confidence: '99.8%' },
-          { source: 'orders.xlsx',    target: 'products.xlsx',  column: 'product_id',  matchType: 'Exact',    confidence: '100%' },
-          { source: 'orders.xlsx',    target: 'invoices.xlsx',  column: 'order_id',    matchType: 'Exact',    confidence: '98.2%' },
-          { source: 'orders.xlsx',    target: 'shipments.xlsx', column: 'order_id',    matchType: 'Exact',    confidence: '97.5%' },
-          { source: 'invoices.xlsx',  target: 'customers.xlsx', column: 'customer_id', matchType: 'Inferred', confidence: '92.1%' },
-        ],
+        dbBinding: '{{queries.get-tables.data}}',
         mockValue: [],
-        columnVisibility: { source: true, target: true, column: true, matchType: true, confidence: true },
+        columnVisibility: { table_id: true, name: true, source_file: true, row_count: true, column_count: true },
       },
     },
   ],
-  queries: [],
+
+  // ──────────────────────────────────────────────────────────────────────
+  // QUERIES — chained on session_id captured by FileUpload after upload.
+  // The user MUST update `resource` on each query to the actual name of
+  // their imported data-layer-services resource (Queries panel in builder).
+  // ──────────────────────────────────────────────────────────────────────
+  queries: [
+    // Re-fetches after upload completes & session_id appears.
+    {
+      name: 'get-tables',
+      resource: RESOURCE,
+      endpoint: '/api/v1/pipelines/small-dataset/tables/{{componentState.upload-zone.sessionId}}',
+      method: 'GET',
+      trigger: 'onDependencyChange',
+      dependsOn: ['componentState.upload-zone.sessionId'],
+    },
+
+    // Kicks off relationship detection automatically when session_id arrives.
+    {
+      name: 'detect-relationships',
+      resource: RESOURCE,
+      endpoint: '/api/v1/pipelines/small-dataset/relationships/{{componentState.upload-zone.sessionId}}/detect',
+      method: 'POST',
+      trigger: 'onDependencyChange',
+      dependsOn: ['componentState.upload-zone.sessionId'],
+    },
+
+    // Pulls the graph payload. Re-runs whenever detect-relationships completes.
+    {
+      name: 'get-relationships',
+      resource: RESOURCE,
+      endpoint: '/api/v1/pipelines/small-dataset/relationships/{{componentState.upload-zone.sessionId}}',
+      method: 'GET',
+      trigger: 'onDependencyChange',
+      dependsOn: [
+        'componentState.upload-zone.sessionId',
+        'queries.detect-relationships.data',
+      ],
+    },
+
+    // Chat history (refreshes after each ask-rag completes).
+    {
+      name: 'get-chat-history',
+      resource: RESOURCE,
+      endpoint: '/api/v1/pipelines/small-dataset/chat/{{componentState.upload-zone.sessionId}}/history',
+      method: 'GET',
+      trigger: 'onDependencyChange',
+      dependsOn: [
+        'componentState.upload-zone.sessionId',
+        'queries.ask-rag.data',
+      ],
+    },
+
+    // RAG ask — manual trigger, fired by ChatBox when user hits send.
+    // ChatBox stores the question in componentState[<id>].value before firing.
+    {
+      name: 'ask-rag',
+      resource: RESOURCE,
+      endpoint: '/api/v1/pipelines/small-dataset/chat/{{componentState.upload-zone.sessionId}}',
+      method: 'POST',
+      trigger: 'manual',
+      body: {
+        message: '{{componentState.rag-chat.value}}',
+      },
+    },
+  ] as any,
+
   canvasStyle: {
     backgroundColor: '#05080f',
     backgroundGradient: {

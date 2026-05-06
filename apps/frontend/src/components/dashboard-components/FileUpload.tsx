@@ -72,6 +72,23 @@ export default function FileUpload({ config }: FileUploadProps) {
       const payload = await res.json().catch(() => ({}));
       // Stash the most recent upload result so other components can react.
       setComponentState(config.id, 'lastUpload', { file: file.name, response: payload });
+
+      // Auto-extract session_id from common response shapes. Many pipeline
+      // APIs (incl. the small-dataset service) return one session_id per
+      // upload that downstream calls embed in their path. Storing under
+      // both `sessionId` AND `value` lets queries reference it via the
+      // canonical `{{componentState.<id>.value}}` pattern.
+      const inner = (payload && typeof payload === 'object' && 'data' in payload)
+        ? (payload as any).data
+        : payload;
+      const sid =
+        (inner && typeof inner === 'object'
+          ? (inner.session_id ?? inner.sessionId ?? inner.id)
+          : undefined) as string | undefined;
+      if (sid) {
+        setComponentState(config.id, 'sessionId', sid);
+        setComponentState(config.id, 'value', sid);
+      }
       return { name: file.name, size: file.size, status: 'success' };
     } catch (err) {
       return { name: file.name, size: file.size, status: 'error', message: (err as Error).message };
