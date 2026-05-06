@@ -18,6 +18,25 @@ from .component_capabilities import COMPONENT_CAPABILITIES
 
 logger = logging.getLogger("llm.tools")
 
+PROPERTY_HINTS: dict[str, str] = {
+    "backgroundColor": "hex color string, e.g. '#0f172a'",
+    "textColor": "hex color string, e.g. '#e2e8f0'",
+    "fontSize": "number in px, e.g. 14",
+    "borderRadius": "number in px, e.g. 8",
+    "borderColor": "hex color string",
+    "borderWidth": "number in px",
+    "padding": "number in px",
+    "seriesColors": "array of hex colors, e.g. ['#2563eb', '#10b981']",
+    "visible": "boolean or expression string",
+    "visibleForRoles": "array of role strings",
+    "dbBinding": "binding string like '{{queries.myQuery.data}}'",
+    "backgroundGradient": (
+        "object: { enabled: boolean, direction: number(0-360), "
+        "stops: [{ color: '#RRGGBB', position: number(0-100) }, ...] }; "
+        "use 2-3 stops; positions increasing from 0 to 100"
+    ),
+}
+
 
 TOOLS = [
     {
@@ -39,7 +58,7 @@ TOOLS = [
 
 def _properties_as_schema(properties: list[str]) -> dict[str, str]:
     """Turn the compact registry list into a property-description mapping."""
-    return {name: "supported property" for name in properties}
+    return {name: PROPERTY_HINTS.get(name, "supported property") for name in properties}
 
 
 @lru_cache(maxsize=64)
