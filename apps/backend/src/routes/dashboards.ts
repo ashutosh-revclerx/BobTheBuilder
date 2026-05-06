@@ -313,58 +313,71 @@ router.put('/:id', async (req, res) => {
     return res.status(400).json({ error: 'No fields provided to update' });
   }
 
-  // Build dynamic SET clause from whichever fields were supplied.
-  // Slug is derived from the incoming name when name changes but slug is omitted.
-  const setClauses: string[] = [];
-  const values: unknown[]    = [];
-  let   i = 1;
+  // Determine the base slug and attempt retries with suffixes if conflicts occur
+  let baseSlug = data.slug ?? (data.name !== undefined ? toSlug(data.name) : undefined);
+  let currentSlug = baseSlug;
+  let attempts = 0;
 
-  if (data.name !== undefined) {
-    setClauses.push(`name = $${i++}`);
-    values.push(data.name);
-  }
+  while (attempts < 10) {
+    try {
+      // Build dynamic SET clause from whichever fields were supplied.
+      const setClauses: string[] = [];
+      const values: unknown[]    = [];
+      let   i = 1;
 
-  const newSlug = data.slug ?? (data.name !== undefined ? toSlug(data.name) : undefined);
-  if (newSlug !== undefined) {
-    setClauses.push(`slug = $${i++}`);
-    values.push(newSlug);
-  }
+      if (data.name !== undefined) {
+        setClauses.push(`name = $${i++}`);
+        values.push(data.name);
+      }
 
-  if (data.config !== undefined) {
-    setClauses.push(`config = $${i++}`);
-    values.push(data.config);
-  }
+      if (currentSlug !== undefined) {
+        setClauses.push(`slug = $${i++}`);
+        values.push(currentSlug);
+      }
 
-  if (data.status !== undefined) {
-    setClauses.push(`status = $${i++}`);
-    values.push(data.status);
-  }
+      if (data.config !== undefined) {
+        setClauses.push(`config = $${i++}`);
+        values.push(data.config);
+      }
 
-  setClauses.push('updated_at = NOW()');
-  values.push(req.params.id);
+      if (data.status !== undefined) {
+        setClauses.push(`status = $${i++}`);
+        values.push(data.status);
+      }
 
-  try {
-    const { rows } = await pool.query<DashboardRow>(
-      `UPDATE dashboards
-       SET ${setClauses.join(', ')}
-       WHERE id = $${i}
-       RETURNING id, name, slug, config, status, created_at, updated_at`,
-      values,
-    );
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Dashboard not found' });
+      setClauses.push('updated_at = NOW()');
+      values.push(req.params.id);
+
+      const { rows } = await pool.query<DashboardRow>(
+        `UPDATE dashboards
+         SET ${setClauses.join(', ')}
+         WHERE id = $${i}
+         RETURNING id, name, slug, config, status, created_at, updated_at`,
+        values,
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Dashboard not found' });
+      }
+      return res.json(rows[0]);
+    } catch (err) {
+      if (pgCode(err) === PG_UNIQUE_VIOLATION) {
+        if (baseSlug !== undefined) {
+          attempts++;
+          currentSlug = `${baseSlug}-${attempts}`;
+          continue;
+        }
+        // If no slug was being set, propagate the error
+        return res.status(409).json({ error: 'Slug is already taken' });
+      }
+      if (pgCode(err) === PG_INVALID_UUID) {
+        return res.status(400).json({ error: 'Invalid dashboard ID' });
+      }
+      console.error('[dashboards] update:', err);
+      return res.status(500).json({ error: 'Internal server error' });
     }
-    return res.json(rows[0]);
-  } catch (err) {
-    if (pgCode(err) === PG_UNIQUE_VIOLATION) {
-      return res.status(409).json({ error: 'Slug is already taken' });
-    }
-    if (pgCode(err) === PG_INVALID_UUID) {
-      return res.status(400).json({ error: 'Invalid dashboard ID' });
-    }
-    console.error('[dashboards] update:', err);
-    return res.status(500).json({ error: 'Internal server error' });
   }
+
+  return res.status(409).json({ error: 'Could not generate a unique slug after 10 attempts' });
 });
 
 // ─── PATCH /api/dashboards/:id/publish ────────────────────────────────────────

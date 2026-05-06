@@ -538,33 +538,52 @@ def _apply_palette(
 DEFAULT_POLISH_PALETTE = PALETTES[0]
 
 
+def _ensure_required_fields(component: dict[str, Any]) -> dict[str, Any]:
+    """
+    Ensure structurally required style fields exist without overriding
+    any colors the LLM already set.
+    """
+    style = component.setdefault("style", {})
+    ctype = component.get("type")
+    style.setdefault("borderWidth", 1)
+    style.setdefault("borderRadius", 12)
+    style.setdefault("padding", 16)
+    if ctype == "StatCard":
+        style.setdefault("metricFontSize", 32)
+        style.setdefault("labelFontSize", 13)
+        style.setdefault("borderLeftWidth", 4)
+    elif ctype in {"LineChart", "BarChart"}:
+        style.setdefault("showGrid", True)
+        style.setdefault("showLegend", True)
+    elif ctype == "Table":
+        style.setdefault("stripeRows", True)
+    elif ctype == "LogsViewer":
+        style.setdefault("fontFamily", "Fira Code")
+        style.setdefault("fontSize", 12)
+        style.setdefault("lineHeight", 1.6)
+    return component
+
+
 def _polish_original(
     config: DashboardConfig, dashboard_type: DashboardType
 ) -> DashboardConfig:
     """
-    Apply visual polish to the Gemini-generated config WITHOUT relayouting it.
-    Goal: never ship a raw LLM-coloured first option. The user's default pick
-    should still look professional.
-
-    We reuse `_repaint_component` + the hero gradient pass with a default
-    palette, but skip the layout transforms — the LLM's structural choices
-    are preserved.
+    Preserve the LLM's colors and design intent exactly — only fix layout
+    overlaps and fill in any missing required style fields.
     """
     cloned = copy.deepcopy(config.model_dump(by_alias=True))
-    palette = DEFAULT_POLISH_PALETTE
 
     canvas = cloned.setdefault("canvasStyle", {}) or {}
-    canvas.setdefault("backgroundColor", palette["surface"])
+    canvas.setdefault("backgroundColor", "#f8fafc")
     cloned["canvasStyle"] = canvas
 
-    # Pack rows to fix any LLM-introduced overlap, but keep the LLM's relative
-    # ordering and width preferences (no profile transform here).
+    # Fix overlaps without reordering or resizing — keep the LLM's layout.
     cloned["components"] = _pack_rows(cloned["components"], height_scale=1.0)
     cloned["components"] = _apply_archetype_adjustments(
         cloned["components"], dashboard_type, profile="Original"
     )
-    cloned["components"] = [_repaint_component(c, palette) for c in cloned["components"]]
-    _apply_hero_gradient(cloned["components"], palette)
+    # Only fill missing required fields; never overwrite existing LLM colors.
+    cloned["components"] = [_ensure_required_fields(c) for c in cloned["components"]]
     return DashboardConfig.model_validate(cloned)
 
 
