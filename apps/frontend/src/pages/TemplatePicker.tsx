@@ -18,8 +18,9 @@ interface GeneratedVariant {
 }
 
 interface StashedGeneration {
-  prompt:  string;
-  configs: GeneratedVariant[];
+  prompt:      string;
+  configs:     GeneratedVariant[];
+  dashboardId?: string;
 }
 
 interface Palette {
@@ -353,23 +354,40 @@ export default function TemplatePicker() {
     setCreatingFor(index);
     try {
       const variant = stash.configs[index];
-      const response = await fetch(`${API_BASE}/api/dashboards`, {
-        method:  'POST',
+      const payload = {
+        name:   variant.name,
+        config: variant.config,
+        status: 'draft',
+      };
+
+      // If a dashboard was already created in this generation session,
+      // update it instead of creating a new one. This prevents duplicates
+      // when the user switches templates.
+      const isUpdate = !!stash.dashboardId;
+      const method = isUpdate ? 'PUT' : 'POST';
+      const endpoint = isUpdate
+        ? `${API_BASE}/api/dashboards/${stash.dashboardId}`
+        : `${API_BASE}/api/dashboards`;
+
+      const response = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          name:   variant.name,
-          config: variant.config,
-          status: 'draft',
-        }),
+        body:    JSON.stringify(payload),
       });
       const json = await response.json();
       if (!response.ok) {
         setError(json.error || 'Could not save dashboard');
         return;
       }
-      // Keep the stash so the user can come back and try a different template
-      // without re-running the (slow, paid) generation. The builder shows a
-      // "Try a different template" button when this stash exists.
+
+      // On first creation, store the dashboard ID in the stash so subsequent
+      // picks update the same dashboard rather than creating duplicates.
+      if (!isUpdate) {
+        const updatedStash = { ...stash, dashboardId: json.id };
+        sessionStorage.setItem('btb:lastGeneration', JSON.stringify(updatedStash));
+        setStash(updatedStash);
+      }
+
       navigate(`/builder/${json.id}`);
     } catch (err) {
       setError((err as Error).message || 'Network error');

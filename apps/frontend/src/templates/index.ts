@@ -1,18 +1,16 @@
 import type { TemplateConfig } from '../types/template';
-import projectOverview from './project-overview';
-import sprintTracker from './sprint-tracker';
-import budgetMonitor from './budget-monitor';
-import phase1Testing from './phase1-testing';
-import nexusOperations from './nexus-operations';
-import demoTable from './demo-table';
+import majesticMaroon from './majestic-maroon';
+import oceanicTeal from './oceanic-teal';
+import emeraldGrove from './emerald-grove';
+import midnightIndigo from './midnight-indigo';
+import sunsetBlaze from './sunset-blaze';
 
 export const templates: TemplateConfig[] = [
-  phase1Testing,
-  projectOverview,
-  sprintTracker,
-  budgetMonitor,
-  nexusOperations,
-  demoTable,
+  majesticMaroon,
+  oceanicTeal,
+  emeraldGrove,
+  midnightIndigo,
+  sunsetBlaze,
 ];
 
 export function getTemplateById(id: string): TemplateConfig | undefined {
