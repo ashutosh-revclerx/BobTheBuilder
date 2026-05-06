@@ -287,7 +287,10 @@ const smallDatasetPipeline: TemplateConfig = {
       },
       data: {
         placeholder: 'Ask about your datasets...',
-        dbBinding: '{{queries.ask-rag.data}}',
+        // Button-style binding (NO braces) — ChatBox needs to parse the query
+        // name itself to call it manually. With braces it would get resolved
+        // to the (empty) data value before ChatBox sees it.
+        dbBinding: 'queries.ask-rag.trigger',
         mockValue: '',
       },
     },
