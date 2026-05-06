@@ -114,7 +114,6 @@ Roughly even. Ashutosh has more high-priority items (the visible UI bugs from th
 ```
 date 03/05/2026
 issue 28 the stat button have options of tred but they are not binded , hard code values
-Sparkline data in stat tab is just a place holder
 tables should have variants
 if component label istoo long no handlin / preferably it should wrap to next line or two lines and ajjsut the component 
 Visible for roles is still not usable  adsut the download property accordingly for this case
