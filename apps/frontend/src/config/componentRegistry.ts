@@ -12,7 +12,10 @@ import {
   LineChart as LineIcon,
   Terminal,
   Image as ImageIcon,
-  Play as PlayIcon
+  Play as PlayIcon,
+  Share2,
+  Upload,
+  MessageCircle
 } from 'lucide-react';
 import type { ComponentType } from '../types/template';
 
@@ -72,6 +75,14 @@ export const COMPONENT_REGISTRY: ComponentCategory[] = [
     options: [
       { type: 'Image', icon: ImageIcon, label: 'Image', description: 'Display an image from URL or upload' },
       { type: 'Embed', icon: PlayIcon, label: 'Embed', description: 'Embed a YouTube / Vimeo / iframe URL' },
+    ],
+  },
+  {
+    title: 'AI & Data Pipelines',
+    options: [
+      { type: 'NodeGraph', icon: Share2, label: 'Node Graph', description: 'Visualize relationships between datasets' },
+      { type: 'FileUpload', icon: Upload, label: 'File Upload', description: 'Upload Excel, CSV, PDF, and docs' },
+      { type: 'ChatBox', icon: MessageCircle, label: 'Chat Box', description: 'RAG-style chat interface' },
     ],
   },
 ];

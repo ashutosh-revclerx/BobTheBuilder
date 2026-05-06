@@ -4,8 +4,10 @@ import oceanicTeal from './oceanic-teal';
 import emeraldGrove from './emerald-grove';
 import midnightIndigo from './midnight-indigo';
 import sunsetBlaze from './sunset-blaze';
+import smallDatasetPipeline from './small-dataset-pipeline';
 
 export const templates: TemplateConfig[] = [
+  smallDatasetPipeline,
   majesticMaroon,
   oceanicTeal,
   emeraldGrove,

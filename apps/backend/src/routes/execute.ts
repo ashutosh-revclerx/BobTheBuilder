@@ -1,5 +1,6 @@
 import { Router }        from 'express';
 import { z }             from 'zod';
+import multer            from 'multer';
 import { pool }          from '../db/client.js';
 import { restExecutor }  from '../executors/restExecutor.js';
 import { dbExecutor }    from '../executors/dbExecutor.js';
@@ -9,6 +10,9 @@ import { createLogger }  from '../utils/logger.js';
 
 const log = createLogger('execute');
 const router = Router();
+
+// 50 MB cap — Excel/CSV/PDF rarely exceed this; protects the server from OOM.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -176,6 +180,102 @@ router.post('/', async (req, res) => {
 
   // 6. Return
   return res.json(result);
+});
+
+// ─── POST /api/execute/upload ─────────────────────────────────────────────────
+// Multipart proxy for FileUpload component. Accepts files in `file` field and
+// forwards them to a registered REST resource as multipart/form-data.
+//
+// Headers:
+//   x-btb-resource-id   - UUID of the resource to upload to
+//   x-btb-endpoint-path - endpoint path on that resource (e.g. /upload)
+//   x-btb-field-name    - optional override for the form field name (default: "file")
+
+router.post('/upload', upload.any(), async (req, res) => {
+  const resourceId   = String(req.headers['x-btb-resource-id']   || '').trim();
+  const endpointPath = String(req.headers['x-btb-endpoint-path'] || '').trim();
+  const fieldName    = String(req.headers['x-btb-field-name']    || 'file').trim();
+
+  if (!resourceId || !endpointPath) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing x-btb-resource-id or x-btb-endpoint-path header',
+    });
+  }
+
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  if (files.length === 0) {
+    return res.status(400).json({ success: false, error: 'No files in request' });
+  }
+
+  let resource: ResourceDbRow;
+  try {
+    const { rows } = await pool.query<ResourceDbRow>(
+      `SELECT id, name, type, base_url, auth_type, secret_ref
+       FROM resources
+       WHERE id = $1`,
+      [resourceId],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Resource not found' });
+    }
+    resource = rows[0];
+  } catch (err) {
+    log.error('upload resource lookup failed:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+
+  if (resource.type !== 'REST' || !resource.base_url) {
+    return res.status(400).json({
+      success: false,
+      error: 'Upload is only supported for REST resources with a base_url',
+    });
+  }
+
+  const resolvedSecret = resolveEnvSecret(resource.secret_ref);
+
+  // Build a FormData on the server (Node 18+ has these globals).
+  const fd = new FormData();
+  for (const f of files) {
+    // Copy into a fresh Uint8Array to avoid the SharedArrayBuffer typing edge.
+    const view = new Uint8Array(f.buffer);
+    const blob = new Blob([view], { type: f.mimetype || 'application/octet-stream' });
+    fd.append(f.fieldname || fieldName, blob, f.originalname);
+  }
+  // Forward any non-file body fields too (e.g. dataset name typed alongside).
+  for (const [k, v] of Object.entries(req.body || {})) {
+    if (typeof v === 'string') fd.append(k, v);
+  }
+
+  const headers: Record<string, string> = {};
+  if (resource.auth_type === 'bearer' && resolvedSecret) {
+    headers.Authorization = `Bearer ${resolvedSecret}`;
+  } else if (resource.auth_type === 'api_key' && resolvedSecret) {
+    headers['X-API-Key'] = resolvedSecret;
+  } else if (resource.auth_type === 'basic' && resolvedSecret) {
+    headers.Authorization = `Basic ${Buffer.from(resolvedSecret).toString('base64')}`;
+  }
+
+  const url = resource.base_url.replace(/\/$/, '') + (endpointPath.startsWith('/') ? endpointPath : `/${endpointPath}`);
+  const startMs = Date.now();
+
+  try {
+    const upstream = await fetch(url, { method: 'POST', headers, body: fd as any });
+    const text = await upstream.text();
+    let payload: unknown = text;
+    try { payload = JSON.parse(text); } catch { /* leave as text */ }
+
+    logQuery(undefined, resource.name, endpointPath, upstream.ok ? 'success' : 'error', Date.now() - startMs);
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).json({ success: false, error: payload });
+    }
+    return res.json({ success: true, data: payload });
+  } catch (err) {
+    log.error('upload proxy failed:', err);
+    logQuery(undefined, resource.name, endpointPath, 'error', Date.now() - startMs);
+    return res.status(502).json({ success: false, error: (err as Error).message });
+  }
 });
 
 export default router;
