@@ -1,16 +1,15 @@
 import type { TemplateConfig } from '../types/template';
 
-// Resource name placeholder. After importing, open the Queries panel and
-// change `resource` on every query to the actual name of your imported
-// data-layer-services resource. Same for FileUpload.data.resourceId
-// (must be the resource UUID).
-const RESOURCE = 'data-layer-services';
+// Hardcoded to the user's known resource name. The backend looks up resources
+// by name in the resources table, so as long as the imported resource is
+// named exactly this string, no UUID juggling is needed.
+const RESOURCE = 'Centralized Data Layer Backend';
 
 const smallDatasetPipeline: TemplateConfig = {
   id: 'small-dataset-pipeline',
   name: 'Small Dataset Pipeline',
   description:
-    'Upload Excel/CSV/PDF docs → automatic relationship detection → node-graph viz + RAG chat. Session-based: upload returns a session_id that drives every other call.',
+    'Upload Excel/CSV/PDF docs → automatic cleaning + relationship detection → node-graph viz + RAG chat. Fully wired to "Centralized Data Layer Backend".',
   components: [
     // ─── Header ─────────────────────────────────────────────────────────
     {
@@ -61,7 +60,7 @@ const smallDatasetPipeline: TemplateConfig = {
       id: 'upload-zone',
       type: 'FileUpload',
       label: 'Upload Datasets',
-      layout: { x: 0, y: 2, w: 4, h: 6 },
+      layout: { x: 0, y: 2, w: 4, h: 7 },
       style: {
         backgroundColor: '#111c2e',
         borderColor: '#22d3ee',
@@ -75,9 +74,13 @@ const smallDatasetPipeline: TemplateConfig = {
         ...({
           accept: '.xlsx,.xls,.csv,.pdf,.docx,.txt',
           multiple: true,
-          fieldName: 'files', // most FastAPI multi-file handlers expect "files"
-          resourceId: '', // ← USER MUST FILL: UUID of imported data-layer-services resource
+          fieldName: 'files',
+          // Resource looked up by NAME — no UUID needed.
+          resourceName: RESOURCE,
           endpointPath: '/api/v1/pipelines/small-dataset/upload',
+          // Polling: FileUpload auto-polls this after upload, and sets
+          // componentState[upload-zone].cleaningComplete=true when done.
+          progressEndpoint: '/api/v1/pipelines/small-dataset/upload/progress/{session_id}',
         } as any),
       },
     },
@@ -85,14 +88,14 @@ const smallDatasetPipeline: TemplateConfig = {
       id: 'session-display',
       type: 'Text',
       label: 'Active Session',
-      layout: { x: 0, y: 8, w: 4, h: 2 },
+      layout: { x: 0, y: 9, w: 4, h: 2 },
       style: {
         backgroundColor: '#0c2331',
         borderColor: '#22d3ee',
         borderWidth: 1,
         borderRadius: 10,
         padding: 12,
-        fontSize: 12,
+        fontSize: 11,
         fontFamily: 'Fira Code',
         textColor: '#22d3ee',
         overflow: 'Truncate',
@@ -106,9 +109,9 @@ const smallDatasetPipeline: TemplateConfig = {
 
     // ─── Stat Cards ────────────────────────────────────────────────────
     {
-      id: 'stat-docs',
+      id: 'stat-tables',
       type: 'StatCard',
-      label: 'Documents Ingested',
+      label: 'Tables Parsed',
       layout: { x: 4, y: 2, w: 4, h: 4 },
       style: {
         backgroundColor: '#111c2e',
@@ -156,40 +159,41 @@ const smallDatasetPipeline: TemplateConfig = {
       },
     },
     {
-      id: 'stat-tables',
+      id: 'stat-progress',
       type: 'StatCard',
-      label: 'Tables Parsed',
-      layout: { x: 4, y: 6, w: 4, h: 4 },
+      label: 'Cleaning Progress',
+      layout: { x: 4, y: 6, w: 4, h: 3 },
       style: {
         backgroundColor: '#111c2e',
         borderLeftColor: '#34d399',
         borderLeftWidth: 4,
         borderRadius: 14,
-        padding: 22,
+        padding: 18,
         textColor: '#ffffff',
-        metricFontSize: 32,
-        labelFontSize: 13,
+        metricFontSize: 28,
+        labelFontSize: 12,
         boxShadow: '0 4px 12px rgba(52, 211, 153, 0.12)',
       },
       data: {
         mockValue: '0',
-        dbBinding: '{{queries.get-tables.data.length}}',
+        suffix: '%',
+        dbBinding: '{{componentState.upload-zone.progressPercent}}',
       },
     },
     {
       id: 'stat-rag',
       type: 'StatCard',
       label: 'Chat Messages',
-      layout: { x: 8, y: 6, w: 4, h: 4 },
+      layout: { x: 8, y: 6, w: 4, h: 3 },
       style: {
         backgroundColor: '#111c2e',
         borderLeftColor: '#fbbf24',
         borderLeftWidth: 4,
         borderRadius: 14,
-        padding: 22,
+        padding: 18,
         textColor: '#ffffff',
-        metricFontSize: 32,
-        labelFontSize: 13,
+        metricFontSize: 28,
+        labelFontSize: 12,
         boxShadow: '0 4px 12px rgba(251, 191, 36, 0.12)',
       },
       data: {
@@ -198,12 +202,12 @@ const smallDatasetPipeline: TemplateConfig = {
       },
     },
 
-    // ─── Action Buttons (manual triggers) ──────────────────────────────
+    // ─── Action Buttons ────────────────────────────────────────────────
     {
       id: 'btn-detect',
       type: 'Button',
       label: '🔍 Detect Relationships',
-      layout: { x: 0, y: 10, w: 2, h: 3 },
+      layout: { x: 0, y: 11, w: 2, h: 3 },
       style: {
         backgroundColor: '#a855f7',
         borderColor: '#a855f7',
@@ -222,7 +226,7 @@ const smallDatasetPipeline: TemplateConfig = {
       id: 'btn-refresh',
       type: 'Button',
       label: '🔄 Refresh Graph',
-      layout: { x: 2, y: 10, w: 2, h: 3 },
+      layout: { x: 2, y: 11, w: 2, h: 3 },
       style: {
         backgroundColor: '#0ea5e9',
         borderColor: '#0ea5e9',
@@ -243,7 +247,7 @@ const smallDatasetPipeline: TemplateConfig = {
       id: 'relations-graph',
       type: 'NodeGraph',
       label: 'Dataset Relationships',
-      layout: { x: 0, y: 13, w: 8, h: 13 },
+      layout: { x: 0, y: 14, w: 8, h: 13 },
       style: {
         backgroundColor: '#0d1424',
         borderColor: '#22d3ee',
@@ -255,7 +259,6 @@ const smallDatasetPipeline: TemplateConfig = {
       },
       data: {
         dbBinding: '{{queries.get-relationships.data}}',
-        // Fallback when no session yet
         mockValue: {
           nodes: [
             { id: 'customers', label: '👥 customers.xlsx' },
@@ -273,7 +276,7 @@ const smallDatasetPipeline: TemplateConfig = {
       id: 'rag-chat',
       type: 'ChatBox',
       label: 'Ask Your Data',
-      layout: { x: 8, y: 10, w: 4, h: 16 },
+      layout: { x: 8, y: 9, w: 4, h: 18 },
       style: {
         backgroundColor: '#111c2e',
         borderColor: '#a855f7',
@@ -294,7 +297,7 @@ const smallDatasetPipeline: TemplateConfig = {
       id: 'tables-table',
       type: 'Table',
       label: 'Parsed Tables',
-      layout: { x: 0, y: 26, w: 12, h: 7 },
+      layout: { x: 0, y: 27, w: 12, h: 7 },
       style: {
         backgroundColor: '#0d1424',
         borderColor: '#1e2d42',
@@ -322,32 +325,34 @@ const smallDatasetPipeline: TemplateConfig = {
   ],
 
   // ──────────────────────────────────────────────────────────────────────
-  // QUERIES — chained on session_id captured by FileUpload after upload.
-  // The user MUST update `resource` on each query to the actual name of
-  // their imported data-layer-services resource (Queries panel in builder).
+  // QUERIES — fully wired. All use resource = "Centralized Data Layer
+  // Backend" (looked up by name). They fire automatically when:
+  //   - cleaningComplete becomes true (after upload polling finishes), OR
+  //   - sessionId appears (chat works as soon as session exists), OR
+  //   - manually via the Refresh / Detect buttons.
   // ──────────────────────────────────────────────────────────────────────
   queries: [
-    // Re-fetches after upload completes & session_id appears.
     {
       name: 'get-tables',
       resource: RESOURCE,
       endpoint: '/api/v1/pipelines/small-dataset/tables/{{componentState.upload-zone.sessionId}}',
       method: 'GET',
       trigger: 'onDependencyChange',
-      dependsOn: ['componentState.upload-zone.sessionId'],
+      dependsOn: [
+        'componentState.upload-zone.sessionId',
+        'componentState.upload-zone.cleaningComplete',
+      ],
     },
-
-    // Kicks off relationship detection automatically when session_id arrives.
     {
       name: 'detect-relationships',
       resource: RESOURCE,
       endpoint: '/api/v1/pipelines/small-dataset/relationships/{{componentState.upload-zone.sessionId}}/detect',
       method: 'POST',
       trigger: 'onDependencyChange',
-      dependsOn: ['componentState.upload-zone.sessionId'],
+      dependsOn: [
+        'componentState.upload-zone.cleaningComplete',
+      ],
     },
-
-    // Pulls the graph payload. Re-runs whenever detect-relationships completes.
     {
       name: 'get-relationships',
       resource: RESOURCE,
@@ -359,8 +364,6 @@ const smallDatasetPipeline: TemplateConfig = {
         'queries.detect-relationships.data',
       ],
     },
-
-    // Chat history (refreshes after each ask-rag completes).
     {
       name: 'get-chat-history',
       resource: RESOURCE,
@@ -372,15 +375,15 @@ const smallDatasetPipeline: TemplateConfig = {
         'queries.ask-rag.data',
       ],
     },
-
-    // RAG ask — manual trigger, fired by ChatBox when user hits send.
-    // ChatBox stores the question in componentState[<id>].value before firing.
     {
       name: 'ask-rag',
       resource: RESOURCE,
       endpoint: '/api/v1/pipelines/small-dataset/chat/{{componentState.upload-zone.sessionId}}',
       method: 'POST',
       trigger: 'manual',
+      // ChatBox stores the user's question in componentState[<id>].value.
+      // If your API expects a different field (question/query/text/prompt),
+      // replace `message` here with that field name.
       body: {
         message: '{{componentState.rag-chat.value}}',
       },

@@ -193,13 +193,14 @@ router.post('/', async (req, res) => {
 
 router.post('/upload', upload.any(), async (req, res) => {
   const resourceId   = String(req.headers['x-btb-resource-id']   || '').trim();
+  const resourceName = String(req.headers['x-btb-resource-name'] || '').trim();
   const endpointPath = String(req.headers['x-btb-endpoint-path'] || '').trim();
   const fieldName    = String(req.headers['x-btb-field-name']    || 'file').trim();
 
-  if (!resourceId || !endpointPath) {
+  if ((!resourceId && !resourceName) || !endpointPath) {
     return res.status(400).json({
       success: false,
-      error: 'Missing x-btb-resource-id or x-btb-endpoint-path header',
+      error: 'Missing x-btb-resource-id or x-btb-resource-name, or missing x-btb-endpoint-path header',
     });
   }
 
@@ -210,14 +211,17 @@ router.post('/upload', upload.any(), async (req, res) => {
 
   let resource: ResourceDbRow;
   try {
-    const { rows } = await pool.query<ResourceDbRow>(
-      `SELECT id, name, type, base_url, auth_type, secret_ref
-       FROM resources
-       WHERE id = $1`,
-      [resourceId],
-    );
+    // Look up by id OR by name — name is friendlier for prebuilt templates.
+    const lookupSql = resourceId
+      ? `SELECT id, name, type, base_url, auth_type, secret_ref FROM resources WHERE id = $1`
+      : `SELECT id, name, type, base_url, auth_type, secret_ref FROM resources WHERE name = $1`;
+    const lookupArg = resourceId || resourceName;
+    const { rows } = await pool.query<ResourceDbRow>(lookupSql, [lookupArg]);
     if (rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Resource not found' });
+      return res.status(404).json({
+        success: false,
+        error: `Resource not found (looked up by ${resourceId ? 'id' : 'name'}: ${lookupArg})`,
+      });
     }
     resource = rows[0];
   } catch (err) {
