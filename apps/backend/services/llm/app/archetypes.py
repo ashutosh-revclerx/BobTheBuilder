@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-DashboardType = Literal["analytics", "crud_admin", "monitoring", "form_workflow", "logs"]
+DashboardType = Literal["analytics", "crud_admin", "monitoring", "form_workflow", "logs", "data_pipeline"]
 
 
 @dataclass(frozen=True)
@@ -50,6 +50,14 @@ ARCHETYPE_RULES: dict[DashboardType, str] = {
         "- Optional summary StatCards for counts by level/status.\n"
         "- Prioritize scanability and timestamp visibility."
     ),
+    "data_pipeline": (
+        "- Top: 3-4 StatCards (documents ingested, relations found, columns, queries).\n"
+        "- Left column: FileUpload component for ingesting Excel/CSV/PDF/docs.\n"
+        "- Center: NodeGraph as the hero — visualizes dataset/column relationships.\n"
+        "- Right: ChatBox for RAG-style question answering against the datasets.\n"
+        "- Bottom: Table summarizing detected relations or pipeline runs.\n"
+        "- Choose a dark, premium canvas (gradient from #05080f → #0a1628) when the prompt suggests data-engineering aesthetic."
+    ),
 }
 
 
@@ -62,6 +70,7 @@ def classify_prompt(prompt: str) -> ArchetypeDecision:
         "monitoring": 0,
         "form_workflow": 0,
         "logs": 0,
+        "data_pipeline": 0,
     }
 
     if any(k in p for k in ("log", "logs", "incident", "trace")):
@@ -75,6 +84,13 @@ def classify_prompt(prompt: str) -> ArchetypeDecision:
         scores["crud_admin"] += 3
     if any(k in p for k in ("analytics", "kpi", "metric", "revenue", "trend", "overview")):
         scores["analytics"] += 3
+    if any(k in p for k in (
+        "small dataset", "small-dataset", "node graph", "node-graph",
+        "rag", "relation", "relations", "relationship", "excel", "spreadsheet",
+        "xlsx", "csv files", "upload", "ingest", "pipeline", "data pipeline",
+        "knowledge graph", "lineage", "schema graph",
+    )):
+        scores["data_pipeline"] += 4
 
     # Mild fallback bias toward analytics for broad, business-style prompts.
     if any(k in p for k in ("dashboard", "report", "summary")):

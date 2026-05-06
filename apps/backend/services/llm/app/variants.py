@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 from .schemas import DashboardConfig, GeneratedVariant
 
-DashboardType = Literal["analytics", "crud_admin", "monitoring", "form_workflow", "logs"]
+DashboardType = Literal["analytics", "crud_admin", "monitoring", "form_workflow", "logs", "data_pipeline"]
 
 SHADOW_LIGHT_THEME = "0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.06)"
 SHADOW_DARK_THEME  = "0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35)"

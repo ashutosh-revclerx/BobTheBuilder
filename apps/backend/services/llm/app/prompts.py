@@ -12,7 +12,7 @@ from .archetypes import ARCHETYPE_RULES, DashboardType
 from .component_capabilities import format_capabilities_for_prompt
 from .schemas import GenerateRequest, ResourceContext
 
-SYSTEM_PROMPT_VERSION = "v4.0"
+SYSTEM_PROMPT_VERSION = "v4.1"
 
 HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}\b")
 
@@ -43,7 +43,8 @@ REQUIRED FIELDS on every component:
   - id        kebab-case unique string         e.g. "tbl-orders"
   - type      one of: StatCard | Table | BarChart | LineChart | StatusBadge |
               Button | LogsViewer | Container | TabbedContainer | Text |
-              TextInput | NumberInput | Select | Image | Embed
+              TextInput | NumberInput | Select | Image | Embed |
+              NodeGraph | FileUpload | ChatBox
   - label     human-readable label             e.g. "Recent Orders"
   - layout    { "x": 0, "y": 0, "w": 6, "h": 12 }
               12-col grid; rowHeight is small; sensible heights are 4-18 rows
@@ -135,6 +136,29 @@ Button:       data.dbBinding         = "queries.X.trigger" (NO braces)
 
 TextInput:    data.placeholder  = "..."
               data.type         = "Text" | "URL" | "Email"
+
+NodeGraph:    data.dbBinding    = "{{queries.X.data}}"  ← expects { nodes:[...], edges:[...] }
+              Fallback shape if API differs:
+                nodes: [{ id: "sheet-1", label: "customers.xlsx", type: "sheet" }, ...]
+                edges: [{ source: "sheet-1", target: "sheet-2", label: "customer_id" }, ...]
+              Use NodeGraph for relationship/lineage/schema/dependency visualizations.
+
+FileUpload:   data.resourceId    = "<uuid of the BTB resource the user picked>"
+              data.endpointPath  = "/upload"   ← path on that resource
+              data.accept        = ".xlsx,.csv,.pdf,.docx,.txt"
+              data.multiple      = true
+              data.fieldName     = "file"      ← multipart form field name
+              IMPORTANT: FileUpload does NOT use dbBinding. Files post directly
+              to the resource via /api/execute/upload. The resourceId comes from
+              the user's selected resource — when the resource list contains
+              exactly one resource, use that resource's id (passed as `id`).
+
+ChatBox:      data.dbBinding    = "{{queries.X.data}}"
+              data.placeholder  = "Ask about your data..."
+              The bound query should be a POST that accepts a "question" body
+              field. The component sends `{ question, value }` as the body
+              substitutions. Pair with a RAG-style endpoint.
+              Define the query body as: { "question": "{{componentState.<chatbox-id>.value}}" }
 
 # Layout patterns to prefer
 
@@ -320,13 +344,149 @@ Charts use seriesColors, gridColor, axisColor, showGrid, showLegend, xField, ser
 Table uses headerBackgroundColor, stripeRows, rowHoverColor, searchBarBackground,
 searchable, pagination, and explicit columns.
 Every component goes well beyond the base backgroundColor/borderColor/textColor.
+
+# Worked example — Small Dataset Pipeline (NodeGraph + FileUpload + ChatBox)
+
+USER PROMPT: "Small dataset pipeline. Upload Excel sheets, visualize column relations as a node graph, RAG chat to ask questions about the data."
+RESOURCE: { "id": "<resource-uuid>", "name": "data-layer", "type": "REST", "endpoints": [
+  {"method":"POST","path":"/small-dataset/upload"},
+  {"method":"GET", "path":"/small-dataset/relations"},
+  {"method":"GET", "path":"/small-dataset/stats"},
+  {"method":"POST","path":"/small-dataset/ask"}
+] }
+
+VALID OUTPUT — uses ALL 3 new components plus stats and a relation table:
+{
+  "components": [
+    {
+      "id": "header-bar", "type": "Container", "label": "Header",
+      "layout": {"x":0,"y":0,"w":12,"h":2},
+      "style": {"backgroundColor":"#0d1424","borderWidth":0,"borderRadius":0,"padding":16},
+      "data": {}
+    },
+    {
+      "id": "header-title", "type": "Text", "label": "Title",
+      "layout": {"x":0,"y":0,"w":8,"h":2},
+      "style": {"backgroundColor":"transparent","fontSize":24,"fontWeight":700,"textColor":"#22d3ee"},
+      "data": {"mockValue":"🧬 Small Dataset Intelligence"}
+    },
+    {
+      "id": "stat-docs", "type": "StatCard", "label": "Documents Ingested",
+      "layout": {"x":0,"y":2,"w":3,"h":5},
+      "style": {
+        "backgroundGradient": {"enabled":true,"direction":135,
+          "stops":[{"color":"#0c2331","position":0},{"color":"#155e75","position":100}]},
+        "borderLeftColor":"#22d3ee","borderLeftWidth":4,
+        "textColor":"#ffffff","metricFontSize":32,"labelFontSize":13,
+        "borderRadius":12,"padding":20
+      },
+      "data": {"mockValue":"0","dbBinding":"{{queries.get-stats.data.documents}}"}
+    },
+    {
+      "id": "stat-relations", "type": "StatCard", "label": "Relations Found",
+      "layout": {"x":3,"y":2,"w":3,"h":5},
+      "style": {"backgroundColor":"#111c2e","borderLeftColor":"#a855f7","borderLeftWidth":4,
+                "metricFontSize":32,"labelFontSize":13,"borderRadius":12,"padding":20,
+                "textColor":"#ffffff"},
+      "data": {"mockValue":"0","dbBinding":"{{queries.get-stats.data.relations}}"}
+    },
+    {
+      "id": "stat-columns", "type": "StatCard", "label": "Columns Indexed",
+      "layout": {"x":6,"y":2,"w":3,"h":5},
+      "style": {"backgroundColor":"#111c2e","borderLeftColor":"#34d399","borderLeftWidth":4,
+                "metricFontSize":32,"labelFontSize":13,"borderRadius":12,"padding":20,
+                "textColor":"#ffffff"},
+      "data": {"mockValue":"0","dbBinding":"{{queries.get-stats.data.columns}}"}
+    },
+    {
+      "id": "stat-queries", "type": "StatCard", "label": "RAG Queries (24h)",
+      "layout": {"x":9,"y":2,"w":3,"h":5},
+      "style": {"backgroundColor":"#111c2e","borderLeftColor":"#fbbf24","borderLeftWidth":4,
+                "metricFontSize":32,"labelFontSize":13,"borderRadius":12,"padding":20,
+                "textColor":"#ffffff"},
+      "data": {"mockValue":"0","dbBinding":"{{queries.get-stats.data.rag_queries}}"}
+    },
+    {
+      "id": "upload-zone", "type": "FileUpload", "label": "Upload Datasets",
+      "layout": {"x":0,"y":7,"w":4,"h":7},
+      "style": {"backgroundColor":"#111c2e","borderColor":"#22d3ee","textColor":"#e2e8f0",
+                "borderRadius":14,"padding":18},
+      "data": {
+        "accept":".xlsx,.xls,.csv,.pdf,.docx,.txt",
+        "multiple":true,
+        "resourceId":"<resource-uuid>",
+        "endpointPath":"/small-dataset/upload",
+        "fieldName":"file"
+      }
+    },
+    {
+      "id": "relations-graph", "type": "NodeGraph", "label": "Dataset Relationships",
+      "layout": {"x":4,"y":7,"w":8,"h":12},
+      "style": {"backgroundColor":"#0d1424","borderColor":"#22d3ee","textColor":"#e2e8f0",
+                "borderWidth":1,"borderRadius":14,"padding":0},
+      "data": {"dbBinding":"{{queries.get-relations.data}}",
+               "mockValue":{"nodes":[{"id":"a","label":"customers.xlsx"},{"id":"b","label":"orders.xlsx"}],
+                            "edges":[{"source":"a","target":"b","label":"customer_id"}]}}
+    },
+    {
+      "id": "rag-chat", "type": "ChatBox", "label": "Ask Your Data",
+      "layout": {"x":0,"y":14,"w":4,"h":10},
+      "style": {"backgroundColor":"#111c2e","borderColor":"#a855f7","textColor":"#e2e8f0",
+                "borderRadius":14,"padding":14},
+      "data": {"placeholder":"Ask about your datasets...",
+               "dbBinding":"{{queries.ask-rag.data}}"}
+    },
+    {
+      "id": "relations-table", "type": "Table", "label": "Detected Column Relations",
+      "layout": {"x":4,"y":19,"w":8,"h":7},
+      "style": {"backgroundColor":"#0d1424","borderColor":"#1e2d42",
+                "headerBackgroundColor":"#111c2e","textColor":"#e2e8f0",
+                "stripeRows":true,"borderRadius":12,"padding":0},
+      "data": {
+        "searchable":true,"pagination":true,
+        "columns":[
+          {"name":"Source Sheet","fieldKey":"source"},
+          {"name":"Target Sheet","fieldKey":"target"},
+          {"name":"Common Column","fieldKey":"column"},
+          {"name":"Confidence","fieldKey":"confidence"}
+        ],
+        "dbBinding":"{{queries.get-relations.data.relations}}"
+      }
+    }
+  ],
+  "queries": [
+    {"name":"get-stats","resource":"data-layer","endpoint":"/small-dataset/stats",
+     "method":"GET","trigger":"onLoad"},
+    {"name":"get-relations","resource":"data-layer","endpoint":"/small-dataset/relations",
+     "method":"GET","trigger":"onLoad"},
+    {"name":"ask-rag","resource":"data-layer","endpoint":"/small-dataset/ask",
+     "method":"POST","trigger":"manual",
+     "body":{"question":"{{componentState.rag-chat.value}}"}}
+  ],
+  "canvasStyle": {
+    "backgroundColor":"#05080f",
+    "backgroundGradient":{"enabled":true,"direction":135,
+      "stops":[{"color":"#03060c","position":0},{"color":"#0a1628","position":100}]}
+  }
+}
+
+Notice:
+- FileUpload uses resourceId (UUID, not name) + endpointPath. NO dbBinding.
+- NodeGraph binds whole-object: `{{queries.get-relations.data}}` — payload must
+  have shape { nodes: [...], edges: [...] }. If the API only returns the array
+  of relations, drill in: `{{queries.get-relations.data.graph}}`.
+- ChatBox dbBinding points at the RAG ask query. The query body templates the
+  user's input: `"question": "{{componentState.<chatbox-id>.value}}"`.
+- The ask-rag query is `trigger: "manual"` — ChatBox calls it on send.
+- Dark canvas + cyan/purple accent palette is the canonical look for
+  data_pipeline dashboards.
 """
 
 
 def _format_resource_block(resource: ResourceContext) -> str:
     """Render one resource + its endpoints as compact, LLM-friendly text."""
     lines = [
-        f"- {resource.name} ({resource.type})"
+        f"- {resource.name} ({resource.type}) — id: {resource.id}"
         + (f" — base_url: {resource.base_url}" if resource.base_url else ""),
     ]
     if resource.endpoints:
