@@ -152,7 +152,7 @@ def generate(req: GenerateRequest, request: Request) -> GenerateResponse:
 
     base_config = enrich_config(base_config, req.prompt)
 
-    base_name = req.prompt.strip().splitlines()[0][:40].strip() or "Untitled"
+    base_name = "Dashboard"
     variants = derive_variants(
         base_config,
         base_name,

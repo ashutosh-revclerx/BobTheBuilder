@@ -32,6 +32,9 @@ const COMPONENT_LAYOUTS: Record<ComponentType, LayoutConfig> = {
   LogsViewer: { x: 0, y: 0, w: 4, h: 12, minW: 4, minH: 4 },
   Image: { x: 0, y: 0, w: 4, h: 8, minW: 2, minH: 3 },
   Embed: { x: 0, y: 0, w: 6, h: 10, minW: 3, minH: 4 },
+  NodeGraph: { x: 0, y: 0, w: 8, h: 14, minW: 4, minH: 8 },
+  FileUpload: { x: 0, y: 0, w: 4, h: 8, minW: 3, minH: 4 },
+  ChatBox: { x: 0, y: 0, w: 5, h: 14, minW: 3, minH: 8 },
 };
 
 const createBaseData = (): ComponentData => ({
@@ -425,6 +428,76 @@ const createDefaultConfig = (
         },
         layout: { ...COMPONENT_LAYOUTS[type] },
       };
+    case 'NodeGraph':
+      return {
+        style: {
+          ...createBaseStyle(),
+          backgroundColor: '#0d1424',
+          borderColor: '#22d3ee',
+          textColor: '#e2e8f0',
+          borderRadius: 14,
+          padding: 0,
+        },
+        data: {
+          ...createBaseData(),
+          mockValue: {
+            nodes: [
+              { id: 'sheet-1', label: 'customers.xlsx', type: 'sheet' },
+              { id: 'sheet-2', label: 'orders.xlsx', type: 'sheet' },
+              { id: 'sheet-3', label: 'products.xlsx', type: 'sheet' },
+              { id: 'sheet-4', label: 'invoices.xlsx', type: 'sheet' },
+            ],
+            edges: [
+              { source: 'sheet-1', target: 'sheet-2', label: 'customer_id' },
+              { source: 'sheet-2', target: 'sheet-3', label: 'product_id' },
+              { source: 'sheet-2', target: 'sheet-4', label: 'order_id' },
+            ],
+          },
+          refreshOn: 'onLoad',
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
+    case 'FileUpload':
+      return {
+        style: {
+          ...createBaseStyle(),
+          backgroundColor: '#f8fafc',
+          borderColor: '#cbd5e1',
+          textColor: '#0f172a',
+          borderRadius: 12,
+          padding: 18,
+        },
+        data: {
+          ...createBaseData(),
+          mockValue: '',
+          ...( {
+            accept: '.xlsx,.xls,.csv,.pdf,.docx,.txt',
+            multiple: true,
+            uploadUrl: '',
+            fieldName: 'file',
+            resourceId: '',
+            endpointPath: '',
+          } as any ),
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
+    case 'ChatBox':
+      return {
+        style: {
+          ...createBaseStyle(),
+          backgroundColor: '#ffffff',
+          borderColor: '#6366f1',
+          textColor: '#0f172a',
+          borderRadius: 14,
+          padding: 14,
+        },
+        data: {
+          ...createBaseData(),
+          placeholder: 'Ask about your data...',
+          mockValue: '',
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
     default:
       return {
         style: createBaseStyle(),
@@ -450,6 +523,9 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
   Select: createDefaultConfig('Select'),
   Image: createDefaultConfig('Image'),
   Embed: createDefaultConfig('Embed'),
+  NodeGraph: createDefaultConfig('NodeGraph'),
+  FileUpload: createDefaultConfig('FileUpload'),
+  ChatBox: createDefaultConfig('ChatBox'),
 };
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));

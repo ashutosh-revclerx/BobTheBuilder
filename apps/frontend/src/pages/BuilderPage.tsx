@@ -13,6 +13,14 @@ import { downloadAsCode } from '../services/exportService';
 
 const API_BASE = 'http://localhost:3001';
 
+type ResetBaseline = {
+  templateId: string;
+  name: string;
+  components: any[];
+  queries: any[];
+  canvasStyle?: any;
+};
+
 export default function BuilderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -31,6 +39,7 @@ export default function BuilderPage() {
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
+  const [resetBaseline, setResetBaseline] = useState<ResetBaseline | null>(null);
 
   // Left panel toggle state
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
@@ -159,6 +168,7 @@ export default function BuilderPage() {
     if (!id) return;
 
     let cancelled = false;
+    setResetBaseline(null);
 
     // For UUID dashboards (real DB rows) the DB is the source of truth.
     // localStorage was previously checked first — but a stale snapshot
@@ -179,6 +189,14 @@ export default function BuilderPage() {
           }
           const dashboard = await response.json();
           if (cancelled) return;
+          const baseline: ResetBaseline = {
+            templateId: dashboard.id,
+            name: dashboard.name,
+            components: dashboard.config?.components ?? [],
+            queries: dashboard.config?.queries ?? [],
+            canvasStyle: dashboard.config?.canvasStyle,
+          };
+          setResetBaseline(baseline);
           loadTemplate(
             dashboard.id,
             dashboard.name,
@@ -198,18 +216,39 @@ export default function BuilderPage() {
       //    localStorage / hardcoded templates are the only sources.
       const saved = savedTemplates[id];
       if (saved) {
+        setResetBaseline({
+          templateId: saved.templateId,
+          name: saved.dashboardName,
+          components: saved.components,
+          queries: saved.queries ?? [],
+          canvasStyle: saved.canvasStyle,
+        });
         loadSavedTemplate(saved);
         return;
       }
 
       if (id === 'blank') {
         const blank = getBlankTemplate();
+        setResetBaseline({
+          templateId: blank.id,
+          name: blank.name,
+          components: blank.components,
+          queries: [],
+          canvasStyle: blank.canvasStyle,
+        });
         loadTemplate(blank.id, blank.name, blank.components, [], 'draft', null, blank.canvasStyle);
         return;
       }
 
       const template = getTemplateById(id);
       if (template) {
+        setResetBaseline({
+          templateId: template.id,
+          name: template.name,
+          components: template.components,
+          queries: template.queries ?? [],
+          canvasStyle: template.canvasStyle,
+        });
         loadTemplate(
           template.id,
           template.name,
@@ -339,18 +378,32 @@ export default function BuilderPage() {
   };
 
   const handleReset = () => {
+    if (resetBaseline) {
+      resetToTemplate(
+        resetBaseline.templateId,
+        resetBaseline.name,
+        resetBaseline.components,
+        resetBaseline.queries,
+        resetBaseline.canvasStyle,
+      );
+      setShowResetConfirm(false);
+      return;
+    }
+
     if (!originalTemplateId) return;
-    
-    if (originalTemplateId.startsWith('blank')) {
-      resetToTemplate(originalTemplateId, 'Untitled Dashboard', []);
+
+    const template = getTemplateById(originalTemplateId);
+    if (template) {
+      resetToTemplate(
+        template.id,
+        template.name,
+        template.components,
+        template.queries ?? [],
+        template.canvasStyle,
+      );
     } else {
-      const template = getTemplateById(originalTemplateId);
-      if (template) {
-        resetToTemplate(template.id, template.name, template.components);
-      } else {
-        // Fallback for custom dashboards: Reset to empty if template not found
-        resetToTemplate(originalTemplateId, 'Dashboard', []);
-      }
+      // Fallback for unknown sources when no baseline is available.
+      resetToTemplate(originalTemplateId, 'Dashboard', []);
     }
     setShowResetConfirm(false);
   };

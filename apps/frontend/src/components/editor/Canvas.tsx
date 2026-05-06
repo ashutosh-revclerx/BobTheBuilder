@@ -16,12 +16,15 @@ import NumberInput from '../dashboard-components/NumberInput';
 import Select from '../dashboard-components/Select';
 import Image from '../dashboard-components/Image';
 import Embed from '../dashboard-components/Embed';
+import FileUpload from '../dashboard-components/FileUpload';
+import ChatBox from '../dashboard-components/ChatBox';
 import type { ComponentType } from '../../types/template';
 
 // Lazy load heavy components
 const BarChartComponent = lazy(() => import('../dashboard-components/BarChart'));
 const LineChartComponent = lazy(() => import('../dashboard-components/LineChart'));
 const LogsViewer = lazy(() => import('../dashboard-components/LogsViewer'));
+const NodeGraph = lazy(() => import('../dashboard-components/NodeGraph'));
 
 const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
   StatCard,
@@ -39,6 +42,9 @@ const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
   Select,
   Image,
   Embed,
+  NodeGraph,
+  FileUpload,
+  ChatBox,
 };
 
 export default function Canvas({ readOnly = false }: { readOnly?: boolean }) {
