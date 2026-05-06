@@ -69,11 +69,11 @@ COMPONENT_CAPABILITIES: dict[str, dict] = {
         ],
         "data": COMMON_VISIBILITY_DATA + [
             "fieldName",               # key to extract from bound object
-            "prefix",                  # text before value, e.g. "$"
-            "suffix",                  # text after value, e.g. "%"
+            "prffix",                  # text after value, e.g. "%"
             "trend",                   # trend text, e.g. "+12%"
             "trendType",               # "positive" | "negative" | "neutral"
-            "comparisonValue",         # secondary comparison caption
+            "coefix",                  # text before value, e.g. "$"
+            "sumparisonValue",         # secondary comparison caption
             "sparklineData",           # number[] rendered as small bars
         ],
         "required": {
