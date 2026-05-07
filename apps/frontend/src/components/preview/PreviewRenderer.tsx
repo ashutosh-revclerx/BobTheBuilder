@@ -6,7 +6,6 @@
 import { Suspense } from 'react';
 import { RenderRegistry } from '../../config/renderRegistry';
 import { resolveBackground } from '../../utils/styleUtils';
-import type { ComponentType } from '../../types/template';
 
 interface DashboardConfig {
   components: Array<Record<string, any>>;
@@ -22,7 +21,10 @@ interface PreviewRendererProps {
   height?: string | number;
   width?: string | number;
   className?: string;
+  scale?: number;
 }
+
+const PREVIEW_CANVAS_WIDTH = 1020;
 
 /**
  * Renders a dashboard preview using the exact rendering pipeline as the final dashboard.
@@ -38,8 +40,10 @@ export default function PreviewRenderer({
   height = '100%',
   width = '100%',
   className = '',
+  scale,
 }: PreviewRendererProps) {
   const canvasStyle = config.canvasStyle || { backgroundColor: '#f3f4f6' };
+  const isScaled = scale != null && scale > 0 && scale < 1;
 
   return (
     <div
@@ -53,17 +57,34 @@ export default function PreviewRenderer({
         background: resolveBackground(canvasStyle as any),
       }}
     >
-      <div
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          display: 'flex',
-        }}
-      >
-        <Suspense fallback={<div style={{ padding: '20px', color: '#999' }}>Loading preview...</div>}>
-          <PreviewGridLayer config={config} />
-        </Suspense>
-      </div>
+      {isScaled ? (
+        <div
+          style={{
+            width: `${PREVIEW_CANVAS_WIDTH}px`,
+            height: `calc(${typeof height === 'number' ? height : 220} / ${scale})`,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+            flexShrink: 0,
+            overflow: 'visible',
+          }}
+        >
+          <Suspense fallback={<div style={{ padding: '20px', color: '#999' }}>Loading...</div>}>
+            <PreviewGridLayer config={config} />
+          </Suspense>
+        </div>
+      ) : (
+        <div
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            display: 'flex',
+          }}
+        >
+          <Suspense fallback={<div style={{ padding: '20px', color: '#999' }}>Loading preview...</div>}>
+            <PreviewGridLayer config={config} />
+          </Suspense>
+        </div>
+      )}
     </div>
   );
 }

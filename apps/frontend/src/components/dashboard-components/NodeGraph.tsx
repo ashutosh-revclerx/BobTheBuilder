@@ -16,6 +16,7 @@ import { resolveBackground } from '../../utils/styleUtils';
 
 interface NodeGraphProps {
   config: ComponentConfig;
+  readOnly?: boolean;
 }
 
 interface RawNode {
@@ -46,6 +47,65 @@ const FALLBACK_EDGES: RawEdge[] = [
   { source: 'sheet-2', target: 'sheet-4', label: 'order_id' },
 ];
 
+interface GraphPayload {
+  rawNodes: RawNode[];
+  rawEdges: RawEdge[];
+}
+
+// Probes API response for common node/edge shapes. Handles nested wrappers
+// and alternative key names (vertices, links, connections, relationships, etc.)
+function extractGraphData(payload: unknown): GraphPayload | null {
+  if (payload == null || typeof payload !== 'object') return null;
+
+  const GRAPH_NODE_KEYS = ['nodes', 'vertices', 'items'] as const;
+  const GRAPH_EDGE_KEYS = ['edges', 'links', 'relationships', 'connections'] as const;
+
+  const tryRead = (obj: Record<string, unknown>): GraphPayload | null => {
+    for (const nk of GRAPH_NODE_KEYS) {
+      for (const ek of GRAPH_EDGE_KEYS) {
+        const nodes = obj[nk];
+        const edges = obj[ek];
+        if (Array.isArray(nodes) && Array.isArray(edges)) {
+          return { rawNodes: nodes as RawNode[], rawEdges: edges as RawEdge[] };
+        }
+      }
+    }
+    return null;
+  };
+
+  const obj = payload as Record<string, unknown>;
+
+  // Direct shape: { nodes: [...], edges: [...] }
+  const direct = tryRead(obj);
+  if (direct) return direct;
+
+  // Wrapped shapes: { data: { nodes, edges } }, { result: { nodes, edges } }, etc.
+  for (const wrapper of ['data', 'result', 'response', 'output']) {
+    const inner = obj[wrapper];
+    if (inner && typeof inner === 'object') {
+      const nested = tryRead(inner as Record<string, unknown>);
+      if (nested) return nested;
+    }
+  }
+
+  // Flat relationship list: { relationships: [{ source, target, label }] }
+  const rels = obj['relationships'];
+  if (Array.isArray(rels) && rels.length > 0 && rels[0]?.source) {
+    // Synthesize nodes from unique sources/targets
+    const nodeIds = new Set<string>();
+    (rels as RawEdge[]).forEach((r) => {
+      nodeIds.add(r.source);
+      nodeIds.add(r.target);
+    });
+    return {
+      rawNodes: Array.from(nodeIds).map((id) => ({ id, label: id })),
+      rawEdges: rels as RawEdge[],
+    };
+  }
+
+  return null;
+}
+
 function autoLayout(nodes: RawNode[]): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>();
   const radius = Math.max(120, nodes.length * 30);
@@ -61,43 +121,91 @@ function autoLayout(nodes: RawNode[]): Map<string, { x: number; y: number }> {
   return positions;
 }
 
-export default function NodeGraph({ config }: NodeGraphProps) {
+export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
   const { style, data } = config;
   const queryResults = useEditorStore((s) => s.queryResults);
+  const componentState = useEditorStore((s) => s.componentState);
+
+  // Read raw (unresolved) binding from store. By the time `data.dbBinding` arrives
+  // here, {{...}} has been resolved to the actual value — losing the query name.
+  // Reading the unresolved binding directly lets NodeGraph find the query
+  // regardless of whether the template author wrote `queries.X.trigger`
+  // (literal) or `{{queries.X.data}}` (resolved style).
+  const rawBinding = useEditorStore(
+    (s) => (s.components.find((c) => c.id === config.id)?.data as any)?.dbBinding,
+  );
 
   const bg = useMemo(
     () => resolveBackground(style),
     [style.backgroundColor, style.backgroundGradient],
   );
 
-  const { rawNodes, rawEdges } = useMemo<{
+  type GraphStatus = 'readOnly' | 'noSession' | 'loading' | 'loaded' | 'error';
+
+  const { rawNodes, rawEdges, graphStatus } = useMemo<{
     rawNodes: RawNode[];
     rawEdges: RawEdge[];
+    graphStatus: GraphStatus;
   }>(() => {
-    // First try a single dbBinding that returns { nodes: [...], edges: [...] }
-    const queryName = parseQueryName(data.dbBinding);
+    // 1. ReadOnly mode (TemplatePicker preview) — use mockValue immediately
+    if (readOnly) {
+      const graph = extractGraphData(data.mockValue);
+      if (graph) return { ...graph, graphStatus: 'readOnly' };
+      return { rawNodes: FALLBACK_NODES, rawEdges: FALLBACK_EDGES, graphStatus: 'readOnly' };
+    }
+
+    // 2. Check if a session exists (upload-zone sessionId in componentState)
+    const hasSession = Object.values(componentState).some(
+      (cs) => cs && typeof cs === 'object' && 'sessionId' in cs && cs.sessionId,
+    );
+
+    // 3. Try live query result
+    const queryName = parseQueryName(rawBinding) || parseQueryName(data.dbBinding);
     if (queryName) {
       const result = queryResults[queryName];
-      const payload = result?.data as any;
-      if (payload && Array.isArray(payload.nodes) && Array.isArray(payload.edges)) {
-        return { rawNodes: payload.nodes, rawEdges: payload.edges };
+
+      if (result?.status === 'loading' || result?.status === 'idle') {
+        return { rawNodes: [], rawEdges: [], graphStatus: hasSession ? 'loading' : 'noSession' };
+      }
+
+      if (result?.status === 'error') {
+        return { rawNodes: [], rawEdges: [], graphStatus: 'error' };
+      }
+
+      if (result?.status === 'success') {
+        const graph = extractGraphData(result.data);
+        if (graph && graph.rawNodes.length > 0) {
+          return { ...graph, graphStatus: 'loaded' };
+        }
+      }
+
+      // queryName resolved but no result yet
+      if (!result) {
+        return { rawNodes: [], rawEdges: [], graphStatus: hasSession ? 'loading' : 'noSession' };
       }
     }
 
-    // Fallback: explicit `nodes` / `edges` on data, or mockValue
+    // 4. Explicit nodes/edges on the config
     const explicitNodes = (data as any).nodes;
     const explicitEdges = (data as any).edges;
     if (Array.isArray(explicitNodes) && Array.isArray(explicitEdges)) {
-      return { rawNodes: explicitNodes, rawEdges: explicitEdges };
+      return { rawNodes: explicitNodes, rawEdges: explicitEdges, graphStatus: 'loaded' };
     }
 
+    // 5. mockValue
     const mock = data.mockValue as any;
-    if (mock && Array.isArray(mock.nodes) && Array.isArray(mock.edges)) {
-      return { rawNodes: mock.nodes, rawEdges: mock.edges };
+    if (mock) {
+      const graph = extractGraphData(mock);
+      if (graph) return { ...graph, graphStatus: hasSession ? 'loading' : 'noSession' };
     }
 
-    return { rawNodes: FALLBACK_NODES, rawEdges: FALLBACK_EDGES };
-  }, [data.dbBinding, data.mockValue, (data as any).nodes, (data as any).edges, queryResults]);
+    // 6. No session → show placeholder; session but no data → fallback
+    if (!hasSession) {
+      return { rawNodes: [], rawEdges: [], graphStatus: 'noSession' };
+    }
+
+    return { rawNodes: FALLBACK_NODES, rawEdges: FALLBACK_EDGES, graphStatus: 'loading' };
+  }, [readOnly, rawBinding, data, queryResults, componentState]);
 
   const nodes = useMemo<Node[]>(() => {
     const positions = autoLayout(rawNodes);
@@ -149,6 +257,41 @@ export default function NodeGraph({ config }: NodeGraphProps) {
     overflow: 'hidden',
   };
 
+  // No session state — show placeholder
+  if (graphStatus === 'noSession') {
+    return (
+      <div className="nodegraph-component" style={{ ...wrapperStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 32, opacity: 0.3 }}>⬆</div>
+        <div style={{ fontSize: 13, color: style.textColor || '#e2e8f0', opacity: 0.6, textAlign: 'center' }}>
+          Upload files first to build the relationship graph
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state
+  if (graphStatus === 'loading') {
+    return (
+      <div className="nodegraph-component" style={{ ...wrapperStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: 13, color: style.borderColor || '#22d3ee', opacity: 0.8 }}>
+          Building relationship graph…
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (graphStatus === 'error') {
+    return (
+      <div className="nodegraph-component" style={{ ...wrapperStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: 13, color: '#f87171', textAlign: 'center', padding: 16 }}>
+          Failed to load relationships. Retry by clicking "Detect Relationships".
+        </div>
+      </div>
+    );
+  }
+
+  // Loaded state — show ReactFlow graph
   return (
     <div className="nodegraph-component" style={wrapperStyle}>
       <ReactFlow

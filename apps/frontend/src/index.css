@@ -3972,40 +3972,12 @@
 }
 
 .picker-card-canvas {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  grid-auto-rows: 8px;
-  gap: 4px;
-  min-height: 220px;
+  display: block;
+  height: 220px;
+  overflow: hidden;
+  position: relative;
   border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 8px;
-  padding: 8px;
-}
-
-.picker-card-block-wrapper {
-  display: flex;
-  min-height: 14px;
-  overflow: hidden;
-}
-
-.picker-card-block {
-  border: 1px solid;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 12px;
-  overflow: hidden;
-  font-size: 9px;
-  font-weight: 600;
-  padding: 2px 4px;
-}
-
-.picker-card-block-label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  opacity: 0.85;
 }
 
 .picker-card-pick {

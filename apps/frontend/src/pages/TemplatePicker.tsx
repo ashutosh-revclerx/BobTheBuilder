@@ -4,6 +4,7 @@ import TopNav from '../components/ui/TopNav';
 import PreviewRenderer from '../components/preview/PreviewRenderer';
 
 const API_BASE = 'http://localhost:3001';
+const PREVIEW_SCALE = 292 / 1020; // card canvas ~292px wide, builder canvas ~1020px wide
 
 interface DashboardConfig {
   components: Array<Record<string, any>>;
@@ -171,7 +172,7 @@ export default function TemplatePicker() {
                 {/* Real preview using actual dashboard components and renderer.
                     This ensures visual parity between preview and final rendered dashboard. */}
                 <div className="picker-card-canvas" style={{ background: p.background }}>
-                  <PreviewRenderer config={variant.config} height="100%" width="100%" />
+                  <PreviewRenderer config={variant.config} height={220} width={292} scale={PREVIEW_SCALE} />
                 </div>
 
                 <button
