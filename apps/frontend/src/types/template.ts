@@ -74,6 +74,9 @@ export interface ComponentStyle {
   searchBarBackground?: string;
   searchBarTextColor?: string;
   searchBarBorderColor?: string;
+
+  // Elevation
+  boxShadow?: string;
 }
 
 export interface ComponentEvent {
@@ -225,7 +228,10 @@ export type ComponentType =
   | 'NumberInput'
   | 'Select'
   | 'Image'
-  | 'Embed';
+  | 'Embed'
+  | 'NodeGraph'
+  | 'FileUpload'
+  | 'ChatBox';
 
 export interface ComponentConfig {
   id: string;

@@ -2,6 +2,15 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import type { ComponentConfig } from '../types/template';
 
+export interface CanvasStyle {
+  backgroundColor: string;
+  backgroundGradient?: {
+    enabled: boolean;
+    direction: number;
+    stops: Array<{ color: string; position: number }>;
+  };
+}
+
 export interface ProjectData {
   metadata: {
     name: string;
@@ -13,6 +22,7 @@ export interface ProjectData {
   };
   config: {
     components: ComponentConfig[];
+    canvasStyle?: CanvasStyle;
   };
   queries: any[];
   styles: {
@@ -42,6 +52,7 @@ export const exportProject = async (state: any) => {
     },
     config: {
       components: state.components || [],
+      canvasStyle: state.canvasStyle || { backgroundColor: '#f3f4f6' },
     },
     queries: state.queriesConfig || [],
     styles: {

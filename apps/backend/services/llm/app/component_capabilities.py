@@ -69,11 +69,11 @@ COMPONENT_CAPABILITIES: dict[str, dict] = {
         ],
         "data": COMMON_VISIBILITY_DATA + [
             "fieldName",               # key to extract from bound object
-            "prefix",                  # text before value, e.g. "$"
-            "suffix",                  # text after value, e.g. "%"
+            "prffix",                  # text after value, e.g. "%"
             "trend",                   # trend text, e.g. "+12%"
             "trendType",               # "positive" | "negative" | "neutral"
-            "comparisonValue",         # secondary comparison caption
+            "coefix",                  # text before value, e.g. "$"
+            "sumparisonValue",         # secondary comparison caption
             "sparklineData",           # number[] rendered as small bars
         ],
         "required": {
@@ -382,6 +382,40 @@ COMPONENT_CAPABILITIES: dict[str, dict] = {
         ],
         "required": {"style": [], "data": ["src"]},
     },
+    "NodeGraph": {
+        "description": "Interactive node-edge graph for visualizing relationships between datasets, columns, or entities. Powered by react-flow.",
+        "visual_role": "Hero visualization of relationships, lineage, dependency, or schema graphs.",
+        "style": COMMON_CARD_STYLE,
+        "data": COMMON_VISIBILITY_DATA + [
+            # The data binding should resolve to { nodes: [...], edges: [...] }
+            # nodes: [{ id: "x", label: "Sheet A", type: "sheet" }]
+            # edges: [{ source: "x", target: "y", label: "common_col" }]
+        ],
+        "required": {"style": [], "data": ["dbBinding"]},
+    },
+    "FileUpload": {
+        "description": "Drag-and-drop file upload zone that POSTs files as multipart/form-data to a registered REST resource endpoint.",
+        "visual_role": "Entry point for ingesting Excel sheets, CSV files, PDFs, or documents into a pipeline.",
+        "style": COMMON_CARD_STYLE,
+        "data": COMMON_VISIBILITY_DATA + [
+            "accept",                  # comma-list of extensions, e.g. ".xlsx,.csv,.pdf"
+            "multiple",                # boolean — allow multiple files
+            "uploadUrl",               # optional direct upload URL (overrides resourceId)
+            "fieldName",               # multipart form field name (default: "file")
+            "resourceId",              # UUID of the BTB resource to upload to
+            "endpointPath",            # endpoint path on that resource (e.g. /upload)
+        ],
+        "required": {"style": [], "data": []},
+    },
+    "ChatBox": {
+        "description": "RAG-style chat interface with message bubbles. Sends the user's question to a bound query and displays the answer extracted from common response shapes (answer | response | text | message | result).",
+        "visual_role": "Conversational data exploration paired with a RAG / question-answering endpoint.",
+        "style": COMMON_CARD_STYLE,
+        "data": COMMON_VISIBILITY_DATA + [
+            "placeholder",             # input placeholder text
+        ],
+        "required": {"style": [], "data": ["dbBinding"]},
+    },
 }
 
 
@@ -391,8 +425,16 @@ def format_capabilities_for_prompt() -> str:
         "## Component-specific style & data properties",
         "",
         "Use these aggressively to create polished, visually distinct dashboards.",
-        "Most components support backgroundGradient:",
-        "{ enabled: true, direction: 90, stops: [{ color: '#hex', position: 0 }, { color: '#hex', position: 100 }] }.",
+        "Most components support backgroundGradient as an object (not a string):",
+        "backgroundGradient = {",
+        "  enabled: true,",
+        "  direction: 0..360,",
+        "  stops: [",
+        "    { color: '#RRGGBB', position: 0 },",
+        "    { color: '#RRGGBB', position: 100 }",
+        "  ]",
+        "}",
+        "Rules: use 2-3 stops; keep position values numeric and increasing from 0 to 100.",
         "Do NOT invent properties outside this registry.",
         "",
     ]

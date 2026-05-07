@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { deepClone } from '../utils/deepClone';
 import sourceIndexCss from '../index.css?raw';
 import templateTypeSource from '../types/template.ts?raw';
 import queryEngineSource from '../engine/queryEngine.ts?raw';
@@ -26,6 +27,19 @@ import numberInputSource from '../components/dashboard-components/NumberInput.ts
 import selectSource from '../components/dashboard-components/Select.tsx?raw';
 import imageSource from '../components/dashboard-components/Image.tsx?raw';
 import embedSource from '../components/dashboard-components/Embed.tsx?raw';
+
+const DATA_URL_PATTERN = /^data:([^;,]+);base64,(.+)$/;
+
+const MIME_TO_EXTENSION: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/svg+xml': 'svg',
+  'image/bmp': 'bmp',
+  'image/x-icon': 'ico',
+};
 
 // Helper to get file content (in a real app, these might be fetched or bundled)
 const getRuntimeFile = async (path: string) => {
@@ -112,16 +126,87 @@ const sourceRuntimeFiles: Record<string, string> = {
   'src/components/dashboard-components/Embed.tsx': embedSource,
 };
 
+// Use shared deepClone utility instead of local definition
+
+const decodeBase64 = (input: string): Uint8Array => {
+  const binary = atob(input);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+};
+
+const extForMime = (mimeType: string): string => MIME_TO_EXTENSION[mimeType.toLowerCase()] ?? 'bin';
+
+const sanitizeFilePart = (value: string): string => value.toLowerCase().replace(/[^a-z0-9-_]/g, '-') || 'image';
+
+type ImageAssetFile = {
+  zipPath: string;
+  bytes: Uint8Array;
+};
+
+const extractImageAssetsFromComponents = (rawComponents: any[]): { components: any[]; assets: ImageAssetFile[] } => {
+  const components = deepClone(rawComponents ?? []);
+  const assets: ImageAssetFile[] = [];
+  const usedNames = new Set<string>();
+
+  components.forEach((component: any, index: number) => {
+    if (component?.type !== 'Image') return;
+    const uploadedSrc = component?.data?.uploadedSrc;
+    if (typeof uploadedSrc !== 'string' || !uploadedSrc.startsWith('data:')) return;
+
+    const match = uploadedSrc.match(DATA_URL_PATTERN);
+    if (!match) return;
+
+    const [, mimeType, base64Payload] = match;
+    if (!mimeType || !base64Payload) return;
+
+    const ext = extForMime(mimeType);
+    const baseName = sanitizeFilePart(String(component?.id || `image-${index + 1}`));
+    let candidateName = `${baseName}.${ext}`;
+    let counter = 1;
+
+    while (usedNames.has(candidateName)) {
+      counter += 1;
+      candidateName = `${baseName}-${counter}.${ext}`;
+    }
+    usedNames.add(candidateName);
+
+    const zipPath = `public/assets/images/${candidateName}`;
+    assets.push({
+      zipPath,
+      bytes: decodeBase64(base64Payload),
+    });
+
+    component.data = {
+      ...(component.data ?? {}),
+      uploadedSrc: `/assets/images/${candidateName}`,
+    };
+  });
+
+  return { components, assets };
+};
+
 export const downloadAsCode = async (dashboardState: any) => {
   const zip = new JSZip();
   const dashboardName = dashboardState.dashboardName || 'Untitled Dashboard';
+  const { components: exportedComponents, assets: imageAssets } = extractImageAssetsFromComponents(
+    dashboardState.components || [],
+  );
+  const queriesConfig = dashboardState.queriesConfig || [];
+
+  // Export includes all required fields for lossless round-trip:
+  // queries (required for bindings), canvasStyle (visual fidelity), and status metadata
   const dashboardConfig = {
     name: dashboardName,
-    components: dashboardState.components || [],
-    canvasStyle: dashboardState.canvasStyle
+    components: exportedComponents,
+    queries: queriesConfig,
+    canvasStyle: dashboardState.canvasStyle || { backgroundColor: '#f3f4f6' },
+    status: dashboardState.status || 'draft',
+    publishedAt: dashboardState.publishedAt || null,
   };
-  const queriesConfig = dashboardState.queriesConfig || [];
-  
+
   // 1. Add Config files
   console.log('Adding config files to ZIP...');
   const dashboardJson = JSON.stringify(dashboardConfig, null, 2);
@@ -136,6 +221,11 @@ export const downloadAsCode = async (dashboardState: any) => {
   zip.folder('config');
   zip.file('config/dashboard.json', dashboardJson);
   zip.file('config/queries.json', queriesJson);
+
+  // Store uploaded image data-URLs as physical files in exported code.
+  imageAssets.forEach((asset) => {
+    zip.file(asset.zipPath, asset.bytes);
+  });
 
   // 2. Add Runtime files
   const runtimeFiles = [

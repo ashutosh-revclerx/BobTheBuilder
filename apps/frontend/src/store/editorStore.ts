@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { deepClone } from '../utils/deepClone';
 import { type ThemeName, resolveTheme } from '../config/themes';
 import type {
   CanvasStyle,
@@ -9,6 +10,7 @@ import type {
   SavedTemplate,
   TableColumn,
 } from '../types/template';
+import type { AssistantMessage, Suggestion } from '../types/assistant';
 
 const STORAGE_KEY = 'dashboard_templates';
 
@@ -32,6 +34,9 @@ const COMPONENT_LAYOUTS: Record<ComponentType, LayoutConfig> = {
   LogsViewer: { x: 0, y: 0, w: 4, h: 12, minW: 4, minH: 4 },
   Image: { x: 0, y: 0, w: 4, h: 8, minW: 2, minH: 3 },
   Embed: { x: 0, y: 0, w: 6, h: 10, minW: 3, minH: 4 },
+  NodeGraph: { x: 0, y: 0, w: 8, h: 14, minW: 4, minH: 8 },
+  FileUpload: { x: 0, y: 0, w: 4, h: 8, minW: 3, minH: 4 },
+  ChatBox: { x: 0, y: 0, w: 5, h: 14, minW: 3, minH: 8 },
 };
 
 const createBaseData = (): ComponentData => ({
@@ -425,6 +430,76 @@ const createDefaultConfig = (
         },
         layout: { ...COMPONENT_LAYOUTS[type] },
       };
+    case 'NodeGraph':
+      return {
+        style: {
+          ...createBaseStyle(),
+          backgroundColor: '#0d1424',
+          borderColor: '#22d3ee',
+          textColor: '#e2e8f0',
+          borderRadius: 14,
+          padding: 0,
+        },
+        data: {
+          ...createBaseData(),
+          mockValue: {
+            nodes: [
+              { id: 'sheet-1', label: 'customers.xlsx', type: 'sheet' },
+              { id: 'sheet-2', label: 'orders.xlsx', type: 'sheet' },
+              { id: 'sheet-3', label: 'products.xlsx', type: 'sheet' },
+              { id: 'sheet-4', label: 'invoices.xlsx', type: 'sheet' },
+            ],
+            edges: [
+              { source: 'sheet-1', target: 'sheet-2', label: 'customer_id' },
+              { source: 'sheet-2', target: 'sheet-3', label: 'product_id' },
+              { source: 'sheet-2', target: 'sheet-4', label: 'order_id' },
+            ],
+          },
+          refreshOn: 'onLoad',
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
+    case 'FileUpload':
+      return {
+        style: {
+          ...createBaseStyle(),
+          backgroundColor: '#f8fafc',
+          borderColor: '#cbd5e1',
+          textColor: '#0f172a',
+          borderRadius: 12,
+          padding: 18,
+        },
+        data: {
+          ...createBaseData(),
+          mockValue: '',
+          ...( {
+            accept: '.xlsx,.xls,.csv,.pdf,.docx,.txt',
+            multiple: true,
+            uploadUrl: '',
+            fieldName: 'file',
+            resourceId: '',
+            endpointPath: '',
+          } as any ),
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
+    case 'ChatBox':
+      return {
+        style: {
+          ...createBaseStyle(),
+          backgroundColor: '#ffffff',
+          borderColor: '#6366f1',
+          textColor: '#0f172a',
+          borderRadius: 14,
+          padding: 14,
+        },
+        data: {
+          ...createBaseData(),
+          placeholder: 'Ask about your data...',
+          mockValue: '',
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
     default:
       return {
         style: createBaseStyle(),
@@ -450,9 +525,13 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
   Select: createDefaultConfig('Select'),
   Image: createDefaultConfig('Image'),
   Embed: createDefaultConfig('Embed'),
+  NodeGraph: createDefaultConfig('NodeGraph'),
+  FileUpload: createDefaultConfig('FileUpload'),
+  ChatBox: createDefaultConfig('ChatBox'),
 };
 
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+// Use shared deepClone utility instead of local definition
+const clone = deepClone;
 
 const ensureColumnVisibility = (columns: TableColumn[] = [], current?: Record<string, boolean>) =>
   columns.reduce<Record<string, boolean>>((acc, column) => {
@@ -548,7 +627,20 @@ interface EditorState {
   status: 'draft' | 'live';
   publishedAt: string | null;
   canvasStyle: CanvasStyle;
-  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null, canvasStyle?: CanvasStyle) => void;
+  // ─── AI assistant ───────────────────────────────────────────────
+  generationPrompt: string | null;
+  assistantOpen: boolean;
+  assistantMessages: AssistantMessage[];
+  assistantLoading: boolean;
+  assistantError: string | null;
+  /** Per-suggestion undo snapshots, keyed by `${messageId}:${index}`. */
+  assistantUndoSnapshots: Record<string, {
+    components: ComponentConfig[];
+    queriesConfig: any[];
+    canvasStyle: CanvasStyle;
+  }>;
+  // ────────────────────────────────────────────────────────────────
+  loadTemplate: (templateId: string, name: string, components: ComponentConfig[], queries?: any[], status?: 'draft' | 'live', publishedAt?: string | null, canvasStyle?: CanvasStyle, generationPrompt?: string | null) => void;
   loadSavedTemplate: (saved: SavedTemplate) => void;
   selectComponent: (id: string | null) => void;
   clearCanvasSelection: () => void;
@@ -591,6 +683,17 @@ interface EditorState {
   applyThemeToAll: (paletteName: ThemeName) => void;
   duplicateComponent: (id?: string) => void;
   importDashboard: (data: any) => void;
+  // ─── AI assistant actions ───────────────────────────────────────
+  toggleAssistant: () => void;
+  setAssistantOpen: (open: boolean) => void;
+  setGenerationPrompt: (prompt: string | null) => void;
+  appendAssistantMessage: (msg: AssistantMessage) => void;
+  setAssistantLoading: (loading: boolean) => void;
+  setAssistantError: (error: string | null) => void;
+  clearAssistantConversation: () => void;
+  applySuggestion: (messageId: string, suggestionIndex: number) => void;
+  undoSuggestion: (messageId: string, suggestionIndex: number) => void;
+  dismissSuggestion: (messageId: string, suggestionIndex: number) => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -618,6 +721,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   canvasStyle: {
     backgroundColor: '#f3f4f6',
   },
+  generationPrompt: null,
+  assistantOpen: false,
+  assistantMessages: [],
+  assistantLoading: false,
+  assistantError: null,
+  assistantUndoSnapshots: {},
 
   setDraggingType: (type) => set({ draggingType: type }),
 
@@ -652,7 +761,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
     })),
 
-  loadTemplate: (templateId, name, components, queries = [], status = 'draft', publishedAt = null, canvasStyle) => {
+  loadTemplate: (templateId, name, components, queries = [], status = 'draft', publishedAt = null, canvasStyle, generationPrompt = null) => {
     const normalizedComponents = normalizeComponents(clone(components));
     set({
       activeTemplateId: templateId,
@@ -672,6 +781,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       componentState: {},
       isDirty: false,
       canvasStyle: canvasStyle || { backgroundColor: '#f3f4f6' },
+      generationPrompt,
+      // Reset assistant conversation when switching dashboards so the AI
+      // doesn't carry over context from a previous dashboard.
+      assistantMessages: [],
+      assistantError: null,
+      assistantLoading: false,
+      assistantUndoSnapshots: {},
     });
   },
 
@@ -1224,7 +1340,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   importDashboard: (data) => {
     const { metadata, config, queries, state } = data;
     const normalizedComponents = normalizeComponents(clone(config.components || []));
-    
+
     set({
       dashboardName: metadata.name,
       components: normalizedComponents,
@@ -1235,13 +1351,205 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedComponentId: null,
       lastSelectedComponentId: normalizedComponents[0]?.id ?? null,
       isDirty: false,
-      activeTemplateId: null, // Importing a file breaks template link
+      activeTemplateId: null,
       originalTemplateId: null,
       dirtyStyleMap: {},
       dirtyDataMap: {},
       queryResults: {},
       componentState: {},
+      // Preserve canvasStyle from imported config (full round-trip fidelity)
       canvasStyle: config.canvasStyle || { backgroundColor: '#f3f4f6' },
     });
   },
+
+  // ─── AI assistant actions ─────────────────────────────────────────────────
+  toggleAssistant: () =>
+    set((state) => ({ assistantOpen: !state.assistantOpen })),
+
+  setAssistantOpen: (open) => set({ assistantOpen: open }),
+
+  setGenerationPrompt: (prompt) => set({ generationPrompt: prompt }),
+
+  appendAssistantMessage: (msg) =>
+    set((state) => ({ assistantMessages: [...state.assistantMessages, msg] })),
+
+  setAssistantLoading: (loading) => set({ assistantLoading: loading }),
+
+  setAssistantError: (error) => set({ assistantError: error }),
+
+  clearAssistantConversation: () =>
+    set({ assistantMessages: [], assistantError: null, assistantUndoSnapshots: {} }),
+
+  applySuggestion: (messageId, suggestionIndex) => {
+    const state = get();
+    const msg = state.assistantMessages.find((m) => m.id === messageId);
+    if (!msg || !msg.suggestions || !msg.suggestions[suggestionIndex]) return;
+    const suggestion: Suggestion = msg.suggestions[suggestionIndex];
+    const payload = suggestion.payload || {};
+
+    let nextComponents = state.components;
+    let nextQueries = state.queriesConfig;
+    let nextCanvasStyle = state.canvasStyle;
+    let validationError: string | null = null;
+
+    switch (suggestion.type) {
+      case 'addComponent': {
+        const c = payload.component as Partial<ComponentConfig> & { type: ComponentType };
+        if (!c || !c.type) {
+          validationError = 'Suggestion is missing a component type.';
+          break;
+        }
+        const type = String(c.type);
+        if (!(type in defaultConfigs)) {
+          validationError = `"${type}" is not a valid BTB component type. Try asking the assistant to use one of: ${Object.keys(defaultConfigs).join(', ')}.`;
+          break;
+        }
+        const existingIds = new Set(state.components.map((x) => x.id));
+        const baseId = c.id && c.id !== 'auto' ? String(c.id) : `${type.toLowerCase()}-${Date.now()}`;
+        let newId = baseId;
+        let n = 1;
+        while (existingIds.has(newId)) {
+          newId = `${baseId}-${n++}`;
+        }
+        const defaults = defaultConfigs[type as ComponentType];
+        const newComp: ComponentConfig = {
+          id: newId,
+          type: type as ComponentType,
+          label: (c as any).label ?? `New ${type}`,
+          layout: { ...clone(defaults.layout), ...((c as any).layout ?? {}) },
+          style: { ...clone(defaults.style), ...((c as any).style ?? {}) },
+          data: { ...clone(defaults.data), ...((c as any).data ?? {}) },
+          ...(((c as any).parentId !== undefined) ? { parentId: (c as any).parentId } : {}),
+        } as ComponentConfig;
+        nextComponents = normalizeComponents([...state.components, newComp]);
+        break;
+      }
+      case 'updateComponent': {
+        const id = payload.id as string | undefined;
+        if (!id) {
+          validationError = 'Suggestion is missing the component id to update.';
+          break;
+        }
+        if (!state.components.some((c) => c.id === id)) {
+          validationError = `No component with id "${id}" exists.`;
+          break;
+        }
+        nextComponents = state.components.map((comp) => {
+          if (comp.id !== id) return comp;
+          return {
+            ...comp,
+            ...(payload.label !== undefined ? { label: payload.label } : {}),
+            ...(payload.layout ? { layout: { ...comp.layout, ...payload.layout } } : {}),
+            style: payload.style ? { ...comp.style, ...payload.style } : comp.style,
+            data: payload.data ? { ...comp.data, ...payload.data } : comp.data,
+          } as ComponentConfig;
+        });
+        break;
+      }
+      case 'removeComponent': {
+        const id = payload.id as string | undefined;
+        if (!id) { validationError = 'Suggestion is missing the component id to remove.'; break; }
+        nextComponents = state.components.filter((c) => c.id !== id && c.parentId !== id);
+        break;
+      }
+      case 'addQuery': {
+        const q = payload.query;
+        if (!q || !q.name) { validationError = 'Suggestion is missing a query definition.'; break; }
+        if (state.queriesConfig.some((existing: any) => existing.name === q.name)) {
+          validationError = `A query named "${q.name}" already exists.`;
+          break;
+        }
+        nextQueries = [...state.queriesConfig, q];
+        break;
+      }
+      case 'updateQuery': {
+        const name = payload.name as string | undefined;
+        const patch = payload.patch || {};
+        if (!name) { validationError = 'Suggestion is missing the query name to update.'; break; }
+        nextQueries = state.queriesConfig.map((q: any) =>
+          q.name === name ? { ...q, ...patch } : q,
+        );
+        break;
+      }
+      case 'removeQuery': {
+        const name = payload.name as string | undefined;
+        if (!name) { validationError = 'Suggestion is missing the query name to remove.'; break; }
+        nextQueries = state.queriesConfig.filter((q: any) => q.name !== name);
+        break;
+      }
+      case 'updateCanvas': {
+        nextCanvasStyle = { ...state.canvasStyle, ...payload };
+        break;
+      }
+      default:
+        validationError = `Unknown suggestion type "${(suggestion as any).type}".`;
+    }
+
+    if (validationError) {
+      set({ assistantError: validationError });
+      return;
+    }
+
+    // Snapshot BEFORE mutation so we can undo this exact suggestion later.
+    const snapshotKey = `${messageId}:${suggestionIndex}`;
+    const snapshot = {
+      components: clone(state.components),
+      queriesConfig: clone(state.queriesConfig),
+      canvasStyle: clone(state.canvasStyle),
+    };
+
+    // Mark the suggestion applied + flag dashboard dirty.
+    const nextMessages = state.assistantMessages.map((m) => {
+      if (m.id !== messageId) return m;
+      const applied = m.appliedIndexes ? [...m.appliedIndexes] : [];
+      if (!applied.includes(suggestionIndex)) applied.push(suggestionIndex);
+      return { ...m, appliedIndexes: applied };
+    });
+
+    set({
+      components: nextComponents,
+      queriesConfig: nextQueries,
+      canvasStyle: nextCanvasStyle,
+      assistantMessages: nextMessages,
+      assistantError: null,
+      assistantUndoSnapshots: { ...state.assistantUndoSnapshots, [snapshotKey]: snapshot },
+      isDirty: true,
+    });
+  },
+
+  undoSuggestion: (messageId, suggestionIndex) => {
+    const state = get();
+    const snapshotKey = `${messageId}:${suggestionIndex}`;
+    const snapshot = state.assistantUndoSnapshots[snapshotKey];
+    if (!snapshot) return;
+
+    // Remove from appliedIndexes so the Apply button re-appears.
+    const nextMessages = state.assistantMessages.map((m) => {
+      if (m.id !== messageId) return m;
+      const applied = (m.appliedIndexes ?? []).filter((i) => i !== suggestionIndex);
+      return { ...m, appliedIndexes: applied };
+    });
+
+    const nextSnapshots = { ...state.assistantUndoSnapshots };
+    delete nextSnapshots[snapshotKey];
+
+    set({
+      components: snapshot.components,
+      queriesConfig: snapshot.queriesConfig,
+      canvasStyle: snapshot.canvasStyle,
+      assistantMessages: nextMessages,
+      assistantUndoSnapshots: nextSnapshots,
+      isDirty: true,
+    });
+  },
+
+  dismissSuggestion: (messageId, suggestionIndex) =>
+    set((state) => ({
+      assistantMessages: state.assistantMessages.map((m) => {
+        if (m.id !== messageId) return m;
+        const dismissed = m.dismissedIndexes ? [...m.dismissedIndexes] : [];
+        if (!dismissed.includes(suggestionIndex)) dismissed.push(suggestionIndex);
+        return { ...m, dismissedIndexes: dismissed };
+      }),
+    })),
 }));

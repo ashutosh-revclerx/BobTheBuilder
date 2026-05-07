@@ -20,6 +20,9 @@ import NumberInput from '../components/dashboard-components/NumberInput';
 import Select from '../components/dashboard-components/Select';
 import Image from '../components/dashboard-components/Image';
 import Embed from '../components/dashboard-components/Embed';
+import NodeGraph from '../components/dashboard-components/NodeGraph';
+import FileUpload from '../components/dashboard-components/FileUpload';
+import ChatBox from '../components/dashboard-components/ChatBox';
 import type { ComponentType } from '../types/template';
 
 const API_BASE = 'http://localhost:3001';
@@ -40,6 +43,9 @@ const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
   Select,
   Image,
   Embed,
+  NodeGraph,
+  FileUpload,
+  ChatBox,
 };
 
 interface CustomerPayload {
