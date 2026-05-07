@@ -4,7 +4,7 @@ This document outlines the architecture and step-by-step instructions to deploy 
 
 ## 1. The Kubernetes Manifests Explained
 
-The `k8s/` directory contains 7 sequentially numbered YAML files. Kubernetes applies them in alphabetical order to ensure dependencies (like Namespaces and Configs) exist before the apps that need them.
+The `k8s/` directory contains sequentially numbered YAML files. Kubernetes applies them in alphabetical order to ensure dependencies (like Namespaces and Configs) exist before the apps that need them.
 
 - **`01-namespace.yaml`**: Creates the `btb-production` Namespace. This is a logical boundary that isolates all our resources from other apps on the cluster.
 - **`02-config.yaml`**: Creates the ConfigMap (`btb-config`) and a Secret (`btb-secrets`). This securely provides non-sensitive environment variables (like `NODE_ENV`) and the database URL to our pods.
@@ -16,6 +16,7 @@ The `k8s/` directory contains 7 sequentially numbered YAML files. Kubernetes app
 - **`05-backend.yaml`**: Deploys the Node.js API with 3 baseline replicas, TCP health checks, and its own Autoscaler.
 - **`06-frontend.yaml`**: Deploys the Nginx web server containing the compiled React application. It includes a custom `nginx.conf` that supports React Router's SPA routing.
 - **`07-ingress.yaml`**: The cluster's "front door". It intercepts all traffic and routes requests starting with `/api` to the backend, and everything else to the frontend.
+- **`08-ngrok.yaml`**: Optional public demo tunnel. It runs ngrok inside the cluster and forwards public HTTPS traffic to `btb-frontend-service:80`.
 
 ---
 
@@ -33,10 +34,16 @@ docker build -t your-registry/btb-llm:v1 ./apps/backend/services/llm
 ```
 
 ### Step 2: Apply the Core Manifests
-Tell Kubernetes to spin up the entire architecture defined in the `k8s/` folder:
+Tell Kubernetes to spin up the core app architecture:
 
 ```bash
-kubectl apply -f k8s/
+kubectl apply -f k8s/01-namespace.yaml
+kubectl apply -f k8s/02-config.yaml
+kubectl apply -f k8s/03-postgres.yaml
+kubectl apply -f k8s/04-llm.yaml
+kubectl apply -f k8s/05-backend.yaml
+kubectl apply -f k8s/06-frontend.yaml
+kubectl apply -f k8s/07-ingress.yaml
 ```
 
 ### Step 3: Inject the Sensitive API Keys
@@ -60,7 +67,7 @@ kubectl exec deployment/btb-backend -n btb-production -- npm run migrate
 
 ## 3. Accessing the Application
 
-If you do not have an Ingress Controller (like Nginx Ingress) fully configured with a domain name on your local cluster, you can access the frontend and backend directly via Port-Forwarding.
+If you do not have an Ingress Controller (like Nginx Ingress) fully configured with a domain name on your local cluster, you can access the frontend directly via Port-Forwarding.
 
 ### Port-Forward the Frontend
 Open a terminal tab and run:
@@ -69,18 +76,54 @@ kubectl port-forward svc/btb-frontend-service 8080:80 -n btb-production
 ```
 You can now view the UI at `http://localhost:8080`.
 
-### Port-Forward the Backend
-> [!WARNING]
-> Because the frontend code currently hardcodes its API URL to `http://localhost:3001`, your browser will try to reach the backend on your machine's port 3001.
+The frontend Nginx config proxies `/api` to `btb-backend-service:3001` inside Kubernetes, so a second backend port-forward is not required.
 
-To make saving and loading work, open a **second terminal tab** and run:
+---
+
+## 4. Public Demo Access with ngrok
+
+Use this when you want other people to access your local Kubernetes deployment over a temporary public HTTPS URL.
+
+### Step 1: Get an ngrok Authtoken
+Create or sign in to an ngrok account, then copy your authtoken from the ngrok dashboard.
+
+### Step 2: Create the Kubernetes Secret
+Replace `<YOUR_NGROK_AUTHTOKEN>` with your token:
+
 ```bash
-kubectl port-forward svc/btb-backend-service 3001:3001 -n btb-production
+kubectl create secret generic ngrok-secrets --from-literal=NGROK_AUTHTOKEN=<YOUR_NGROK_AUTHTOKEN> -n btb-production
+```
+
+If you already created it and need to replace it:
+
+```bash
+kubectl delete secret ngrok-secrets -n btb-production
+kubectl create secret generic ngrok-secrets --from-literal=NGROK_AUTHTOKEN=<YOUR_NGROK_AUTHTOKEN> -n btb-production
+```
+
+### Step 3: Deploy the Tunnel
+
+```bash
+kubectl apply -f k8s/08-ngrok.yaml
+```
+
+### Step 4: Read the Public URL
+
+```bash
+kubectl logs deployment/btb-ngrok -n btb-production
+```
+
+Look for the `url=https://...ngrok-free.app` line. Share that HTTPS URL with others.
+
+### Step 5: Stop Public Sharing
+
+```bash
+kubectl delete -f k8s/08-ngrok.yaml
 ```
 
 ---
 
-## 4. Helpful Commands
+## 5. Helpful Commands
 
 **Watch pods spin up or check for crashes:**
 ```bash
@@ -95,4 +138,9 @@ kubectl logs deployment/btb-backend -n btb-production
 **Restart a deployment after making code changes:**
 ```bash
 kubectl rollout restart deployment btb-frontend -n btb-production
+```
+
+**Check the ngrok tunnel logs:**
+```bash
+kubectl logs deployment/btb-ngrok -n btb-production
 ```

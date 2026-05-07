@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: btb-ngrok
+  namespace: btb-production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: btb-ngrok
+  template:
+    metadata:
+      labels:
+        app: btb-ngrok
+    spec:
+      containers:
+      - name: ngrok
+        image: ngrok/ngrok:latest
+        args:
+        - http
+        - btb-frontend-service:80
+        - --log=stdout
+        env:
+        - name: NGROK_AUTHTOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ngrok-secrets
+              key: NGROK_AUTHTOKEN
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
