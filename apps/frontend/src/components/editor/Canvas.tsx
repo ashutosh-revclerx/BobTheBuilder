@@ -1,51 +1,9 @@
-import React, { useEffect, Suspense, lazy } from 'react';
+import React, { useEffect, Suspense } from 'react';
 import { executeOnLoadQueries, watchDependencies, resetReactiveState } from '../../engine/queryEngine';
 import { useEditorStore } from '../../store/editorStore';
 import { GridLayer } from './GridLayer';
 import { resolveBackground } from '../../utils/styleUtils';
-
-import StatCard from '../dashboard-components/StatCard';
-import Table from '../dashboard-components/Table';
-import StatusBadge from '../dashboard-components/StatusBadge';
-import Button from '../dashboard-components/Button';
-import Container from '../dashboard-components/Container';
-import TabbedContainer from '../dashboard-components/TabbedContainer';
-import Text from '../dashboard-components/Text';
-import TextInput from '../dashboard-components/TextInput';
-import NumberInput from '../dashboard-components/NumberInput';
-import Select from '../dashboard-components/Select';
-import Image from '../dashboard-components/Image';
-import Embed from '../dashboard-components/Embed';
-import FileUpload from '../dashboard-components/FileUpload';
-import ChatBox from '../dashboard-components/ChatBox';
-import type { ComponentType } from '../../types/template';
-
-// Lazy load heavy components
-const BarChartComponent = lazy(() => import('../dashboard-components/BarChart'));
-const LineChartComponent = lazy(() => import('../dashboard-components/LineChart'));
-const LogsViewer = lazy(() => import('../dashboard-components/LogsViewer'));
-const NodeGraph = lazy(() => import('../dashboard-components/NodeGraph'));
-
-const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
-  StatCard,
-  Table,
-  BarChart: BarChartComponent,
-  LineChart: LineChartComponent,
-  StatusBadge,
-  Button,
-  LogsViewer,
-  Container,
-  TabbedContainer,
-  Text,
-  TextInput,
-  NumberInput,
-  Select,
-  Image,
-  Embed,
-  NodeGraph,
-  FileUpload,
-  ChatBox,
-};
+import { RenderRegistry } from '../../config/renderRegistry';
 
 export default function Canvas({ readOnly = false }: { readOnly?: boolean }) {
   const components = useEditorStore((s) => s.components);
@@ -85,7 +43,7 @@ export default function Canvas({ readOnly = false }: { readOnly?: boolean }) {
     >
       <div className="builder-canvas">
         <Suspense fallback={<div className="canvas-loading-placeholder">Loading components...</div>}>
-          <GridLayer parentId="root" componentMap={ComponentMap} readOnly={readOnly} />
+          <GridLayer parentId="root" componentMap={RenderRegistry} readOnly={readOnly} />
         </Suspense>
         {components.length === 0 && (
           <div className="canvas-empty">

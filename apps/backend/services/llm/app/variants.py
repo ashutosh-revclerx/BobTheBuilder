@@ -514,13 +514,14 @@ def _apply_palette(
     dashboard_type: DashboardType,
 ) -> DashboardConfig:
     cloned = copy.deepcopy(config.model_dump(by_alias=True))
+    base_canvas = cloned.get("canvasStyle") or {}
+
+    # CRITICAL: Preserve user-specified canvas gradients (hard constraint from prompts.py)
+    # Only update backgroundColor to match palette; never strip gradients that came from user
     cloned["canvasStyle"] = {
-        **(cloned.get("canvasStyle") or {}),
+        **base_canvas,
         "backgroundColor": palette["surface"],
     }
-    # Drop any prompt-driven canvas gradient — variants own the canvas look
-    # so each palette feels distinct in the picker.
-    cloned["canvasStyle"].pop("backgroundGradient", None)
 
     cloned["components"] = _apply_profile(cloned["components"], profile)
     cloned["components"] = _apply_archetype_adjustments(

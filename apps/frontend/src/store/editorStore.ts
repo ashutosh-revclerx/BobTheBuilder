@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { deepClone } from '../utils/deepClone';
 import { type ThemeName, resolveTheme } from '../config/themes';
 import type {
   CanvasStyle,
@@ -528,7 +529,8 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
   ChatBox: createDefaultConfig('ChatBox'),
 };
 
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+// Use shared deepClone utility instead of local definition
+const clone = deepClone;
 
 const ensureColumnVisibility = (columns: TableColumn[] = [], current?: Record<string, boolean>) =>
   columns.reduce<Record<string, boolean>>((acc, column) => {
@@ -1300,7 +1302,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   importDashboard: (data) => {
     const { metadata, config, queries, state } = data;
     const normalizedComponents = normalizeComponents(clone(config.components || []));
-    
+
     set({
       dashboardName: metadata.name,
       components: normalizedComponents,
@@ -1311,12 +1313,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedComponentId: null,
       lastSelectedComponentId: normalizedComponents[0]?.id ?? null,
       isDirty: false,
-      activeTemplateId: null, // Importing a file breaks template link
+      activeTemplateId: null,
       originalTemplateId: null,
       dirtyStyleMap: {},
       dirtyDataMap: {},
       queryResults: {},
       componentState: {},
+      // Preserve canvasStyle from imported config (full round-trip fidelity)
       canvasStyle: config.canvasStyle || { backgroundColor: '#f3f4f6' },
     });
   },

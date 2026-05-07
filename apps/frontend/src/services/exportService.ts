@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { deepClone } from '../utils/deepClone';
 import sourceIndexCss from '../index.css?raw';
 import templateTypeSource from '../types/template.ts?raw';
 import queryEngineSource from '../engine/queryEngine.ts?raw';
@@ -125,7 +126,7 @@ const sourceRuntimeFiles: Record<string, string> = {
   'src/components/dashboard-components/Embed.tsx': embedSource,
 };
 
-const cloneDeep = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+// Use shared deepClone utility instead of local definition
 
 const decodeBase64 = (input: string): Uint8Array => {
   const binary = atob(input);
@@ -146,7 +147,7 @@ type ImageAssetFile = {
 };
 
 const extractImageAssetsFromComponents = (rawComponents: any[]): { components: any[]; assets: ImageAssetFile[] } => {
-  const components = cloneDeep(rawComponents ?? []);
+  const components = deepClone(rawComponents ?? []);
   const assets: ImageAssetFile[] = [];
   const usedNames = new Set<string>();
 
@@ -193,13 +194,19 @@ export const downloadAsCode = async (dashboardState: any) => {
   const { components: exportedComponents, assets: imageAssets } = extractImageAssetsFromComponents(
     dashboardState.components || [],
   );
+  const queriesConfig = dashboardState.queriesConfig || [];
+
+  // Export includes all required fields for lossless round-trip:
+  // queries (required for bindings), canvasStyle (visual fidelity), and status metadata
   const dashboardConfig = {
     name: dashboardName,
     components: exportedComponents,
-    canvasStyle: dashboardState.canvasStyle
+    queries: queriesConfig,
+    canvasStyle: dashboardState.canvasStyle || { backgroundColor: '#f3f4f6' },
+    status: dashboardState.status || 'draft',
+    publishedAt: dashboardState.publishedAt || null,
   };
-  const queriesConfig = dashboardState.queriesConfig || [];
-  
+
   // 1. Add Config files
   console.log('Adding config files to ZIP...');
   const dashboardJson = JSON.stringify(dashboardConfig, null, 2);
