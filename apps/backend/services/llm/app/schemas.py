@@ -96,3 +96,53 @@ class GenerateResponse(BaseModel):
     success: bool
     configs: list[GeneratedVariant] = Field(default_factory=list)
     error: str | None = None
+
+
+# ─── Chat assistant ─────────────────────────────────────────────────────────
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class SelectedComponentContext(BaseModel):
+    """Summary of the component the user has selected in the builder."""
+    id: str
+    type: str
+    label: str | None = None
+    style: dict[str, Any] = Field(default_factory=dict)
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    generation_prompt: str | None = Field(default=None, alias="generationPrompt")
+    dashboard_config: DashboardConfig | None = Field(default=None, alias="dashboardConfig")
+    dashboard_name: str | None = Field(default=None, alias="dashboardName")
+    selected_component: SelectedComponentContext | None = Field(default=None, alias="selectedComponent")
+    conversation_history: list[ChatMessage] = Field(default_factory=list, alias="conversationHistory")
+
+    model_config = {"populate_by_name": True}
+
+
+class Suggestion(BaseModel):
+    """A structured edit the user can apply with one click."""
+    type: Literal[
+        "addComponent",
+        "updateComponent",
+        "removeComponent",
+        "addQuery",
+        "updateQuery",
+        "removeQuery",
+        "updateCanvas",
+    ]
+    description: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChatResponse(BaseModel):
+    success: bool
+    response: str
+    suggestions: list[Suggestion] = Field(default_factory=list)
+    error: str | None = None

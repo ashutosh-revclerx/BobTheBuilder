@@ -7,6 +7,7 @@ import RightPanel from '../components/editor/RightPanel';
 import LeftPanel from '../components/editor/LeftPanel';
 import PublishToggle from '../components/editor/PublishToggle';
 import AssignmentModal from '../components/editor/AssignmentModal';
+import AssistantPanel from '../components/assistant/AssistantPanel';
 import { useKineticWidth } from '../hooks/useTextMeasure';
 import { exportProject, importProject } from '../services/ProjectService';
 import { downloadAsCode } from '../services/exportService';
@@ -36,6 +37,9 @@ export default function BuilderPage() {
   const activeTemplateId = useEditorStore((s) => s.activeTemplateId);
   const originalTemplateId = useEditorStore((s) => s.originalTemplateId);
   const importDashboard = useEditorStore((state) => state.importDashboard);
+  const assistantOpen = useEditorStore((s) => s.assistantOpen);
+  const toggleAssistant = useEditorStore((s) => s.toggleAssistant);
+  const setAssistantOpen = useEditorStore((s) => s.setAssistantOpen);
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
@@ -205,6 +209,7 @@ export default function BuilderPage() {
             dashboard.status,
             dashboard.published_at,
             dashboard.config?.canvasStyle,
+            dashboard.config?.metadata?.generationPrompt ?? null,
           );
         } catch {
           if (!cancelled) navigate('/');
@@ -295,6 +300,9 @@ export default function BuilderPage() {
             components: state.components,
             queries:    state.queriesConfig,
             canvasStyle: state.canvasStyle,
+            metadata: state.generationPrompt
+              ? { generationPrompt: state.generationPrompt }
+              : undefined,
           },
         }),
       });
@@ -321,6 +329,9 @@ export default function BuilderPage() {
             components: state.components,
             queries:    state.queriesConfig,
             canvasStyle: state.canvasStyle,
+            metadata: state.generationPrompt
+              ? { generationPrompt: state.generationPrompt }
+              : undefined,
           },
         }),
       });
@@ -608,12 +619,19 @@ export default function BuilderPage() {
         {/* Narrow Sidebar Toggle - only in edit mode */}
         {!isPreviewMode && (
           <div className="builder-sidebar">
-            <div 
-              className={`sidebar-icon ${isLeftPanelOpen ? 'active' : ''}`} 
+            <div
+              className={`sidebar-icon ${isLeftPanelOpen ? 'active' : ''}`}
               data-tooltip="Components"
               onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
             >
               <span>⊞</span>
+            </div>
+            <div
+              className={`sidebar-icon ${assistantOpen ? 'active' : ''}`}
+              data-tooltip="AI Assistant"
+              onClick={toggleAssistant}
+            >
+              <span>✦</span>
             </div>
             <div className="sidebar-icon" data-tooltip="Layers">
               <span>☰</span>
@@ -622,6 +640,11 @@ export default function BuilderPage() {
               <span>⚙</span>
             </div>
           </div>
+        )}
+
+        {/* AI Assistant Panel — toggleable, sits left of the components palette */}
+        {!isPreviewMode && assistantOpen && (
+          <AssistantPanel onClose={() => setAssistantOpen(false)} />
         )}
 
         {/* Left Panel */}

@@ -5,6 +5,7 @@ import dashboardsRouter from './routes/dashboards.js';
 import resourcesRouter  from './routes/resources.js';
 import executeRouter    from './routes/execute.js';
 import customersRouter  from './routes/customers.js';
+import assistantRouter  from './routes/assistant.js';
 import { createLogger } from './utils/logger.js';
 
 const log = createLogger('http');
@@ -34,6 +35,7 @@ export function createApp() {
   app.use('/api/resources',  resourcesRouter);
   app.use('/api/execute',    executeRouter);
   app.use('/api/customers',  customersRouter);
+  app.use('/api/assistant',  assistantRouter);
 
   app.get('/health', async (_req, res) => {
     try {

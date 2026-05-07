@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentConfig } from '../../types/template';
 import { useEditorStore } from '../../store/editorStore';
 import { resolveBackground } from '../../utils/styleUtils';
@@ -14,12 +14,45 @@ interface UploadedFile {
   message?: string;
 }
 
+interface ProgressState {
+  active:    boolean;
+  percent:   number;        // 0..100
+  status:    string;        // human label
+  done:      boolean;
+}
+
 const API_BASE = 'http://localhost:3001';
+const POLL_INTERVAL_MS = 2000;
+const POLL_MAX_ATTEMPTS = 60; // 2 minutes max
 
 function humanSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Best-effort extraction across common progress-API response shapes.
+function readProgress(payload: unknown): { percent: number; status: string; done: boolean } {
+  const inner =
+    payload && typeof payload === 'object' && 'data' in payload
+      ? (payload as any).data
+      : payload;
+  if (!inner || typeof inner !== 'object') {
+    return { percent: 0, status: 'processing', done: false };
+  }
+  const obj = inner as Record<string, unknown>;
+  const pct = Number(obj.percent ?? obj.progress ?? obj.completion ?? 0);
+  const status = String(obj.status ?? obj.state ?? obj.message ?? 'processing');
+  const explicitDone =
+    obj.done === true ||
+    obj.complete === true ||
+    obj.completed === true ||
+    /(complete|done|success|ready|finished)/i.test(status);
+  return {
+    percent: Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0,
+    status,
+    done: explicitDone || pct >= 100,
+  };
 }
 
 export default function FileUpload({ config }: FileUploadProps) {
@@ -28,6 +61,13 @@ export default function FileUpload({ config }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [progress, setProgress] = useState<ProgressState>({
+    active: false,
+    percent: 0,
+    status: '',
+    done: false,
+  });
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const bg = useMemo(
     () => resolveBackground(style),
@@ -37,61 +77,61 @@ export default function FileUpload({ config }: FileUploadProps) {
   // Configurable from the data tab.
   const accept = ((data as any).accept as string) || '.xlsx,.xls,.csv,.pdf,.docx,.txt';
   const multiple = ((data as any).multiple as boolean) ?? true;
-  const uploadUrl = ((data as any).uploadUrl as string) || ''; // resource endpoint URL
+  const uploadUrl = ((data as any).uploadUrl as string) || '';
   const fieldName = ((data as any).fieldName as string) || 'file';
   const resourceId = ((data as any).resourceId as string) || '';
+  const resourceName = ((data as any).resourceName as string) || '';
   const endpointPath = ((data as any).endpointPath as string) || '';
+  // Optional polling endpoint pattern. Use {session_id} as placeholder.
+  const progressEndpointTemplate = ((data as any).progressEndpoint as string) || '';
 
-  const uploadOne = async (file: File): Promise<UploadedFile> => {
+  const uploadOne = async (file: File): Promise<{ result: UploadedFile; sessionId?: string }> => {
     const form = new FormData();
     form.append(fieldName, file);
 
     try {
-      // If a direct upload URL is provided, hit it directly. Otherwise route
-      // through the BTB execute endpoint with multipart support.
-      const target = uploadUrl
-        ? uploadUrl
-        : `${API_BASE}/api/execute/upload`;
-
+      const target = uploadUrl ? uploadUrl : `${API_BASE}/api/execute/upload`;
       const headers: Record<string, string> = {};
-      if (!uploadUrl && resourceId) {
-        headers['x-btb-resource-id'] = resourceId;
-        headers['x-btb-endpoint-path'] = endpointPath;
+      if (!uploadUrl) {
+        if (resourceId)   headers['x-btb-resource-id']   = resourceId;
+        if (resourceName) headers['x-btb-resource-name'] = resourceName;
+        if (endpointPath) headers['x-btb-endpoint-path'] = endpointPath;
+        if (fieldName)    headers['x-btb-field-name']    = fieldName;
       }
 
-      const res = await fetch(target, {
-        method: 'POST',
-        body: form,
-        headers,
-      });
+      const res = await fetch(target, { method: 'POST', body: form, headers });
 
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
-        return { name: file.name, size: file.size, status: 'error', message: txt.slice(0, 120) || `HTTP ${res.status}` };
+        return {
+          result: {
+            name: file.name,
+            size: file.size,
+            status: 'error',
+            message: txt.slice(0, 120) || `HTTP ${res.status}`,
+          },
+        };
       }
       const payload = await res.json().catch(() => ({}));
-      // Stash the most recent upload result so other components can react.
       setComponentState(config.id, 'lastUpload', { file: file.name, response: payload });
 
-      // Auto-extract session_id from common response shapes. Many pipeline
-      // APIs (incl. the small-dataset service) return one session_id per
-      // upload that downstream calls embed in their path. Storing under
-      // both `sessionId` AND `value` lets queries reference it via the
-      // canonical `{{componentState.<id>.value}}` pattern.
-      const inner = (payload && typeof payload === 'object' && 'data' in payload)
-        ? (payload as any).data
-        : payload;
+      const inner =
+        payload && typeof payload === 'object' && 'data' in payload
+          ? (payload as any).data
+          : payload;
       const sid =
-        (inner && typeof inner === 'object'
-          ? (inner.session_id ?? inner.sessionId ?? inner.id)
-          : undefined) as string | undefined;
-      if (sid) {
-        setComponentState(config.id, 'sessionId', sid);
-        setComponentState(config.id, 'value', sid);
-      }
-      return { name: file.name, size: file.size, status: 'success' };
+        inner && typeof inner === 'object'
+          ? ((inner.session_id ?? inner.sessionId ?? inner.id) as string | undefined)
+          : undefined;
+
+      return {
+        result: { name: file.name, size: file.size, status: 'success' },
+        sessionId: sid,
+      };
     } catch (err) {
-      return { name: file.name, size: file.size, status: 'error', message: (err as Error).message };
+      return {
+        result: { name: file.name, size: file.size, status: 'error', message: (err as Error).message },
+      };
     }
   };
 
@@ -108,14 +148,82 @@ export default function FileUpload({ config }: FileUploadProps) {
     const results = await Promise.all(list.map((f) => uploadOne(f)));
     setFiles((prev) => {
       const next = [...prev];
-      // Replace the just-added "uploading" entries with their results
       results.forEach((r, i) => {
-        next[next.length - results.length + i] = r;
+        next[next.length - results.length + i] = r.result;
       });
       return next;
     });
-    setComponentState(config.id, 'uploadedFiles', results.filter((r) => r.status === 'success').map((r) => r.name));
+
+    // The session_id is shared across all files in the upload — pick the
+    // first non-empty one.
+    const sid = results.map((r) => r.sessionId).find(Boolean);
+    if (sid) {
+      setComponentState(config.id, 'sessionId', sid);
+      setComponentState(config.id, 'value', sid);
+      setComponentState(config.id, 'cleaningComplete', false);
+      setActiveSessionId(sid);
+      setProgress({ active: true, percent: 0, status: 'starting', done: false });
+    }
+    setComponentState(
+      config.id,
+      'uploadedFiles',
+      results.filter((r) => r.result.status === 'success').map((r) => r.result.name),
+    );
   };
+
+  // Poll progress endpoint after upload succeeds with a session_id.
+  useEffect(() => {
+    if (!activeSessionId || !progressEndpointTemplate) return;
+    if (progress.done) return;
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const poll = async () => {
+      while (!cancelled && attempts < POLL_MAX_ATTEMPTS) {
+        attempts++;
+        try {
+          const path = progressEndpointTemplate.replace(
+            /{session_id}|{sessionId}/g,
+            activeSessionId,
+          );
+          const res = await fetch(`${API_BASE}/api/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              resource: resourceName, // friendly name path
+              endpoint: path,
+              method: 'GET',
+            }),
+          });
+          if (res.ok) {
+            const json = await res.json();
+            const result = json?.data ?? json;
+            const p = readProgress(result);
+            if (cancelled) return;
+            setProgress({ active: true, percent: p.percent, status: p.status, done: p.done });
+            if (p.done) {
+              setComponentState(config.id, 'cleaningComplete', true);
+              setComponentState(config.id, 'progressPercent', 100);
+              return;
+            }
+            setComponentState(config.id, 'progressPercent', p.percent);
+          }
+        } catch {
+          /* swallow and keep trying */
+        }
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      }
+      if (!cancelled && attempts >= POLL_MAX_ATTEMPTS) {
+        setProgress((prev) => ({ ...prev, active: false, status: 'timed-out' }));
+      }
+    };
+
+    void poll();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSessionId, progressEndpointTemplate, resourceName, config.id, setComponentState, progress.done]);
 
   const accent = style.borderColor || '#0ea5e9';
   const txt = style.textColor || '#0f172a';
@@ -136,10 +244,7 @@ export default function FileUpload({ config }: FileUploadProps) {
         overflow: 'hidden',
         transition: 'border-color 0.15s, background 0.15s',
       }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragging(true);
-      }}
+      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
       onDragLeave={() => setIsDragging(false)}
       onDrop={(e) => {
         e.preventDefault();
@@ -181,13 +286,45 @@ export default function FileUpload({ config }: FileUploadProps) {
         />
       </div>
 
+      {progress.active && (
+        <div
+          style={{
+            padding: '8px 10px',
+            borderRadius: 8,
+            background: progress.done ? '#dcfce7' : '#1e293b',
+            color: progress.done ? '#065f46' : '#e2e8f0',
+            fontSize: 11,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 600 }}>
+              {progress.done ? '✓ Cleaning complete' : `⏳ ${progress.status || 'Processing'}…`}
+            </span>
+            <span>{progress.percent}%</span>
+          </div>
+          <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' }}>
+            <div
+              style={{
+                height: '100%',
+                width: `${progress.percent}%`,
+                background: progress.done ? '#10b981' : accent,
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {files.length > 0 && (
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
             gap: 4,
-            maxHeight: 120,
+            maxHeight: 100,
             overflowY: 'auto',
             paddingTop: 8,
             borderTop: `1px solid ${style.borderColor || '#e2e8f0'}`,
@@ -202,7 +339,10 @@ export default function FileUpload({ config }: FileUploadProps) {
                 alignItems: 'center',
                 fontSize: 12,
                 padding: '4px 8px',
-                background: f.status === 'success' ? '#dcfce7' : f.status === 'error' ? '#fee2e2' : '#f1f5f9',
+                background:
+                  f.status === 'success' ? '#dcfce7'
+                  : f.status === 'error' ? '#fee2e2'
+                  : '#f1f5f9',
                 borderRadius: 6,
                 color: '#0f172a',
               }}
