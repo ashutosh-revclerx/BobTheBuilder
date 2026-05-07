@@ -1,11 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
+  applyNodeChanges,
   type Node,
   type Edge,
+  type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -31,7 +33,15 @@ interface RawEdge {
   source: string;
   target: string;
   label?: string;
+  strength?: string;
+  confidence?: number;
+  score?: number;
   [k: string]: unknown;
+}
+
+interface GraphPayload {
+  rawNodes: RawNode[];
+  rawEdges: RawEdge[];
 }
 
 const FALLBACK_NODES: RawNode[] = [
@@ -47,24 +57,79 @@ const FALLBACK_EDGES: RawEdge[] = [
   { source: 'sheet-2', target: 'sheet-4', label: 'order_id' },
 ];
 
-interface GraphPayload {
-  rawNodes: RawNode[];
-  rawEdges: RawEdge[];
+function readString(record: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (value != null && String(value).trim()) return String(value);
+  }
+  return '';
 }
 
-// Probes API response for common node/edge shapes. Handles nested wrappers
-// and alternative key names (vertices, links, connections, relationships, etc.)
+function readNumber(record: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const numeric = Number(record[key]);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return undefined;
+}
+
+function relationshipToEdge(item: unknown, index: number): RawEdge | null {
+  if (!item || typeof item !== 'object') return null;
+  const record = item as Record<string, unknown>;
+  const source = readString(record, ['source', 'from', 'source_table', 'sourceTable', 'left_table', 'leftTable', 'table_a', 'tableA']);
+  const target = readString(record, ['target', 'to', 'target_table', 'targetTable', 'right_table', 'rightTable', 'table_b', 'tableB']);
+  if (!source || !target) return null;
+
+  const sourceColumn = readString(record, ['source_column', 'sourceColumn', 'left_column', 'leftColumn', 'column_a', 'columnA']);
+  const targetColumn = readString(record, ['target_column', 'targetColumn', 'right_column', 'rightColumn', 'column_b', 'columnB']);
+  const strength = readString(record, ['strength', 'confidence_label', 'confidenceLabel']);
+  const score = readNumber(record, ['score', 'confidence', 'similarity']);
+  const label = readString(record, ['label', 'relationship', 'type', 'strength'])
+    || [sourceColumn, targetColumn].filter(Boolean).join(' -> ')
+    || undefined;
+
+  return {
+    id: readString(record, ['id', 'relationship_id', 'relationshipId']) || `relationship-${index}`,
+    source,
+    target,
+    label,
+    strength,
+    score,
+    ...record,
+  };
+}
+
+function graphFromRelationshipArray(rels: unknown[]): GraphPayload | null {
+  const rawEdges = rels
+    .map((relationship, index) => relationshipToEdge(relationship, index))
+    .filter((edge): edge is RawEdge => edge != null);
+  if (rawEdges.length === 0) return null;
+
+  const nodeIds = new Set<string>();
+  rawEdges.forEach((edge) => {
+    nodeIds.add(edge.source);
+    nodeIds.add(edge.target);
+  });
+
+  return {
+    rawNodes: Array.from(nodeIds).map((id) => ({ id, label: id, type: 'table' })),
+    rawEdges,
+  };
+}
+
 function extractGraphData(payload: unknown): GraphPayload | null {
+  if (Array.isArray(payload)) return graphFromRelationshipArray(payload);
   if (payload == null || typeof payload !== 'object') return null;
 
   const GRAPH_NODE_KEYS = ['nodes', 'vertices', 'items'] as const;
   const GRAPH_EDGE_KEYS = ['edges', 'links', 'relationships', 'connections'] as const;
+  const obj = payload as Record<string, unknown>;
 
-  const tryRead = (obj: Record<string, unknown>): GraphPayload | null => {
-    for (const nk of GRAPH_NODE_KEYS) {
-      for (const ek of GRAPH_EDGE_KEYS) {
-        const nodes = obj[nk];
-        const edges = obj[ek];
+  const tryRead = (candidate: Record<string, unknown>): GraphPayload | null => {
+    for (const nodeKey of GRAPH_NODE_KEYS) {
+      for (const edgeKey of GRAPH_EDGE_KEYS) {
+        const nodes = candidate[nodeKey];
+        const edges = candidate[edgeKey];
         if (Array.isArray(nodes) && Array.isArray(edges)) {
           return { rawNodes: nodes as RawNode[], rawEdges: edges as RawEdge[] };
         }
@@ -73,66 +138,72 @@ function extractGraphData(payload: unknown): GraphPayload | null {
     return null;
   };
 
-  const obj = payload as Record<string, unknown>;
-
-  // Direct shape: { nodes: [...], edges: [...] }
   const direct = tryRead(obj);
   if (direct) return direct;
 
-  // Wrapped shapes: { data: { nodes, edges } }, { result: { nodes, edges } }, etc.
+  if (Array.isArray(obj.relationships)) return graphFromRelationshipArray(obj.relationships);
+
   for (const wrapper of ['data', 'result', 'response', 'output']) {
     const inner = obj[wrapper];
+    if (Array.isArray(inner)) return graphFromRelationshipArray(inner);
     if (inner && typeof inner === 'object') {
-      const nested = tryRead(inner as Record<string, unknown>);
+      const nested = extractGraphData(inner);
       if (nested) return nested;
     }
-  }
-
-  // Flat relationship list: { relationships: [{ source, target, label }] }
-  const rels = obj['relationships'];
-  if (Array.isArray(rels) && rels.length > 0 && rels[0]?.source) {
-    // Synthesize nodes from unique sources/targets
-    const nodeIds = new Set<string>();
-    (rels as RawEdge[]).forEach((r) => {
-      nodeIds.add(r.source);
-      nodeIds.add(r.target);
-    });
-    return {
-      rawNodes: Array.from(nodeIds).map((id) => ({ id, label: id })),
-      rawEdges: rels as RawEdge[],
-    };
   }
 
   return null;
 }
 
+function extractUploadedTables(componentState: Record<string, Record<string, unknown>>): RawNode[] {
+  const tables = Object.values(componentState)
+    .map((state) => state?.tables)
+    .find(Array.isArray) as Array<Record<string, unknown>> | undefined;
+
+  if (!tables) return [];
+  return tables.map((table, index) => {
+    const id = readString(table, ['table_id', 'id', 'table_name', 'name']) || `table-${index + 1}`;
+    const label = readString(table, ['table_name', 'name', 'source_file']) || id;
+    return { id, label, type: 'table', ...table };
+  });
+}
+
 function autoLayout(nodes: RawNode[]): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>();
-  const radius = Math.max(120, nodes.length * 30);
-  const cx = 0;
-  const cy = 0;
-  nodes.forEach((node, i) => {
-    const angle = (i / Math.max(1, nodes.length)) * Math.PI * 2;
+  const radius = Math.max(140, nodes.length * 42);
+  nodes.forEach((node, index) => {
+    const angle = (index / Math.max(1, nodes.length)) * Math.PI * 2;
     positions.set(node.id, {
-      x: cx + Math.cos(angle) * radius,
-      y: cy + Math.sin(angle) * radius,
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
     });
   });
   return positions;
+}
+
+function edgeColor(edge: RawEdge, fallback: string): string {
+  const strength = String(edge.strength ?? edge.confidence ?? '').toLowerCase();
+  const score = Number(edge.score ?? edge.confidence);
+  if (strength.includes('strong') || score >= 0.75) return '#22c55e';
+  if (strength.includes('medium') || score >= 0.45) return '#f59e0b';
+  if (strength.includes('weak') || score > 0) return '#94a3b8';
+  return fallback;
+}
+
+function emptyGraphMessage(nodeCount: number): string {
+  if (nodeCount > 1) {
+    return 'No relationships found yet. Uploaded tables are shown as separate draggable nodes.';
+  }
+  return 'No relationships found. Upload at least two related tables, then run detection.';
 }
 
 export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
   const { style, data } = config;
   const queryResults = useEditorStore((s) => s.queryResults);
   const componentState = useEditorStore((s) => s.componentState);
-
-  // Read raw (unresolved) binding from store. By the time `data.dbBinding` arrives
-  // here, {{...}} has been resolved to the actual value — losing the query name.
-  // Reading the unresolved binding directly lets NodeGraph find the query
-  // regardless of whether the template author wrote `queries.X.trigger`
-  // (literal) or `{{queries.X.data}}` (resolved style).
+  const setComponentState = useEditorStore((s) => s.setComponentState);
   const rawBinding = useEditorStore(
-    (s) => (s.components.find((c) => c.id === config.id)?.data as any)?.dbBinding,
+    (s) => (s.components.find((component) => component.id === config.id)?.data as any)?.dbBinding,
   );
 
   const bg = useMemo(
@@ -140,36 +211,34 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
     [style.backgroundColor, style.backgroundGradient],
   );
 
-  type GraphStatus = 'readOnly' | 'noSession' | 'loading' | 'loaded' | 'error';
+  type GraphStatus = 'readOnly' | 'noSession' | 'loading' | 'loaded' | 'empty' | 'error';
 
   const { rawNodes, rawEdges, graphStatus } = useMemo<{
     rawNodes: RawNode[];
     rawEdges: RawEdge[];
     graphStatus: GraphStatus;
   }>(() => {
-    // 1. ReadOnly mode (TemplatePicker preview) — use mockValue immediately
     if (readOnly) {
       const graph = extractGraphData(data.mockValue);
       if (graph) return { ...graph, graphStatus: 'readOnly' };
       return { rawNodes: FALLBACK_NODES, rawEdges: FALLBACK_EDGES, graphStatus: 'readOnly' };
     }
 
-    // 2. Check if a session exists (upload-zone sessionId in componentState)
     const hasSession = Object.values(componentState).some(
-      (cs) => cs && typeof cs === 'object' && 'sessionId' in cs && cs.sessionId,
+      (state) => state && typeof state === 'object' && 'sessionId' in state && state.sessionId,
     );
-
-    // 3. Try live query result
+    const uploadedTableNodes = extractUploadedTables(componentState);
     const queryName = parseQueryName(rawBinding) || parseQueryName(data.dbBinding);
+
     if (queryName) {
       const result = queryResults[queryName];
 
       if (result?.status === 'loading' || result?.status === 'idle') {
-        return { rawNodes: [], rawEdges: [], graphStatus: hasSession ? 'loading' : 'noSession' };
+        return { rawNodes: uploadedTableNodes, rawEdges: [], graphStatus: uploadedTableNodes.length ? 'empty' : (hasSession ? 'loading' : 'noSession') };
       }
 
       if (result?.status === 'error') {
-        return { rawNodes: [], rawEdges: [], graphStatus: 'error' };
+        return { rawNodes: uploadedTableNodes, rawEdges: [], graphStatus: 'error' };
       }
 
       if (result?.status === 'success') {
@@ -177,72 +246,100 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
         if (graph && graph.rawNodes.length > 0) {
           return { ...graph, graphStatus: 'loaded' };
         }
+        if (uploadedTableNodes.length > 0) {
+          return { rawNodes: uploadedTableNodes, rawEdges: [], graphStatus: 'empty' };
+        }
+        return { rawNodes: [], rawEdges: [], graphStatus: 'empty' };
       }
 
-      // queryName resolved but no result yet
       if (!result) {
-        return { rawNodes: [], rawEdges: [], graphStatus: hasSession ? 'loading' : 'noSession' };
+        return { rawNodes: uploadedTableNodes, rawEdges: [], graphStatus: uploadedTableNodes.length ? 'empty' : (hasSession ? 'loading' : 'noSession') };
       }
     }
 
-    // 4. Explicit nodes/edges on the config
     const explicitNodes = (data as any).nodes;
     const explicitEdges = (data as any).edges;
     if (Array.isArray(explicitNodes) && Array.isArray(explicitEdges)) {
       return { rawNodes: explicitNodes, rawEdges: explicitEdges, graphStatus: 'loaded' };
     }
 
-    // 5. mockValue
-    const mock = data.mockValue as any;
-    if (mock) {
-      const graph = extractGraphData(mock);
-      if (graph) return { ...graph, graphStatus: hasSession ? 'loading' : 'noSession' };
-    }
-
-    // 6. No session → show placeholder; session but no data → fallback
     if (!hasSession) {
+      const graph = extractGraphData(data.mockValue);
+      if (graph) return { ...graph, graphStatus: 'noSession' };
       return { rawNodes: [], rawEdges: [], graphStatus: 'noSession' };
     }
 
-    return { rawNodes: FALLBACK_NODES, rawEdges: FALLBACK_EDGES, graphStatus: 'loading' };
+    if (uploadedTableNodes.length > 0) {
+      return { rawNodes: uploadedTableNodes, rawEdges: [], graphStatus: 'empty' };
+    }
+
+    return { rawNodes: [], rawEdges: [], graphStatus: 'empty' };
   }, [readOnly, rawBinding, data, queryResults, componentState]);
 
-  const nodes = useMemo<Node[]>(() => {
+  const computedNodes = useMemo<Node[]>(() => {
     const positions = autoLayout(rawNodes);
-    return rawNodes.map((n) => {
-      const pos = positions.get(n.id) ?? { x: 0, y: 0 };
+    const savedPositions = componentState[config.id]?.nodePositions as Record<string, { x: number; y: number }> | undefined;
+
+    return rawNodes.map((node) => {
+      const position = savedPositions?.[node.id] ?? positions.get(node.id) ?? { x: 0, y: 0 };
+      const nodeType = String(node.type ?? 'table');
       return {
-        id: n.id,
-        position: pos,
-        data: { label: n.label ?? n.id },
+        id: node.id,
+        position,
+        data: { label: node.label ?? node.id, source: node },
+        draggable: true,
         style: {
-          background: style.backgroundColor === 'transparent' ? '#1e293b' : (n.type === 'column' ? '#6366f1' : '#0ea5e9'),
+          background: nodeType === 'column' ? '#6366f1' : '#0ea5e9',
           color: '#ffffff',
           border: `2px solid ${style.borderColor || '#22d3ee'}`,
-          borderRadius: 12,
+          borderRadius: 10,
           padding: '10px 14px',
           fontSize: 13,
           fontWeight: 600,
-          minWidth: 120,
+          minWidth: 130,
           textAlign: 'center' as const,
           boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+          cursor: 'grab',
         },
       };
     });
-  }, [rawNodes, style.backgroundColor, style.borderColor]);
+  }, [componentState, config.id, rawNodes, style.borderColor]);
+
+  const [nodes, setNodes] = useState<Node[]>(computedNodes);
+
+  useEffect(() => {
+    setNodes(computedNodes);
+  }, [computedNodes]);
+
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    setNodes((current) => applyNodeChanges(changes, current));
+  }, []);
+
+  const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
+    const current = (useEditorStore.getState().componentState[config.id]?.nodePositions ?? {}) as Record<string, { x: number; y: number }>;
+    setComponentState(config.id, 'nodePositions', {
+      ...current,
+      [node.id]: node.position,
+    });
+    setComponentState(config.id, 'selectedNode', node.data);
+  }, [config.id, setComponentState]);
 
   const edges = useMemo<Edge[]>(
     () =>
-      rawEdges.map((e, i) => ({
-        id: e.id ?? `e-${e.source}-${e.target}-${i}`,
-        source: e.source,
-        target: e.target,
-        label: e.label,
-        animated: true,
-        style: { stroke: style.borderColor || '#22d3ee', strokeWidth: 2 },
-        labelStyle: { fill: style.textColor || '#e2e8f0', fontWeight: 600, fontSize: 11 },
-        labelBgStyle: { fill: '#0d1424', fillOpacity: 0.9 },
-      })),
+      rawEdges.map((edge, index) => {
+        const stroke = edgeColor(edge, style.borderColor || '#22d3ee');
+        const weak = String(edge.strength ?? '').toLowerCase().includes('weak');
+        return {
+          id: edge.id ?? `e-${edge.source}-${edge.target}-${index}`,
+          source: edge.source,
+          target: edge.target,
+          label: edge.label,
+          animated: true,
+          style: { stroke, strokeWidth: 2, strokeDasharray: weak ? '6 4' : undefined },
+          labelStyle: { fill: style.textColor || '#e2e8f0', fontWeight: 600, fontSize: 11 },
+          labelBgStyle: { fill: '#0d1424', fillOpacity: 0.9 },
+        };
+      }),
     [rawEdges, style.borderColor, style.textColor],
   );
 
@@ -255,13 +352,13 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
       ? `${style.borderWidth}px solid ${style.borderColor || '#1e293b'}`
       : undefined,
     overflow: 'hidden',
+    position: 'relative',
   };
 
-  // No session state — show placeholder
   if (graphStatus === 'noSession') {
     return (
       <div className="nodegraph-component" style={{ ...wrapperStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontSize: 32, opacity: 0.3 }}>⬆</div>
+        <div style={{ fontSize: 32, opacity: 0.3 }}>Upload</div>
         <div style={{ fontSize: 13, color: style.textColor || '#e2e8f0', opacity: 0.6, textAlign: 'center' }}>
           Upload files first to build the relationship graph
         </div>
@@ -269,19 +366,17 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
     );
   }
 
-  // Loading state
   if (graphStatus === 'loading') {
     return (
       <div className="nodegraph-component" style={{ ...wrapperStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontSize: 13, color: style.borderColor || '#22d3ee', opacity: 0.8 }}>
-          Building relationship graph…
+          Building relationship graph...
         </div>
       </div>
     );
   }
 
-  // Error state
-  if (graphStatus === 'error') {
+  if (graphStatus === 'error' && rawNodes.length === 0) {
     return (
       <div className="nodegraph-component" style={{ ...wrapperStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontSize: 13, color: '#f87171', textAlign: 'center', padding: 16 }}>
@@ -291,12 +386,42 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
     );
   }
 
-  // Loaded state — show ReactFlow graph
+  if (graphStatus === 'empty' && rawNodes.length === 0) {
+    return (
+      <div className="nodegraph-component" style={{ ...wrapperStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: 13, color: style.textColor || '#e2e8f0', opacity: 0.75, textAlign: 'center', padding: 16 }}>
+          {emptyGraphMessage(rawNodes.length)}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="nodegraph-component" style={wrapperStyle}>
+      {(graphStatus === 'empty' || graphStatus === 'error') && (
+        <div
+          style={{
+            position: 'absolute',
+            zIndex: 5,
+            margin: 10,
+            padding: '6px 9px',
+            borderRadius: 8,
+            background: 'rgba(15, 23, 42, 0.78)',
+            color: graphStatus === 'error' ? '#fca5a5' : (style.textColor || '#e2e8f0'),
+            fontSize: 11,
+            maxWidth: 300,
+          }}
+        >
+          {graphStatus === 'error'
+            ? 'Relationship query failed, but uploaded tables are shown.'
+            : emptyGraphMessage(rawNodes.length)}
+        </div>
+      )}
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodesChange={onNodesChange}
+        onNodeDragStop={onNodeDragStop}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         nodesDraggable

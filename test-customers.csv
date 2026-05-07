@@ -1,0 +1,6 @@
+customer_id,first_name,last_name,email,city
+C001,Ada,Lovelace,ada@example.com,London
+C002,Grace,Hopper,grace@example.com,Arlington
+C003,Katherine,Johnson,katherine@example.com,White Sulphur Springs
+C004,Alan,Turing,alan@example.com,Manchester
+C005,Dorothy,Vaughan,dorothy@example.com,Kansas City

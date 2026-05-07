@@ -14,6 +14,12 @@ interface UploadedFile {
   message?: string;
 }
 
+interface UploadSuccess {
+  results: UploadedFile[];
+  sessionId?: string;
+  payload?: unknown;
+}
+
 interface ProgressState {
   active:    boolean;
   percent:   number;        // 0..100
@@ -85,9 +91,9 @@ export default function FileUpload({ config }: FileUploadProps) {
   // Optional polling endpoint pattern. Use {session_id} as placeholder.
   const progressEndpointTemplate = ((data as any).progressEndpoint as string) || '';
 
-  const uploadOne = async (file: File): Promise<{ result: UploadedFile; sessionId?: string }> => {
+  const uploadBatch = async (selectedFiles: File[]): Promise<UploadSuccess> => {
     const form = new FormData();
-    form.append(fieldName, file);
+    selectedFiles.forEach((file) => form.append(fieldName, file));
 
     try {
       const target = uploadUrl ? uploadUrl : `${API_BASE}/api/execute/upload`;
@@ -104,16 +110,16 @@ export default function FileUpload({ config }: FileUploadProps) {
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
         return {
-          result: {
+          results: selectedFiles.map((file) => ({
             name: file.name,
             size: file.size,
             status: 'error',
             message: txt.slice(0, 120) || `HTTP ${res.status}`,
-          },
+          })),
         };
       }
       const payload = await res.json().catch(() => ({}));
-      setComponentState(config.id, 'lastUpload', { file: file.name, response: payload });
+      setComponentState(config.id, 'lastUpload', { files: selectedFiles.map((file) => file.name), response: payload });
 
       const inner =
         payload && typeof payload === 'object' && 'data' in payload
@@ -125,12 +131,18 @@ export default function FileUpload({ config }: FileUploadProps) {
           : undefined;
 
       return {
-        result: { name: file.name, size: file.size, status: 'success' },
+        results: selectedFiles.map((file) => ({ name: file.name, size: file.size, status: 'success' })),
         sessionId: sid,
+        payload: inner,
       };
     } catch (err) {
       return {
-        result: { name: file.name, size: file.size, status: 'error', message: (err as Error).message },
+        results: selectedFiles.map((file) => ({
+          name: file.name,
+          size: file.size,
+          status: 'error',
+          message: (err as Error).message,
+        })),
       };
     }
   };
@@ -145,29 +157,50 @@ export default function FileUpload({ config }: FileUploadProps) {
     }));
     setFiles((prev) => [...prev, ...initial]);
 
-    const results = await Promise.all(list.map((f) => uploadOne(f)));
+    const uploadResult = await uploadBatch(list);
     setFiles((prev) => {
       const next = [...prev];
-      results.forEach((r, i) => {
-        next[next.length - results.length + i] = r.result;
+      uploadResult.results.forEach((result, i) => {
+        next[next.length - uploadResult.results.length + i] = result;
       });
       return next;
     });
 
     // The session_id is shared across all files in the upload — pick the
     // first non-empty one.
-    const sid = results.map((r) => r.sessionId).find(Boolean);
+    const sid = uploadResult.sessionId;
+    const uploadPayload = uploadResult.payload;
+    const uploadObject = uploadPayload && typeof uploadPayload === 'object'
+      ? uploadPayload as Record<string, unknown>
+      : null;
+
+    if (uploadPayload != null) {
+      setComponentState(config.id, 'uploadResponse', uploadPayload);
+    }
+    if (Array.isArray(uploadObject?.tables)) {
+      setComponentState(config.id, 'tables', uploadObject.tables);
+    }
+    if (typeof uploadObject?.message === 'string') {
+      setComponentState(config.id, 'message', uploadObject.message);
+    }
+
     if (sid) {
       setComponentState(config.id, 'sessionId', sid);
       setComponentState(config.id, 'value', sid);
-      setComponentState(config.id, 'cleaningComplete', false);
-      setActiveSessionId(sid);
-      setProgress({ active: true, percent: 0, status: 'starting', done: false });
+      const alreadyProcessed = Array.isArray(uploadObject?.tables) || !progressEndpointTemplate;
+      setComponentState(config.id, 'cleaningComplete', alreadyProcessed);
+      if (alreadyProcessed) {
+        setComponentState(config.id, 'progressPercent', 100);
+        setProgress({ active: false, percent: 100, status: 'complete', done: true });
+      } else {
+        setActiveSessionId(sid);
+        setProgress({ active: true, percent: 0, status: 'starting', done: false });
+      }
     }
     setComponentState(
       config.id,
       'uploadedFiles',
-      results.filter((r) => r.result.status === 'success').map((r) => r.result.name),
+      uploadResult.results.filter((result) => result.status === 'success').map((result) => result.name),
     );
   };
 

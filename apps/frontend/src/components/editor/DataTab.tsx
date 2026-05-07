@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
+import { resolve } from '../../engine/bindingResolver';
 import EndpointPicker from '../ui/EndpointPicker';
 import type {
   ComponentData,
@@ -27,6 +28,31 @@ interface QueryBinding {
   responseTransformer?: string;
   pollUrlTemplate?: string;
   body?:         string;
+}
+
+function extractBindingDependencies(...values: Array<unknown>): string[] {
+  const paths = new Set<string>();
+  const visit = (value: unknown) => {
+    if (typeof value === 'string') {
+      for (const match of value.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)) {
+        const path = match[1].trim();
+        if (path.startsWith('componentState.') || path.startsWith('queries.')) {
+          paths.add(path);
+        }
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (value && typeof value === 'object') {
+      Object.values(value as Record<string, unknown>).forEach(visit);
+    }
+  };
+
+  values.forEach(visit);
+  return [...paths];
 }
 
 function QueryBindingSection({
@@ -64,6 +90,7 @@ function QueryBindingSection({
     if (!next.resourceName || !next.path) return;
 
     const trigger = next.trigger ?? (next.method === 'GET' ? 'onLoad' : 'manual');
+    const dependsOn = extractBindingDependencies(next.path, next.body, next.pollUrlTemplate);
     upsertQuery({
       name:     queryName,
       resource: next.resourceName,
@@ -73,6 +100,7 @@ function QueryBindingSection({
       responseTransformer: next.responseTransformer,
       pollUrlTemplate: next.pollUrlTemplate,
       body: next.body,
+      dependsOn,
     });
 
     // Auto-bind the component so it reads from the query result. For Buttons
@@ -287,7 +315,7 @@ const BUTTON_QUERY_BINDING_PATHS = [
 const COMMON_STATE_FIELDS = ['value'];
 
 const STATE_FIELDS_BY_TYPE: Partial<Record<string, string[]>> = {
-  FileUpload: ['sessionId', 'value', 'progressPercent', 'cleaningComplete', 'uploadedFiles', 'lastUpload'],
+  FileUpload: ['sessionId', 'tables', 'message', 'progressPercent', 'cleaningComplete', 'uploadedFiles', 'uploadResponse', 'lastUpload'],
   Table: ['selectedRow', 'value'],
   TextInput: ['value'],
   NumberInput: ['value'],
@@ -297,6 +325,13 @@ const STATE_FIELDS_BY_TYPE: Partial<Record<string, string[]>> = {
 
 function bindingExpression(path: string, wrap = true): string {
   return wrap ? `{{${path}}}` : path;
+}
+
+function formatBindingPreview(value: unknown): string {
+  if (value === undefined || value === null || value === '') return 'No value yet';
+  if (Array.isArray(value)) return `${value.length} rows`;
+  if (typeof value === 'object') return `Object with ${Object.keys(value as Record<string, unknown>).length} keys`;
+  return String(value);
 }
 
 function BindingPicker({
@@ -314,6 +349,8 @@ function BindingPicker({
 }) {
   const queriesConfig = useEditorStore((s) => s.queriesConfig);
   const components = useEditorStore((s) => s.components);
+  useEditorStore((s) => s.queryResults);
+  useEditorStore((s) => s.componentState);
   const queryNames = queriesConfig
     .map((query) => String(query?.name ?? '').trim())
     .filter(Boolean);
@@ -383,8 +420,158 @@ function BindingPicker({
           onChange={(e) => onChange(e.target.value)}
           placeholder="Advanced binding, e.g. {{queries.getData.data}}"
         />
+        {value.trim() && (
+          <p className="endpoint-picker-hint">
+            Preview: <code>{formatBindingPreview(resolve(value))}</code>
+          </p>
+        )}
       </div>
     </FormField>
+  );
+}
+
+function FileUploadSettings({
+  data,
+  onChange,
+}: {
+  data: ComponentData;
+  onChange: (key: keyof ComponentData, value: unknown) => void;
+}) {
+  const [resources, setResources] = useState<ResourceListItem[]>([]);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const restResources = useMemo(
+    () => resources.filter((resource) => resource.type === 'REST'),
+    [resources],
+  );
+  const selectedResource = resources.find((r) => r.id === (data as any).resourceId);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE}/api/resources`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((payload: ResourceListItem[]) => {
+        if (!cancelled) setResources(Array.isArray(payload) ? payload : []);
+      })
+      .catch(() => { if (!cancelled) setResources([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if ((data as any).resourceId || restResources.length !== 1) return;
+    onChange('resourceId' as keyof ComponentData, restResources[0].id);
+    onChange('resourceName' as keyof ComponentData, restResources[0].name);
+  }, [data, onChange, restResources]);
+
+  return (
+    <>
+      <div className="panel-section-divider">File Upload</div>
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          padding: 12,
+          border: '1px solid var(--border, #e3e6ec)',
+          borderRadius: 8,
+          background: 'var(--surface-muted, #f8f9fb)',
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <strong style={{ fontSize: 12, color: 'var(--text-primary, #0f1117)' }}>Simple setup</strong>
+          <span style={{ fontSize: 11, color: 'var(--text-muted, #5c6370)' }}>
+            {selectedResource && (data as any).endpointPath ? 'Ready' : 'Pick API + endpoint'}
+          </span>
+        </div>
+        <p className="endpoint-picker-hint" style={{ margin: 0 }}>
+          Choose where files should be sent. Defaults handle documents, multiple files, and the form field name.
+        </p>
+      </div>
+
+      <FormField label="Resource">
+        <select
+          className="form-select"
+          value={String((data as any).resourceId ?? '')}
+          onChange={(e) => {
+            const resource = resources.find((r) => r.id === e.target.value);
+            onChange('resourceId' as keyof ComponentData, resource?.id ?? '');
+            onChange('resourceName' as keyof ComponentData, resource?.name ?? '');
+          }}
+        >
+          <option value="">Pick upload resource...</option>
+          {restResources.map((resource) => (
+            <option key={resource.id} value={resource.id}>{resource.name}</option>
+          ))}
+        </select>
+      </FormField>
+
+      <FormField label="Upload endpoint">
+        <EndpointPicker
+          resourceId={String((data as any).resourceId || '') || null}
+          selectedMethod="POST"
+          selectedPath={String((data as any).endpointPath ?? '')}
+          onChange={(next) => onChange('endpointPath' as keyof ComponentData, next.path)}
+        />
+      </FormField>
+
+      <button
+        type="button"
+        className="mini-editor-add"
+        onClick={() => setAdvancedOpen((open) => !open)}
+      >
+        {advancedOpen ? 'Hide advanced upload options' : 'Show advanced upload options'}
+      </button>
+
+      {advancedOpen && (
+        <>
+          <TextField
+            label="Form field name"
+            value={String((data as any).fieldName ?? 'file')}
+            onChange={(value) => onChange('fieldName' as keyof ComponentData, value)}
+            placeholder="file"
+          />
+
+          <TextField
+            label="Accepted file types"
+            value={String((data as any).accept ?? '.xlsx,.xls,.csv,.pdf,.docx,.txt')}
+            onChange={(value) => onChange('accept' as keyof ComponentData, value)}
+            placeholder=".pdf,.docx,.txt"
+          />
+
+          <BooleanField
+            label="Allow multiple files"
+            value={((data as any).multiple as boolean | undefined) ?? true}
+            onChange={(value) => onChange('multiple' as keyof ComponentData, value)}
+          />
+
+          <FormField label="Progress endpoint">
+            <EndpointPicker
+              resourceId={String((data as any).resourceId || '') || null}
+              selectedMethod="GET"
+              selectedPath={String((data as any).progressEndpoint ?? '')}
+              onChange={(next) => onChange('progressEndpoint' as keyof ComponentData, next.path)}
+            />
+            <p className="endpoint-picker-hint">
+              Use <code>{'{session_id}'}</code> or <code>{'{sessionId}'}</code> where the uploaded session id belongs.
+            </p>
+          </FormField>
+
+          <TextField
+            label="Direct upload URL"
+            value={String((data as any).uploadUrl ?? '')}
+            onChange={(value) => onChange('uploadUrl' as keyof ComponentData, value)}
+            placeholder="Leave empty to use this app's upload proxy"
+          />
+        </>
+      )}
+
+      {selectedResource && (
+        <p className="endpoint-picker-hint">
+          Uploads will be proxied to <code>{selectedResource.name}</code>.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -530,44 +717,55 @@ export default function DataTab() {
 
       <FormField label="Visible for roles">{renderRoleCheckboxes}</FormField>
 
-      <FormField label="Mock Value">
-        {isTable || isChart ? (
-          <textarea
-            className="form-textarea"
-            value={mockValueDisplay}
-            onChange={(e) => handleMockValueChange(e.target.value)}
-            placeholder="JSON array"
-            rows={5}
+      {type === 'FileUpload' && (
+        <FileUploadSettings
+          data={data}
+          onChange={(key, value) => handleDataField(key, value)}
+        />
+      )}
+
+      {type !== 'FileUpload' && (
+        <>
+          <FormField label="Mock Value">
+            {isTable || isChart ? (
+              <textarea
+                className="form-textarea"
+                value={mockValueDisplay}
+                onChange={(e) => handleMockValueChange(e.target.value)}
+                placeholder="JSON array"
+                rows={5}
+              />
+            ) : (
+              <input
+                type="text"
+                className="form-input"
+                value={mockValueDisplay}
+                onChange={(e) => handleMockValueChange(e.target.value)}
+                placeholder="Display value"
+              />
+            )}
+          </FormField>
+
+          <BindingPicker
+            label="Data binding"
+            value={String(data.dbBinding ?? '')}
+            onChange={(value) => handleDataField('dbBinding', value)}
           />
-        ) : (
-          <input
-            type="text"
-            className="form-input"
-            value={mockValueDisplay}
-            onChange={(e) => handleMockValueChange(e.target.value)}
-            placeholder="Display value"
+
+          <QueryBindingSection
+            componentId={selectedComponent.id}
+            binding={(data.queryBindingConfig as QueryBinding) ?? {}}
+            onChange={(next) => handleDataField('queryBindingConfig' as keyof ComponentData, next)}
           />
-        )}
-      </FormField>
 
-      <BindingPicker
-        label="Data binding"
-        value={String(data.dbBinding ?? '')}
-        onChange={(value) => handleDataField('dbBinding', value)}
-      />
-
-      <QueryBindingSection
-        componentId={selectedComponent.id}
-        binding={(data.queryBindingConfig as QueryBinding) ?? {}}
-        onChange={(next) => handleDataField('queryBindingConfig' as keyof ComponentData, next)}
-      />
-
-      <SelectField
-        label="Refresh Trigger"
-        value={data.refreshOn || 'manual'}
-        onChange={(value) => handleDataField('refreshOn', value)}
-        options={['manual', 'onLoad', 'onRowSelect']}
-      />
+          <SelectField
+            label="Refresh Trigger"
+            value={data.refreshOn || 'manual'}
+            onChange={(value) => handleDataField('refreshOn', value)}
+            options={['manual', 'onLoad', 'onRowSelect']}
+          />
+        </>
+      )}
 
       {type === 'StatCard' && (
         <>

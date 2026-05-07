@@ -217,6 +217,8 @@ const demoBackendSuite: TemplateConfig = {
         gridColor: '#1e293b',
         axisColor: '#64748b',
         textColor: '#cbd5e1',
+        barRadius: 6,
+        showDataLabels: false,
       },
       data: {
         showGrid: true,
@@ -227,8 +229,6 @@ const demoBackendSuite: TemplateConfig = {
         yField: 'revenue',
         colorScheme: 'Blue',
         orientation: 'Vertical',
-        barRadius: 6,
-        showDataLabels: false,
         dbBinding: '{{queries.get-revenue-chart.data}}',
         mockValue: [
           { date: '2025-04-21', revenue: 1240 },
