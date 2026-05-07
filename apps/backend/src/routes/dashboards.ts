@@ -488,13 +488,31 @@ router.post('/:id/assign', async (req, res) => {
 
 router.get('/:id/customers', async (req, res) => {
   try {
+    // Try as UUID first, fall back to slug if it doesn't look like a UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id);
+    let dashboardId: string;
+
+    if (isUuid) {
+      dashboardId = req.params.id;
+    } else {
+      // Look up by slug
+      const { rows: dashRows } = await pool.query(
+        'SELECT id FROM dashboards WHERE slug = $1',
+        [req.params.id]
+      );
+      if (dashRows.length === 0) {
+        return res.status(404).json({ error: 'Dashboard not found' });
+      }
+      dashboardId = dashRows[0].id;
+    }
+
     const { rows } = await pool.query(
       `SELECT c.id, c.name, c.slug
        FROM customers c
        JOIN dashboard_assignments da ON da.customer_id = c.id
        WHERE da.dashboard_id = $1
        ORDER BY c.name ASC`,
-      [req.params.id]
+      [dashboardId]
     );
     return res.json(rows);
   } catch (err) {
