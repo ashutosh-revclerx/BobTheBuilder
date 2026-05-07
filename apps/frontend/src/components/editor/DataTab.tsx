@@ -272,6 +272,122 @@ function SelectField({
   );
 }
 
+const QUERY_BINDING_PATHS = [
+  { label: 'Query data', path: 'data', wrap: true },
+  { label: 'Number of rows', path: 'data.length', wrap: true },
+  { label: 'Status', path: 'status', wrap: true },
+  { label: 'Error', path: 'error', wrap: true },
+  { label: 'Manual trigger', path: 'trigger', wrap: false },
+];
+
+const BUTTON_QUERY_BINDING_PATHS = [
+  { label: 'Manual trigger', path: 'trigger', wrap: false },
+];
+
+const COMMON_STATE_FIELDS = ['value'];
+
+const STATE_FIELDS_BY_TYPE: Partial<Record<string, string[]>> = {
+  FileUpload: ['sessionId', 'value', 'progressPercent', 'cleaningComplete', 'uploadedFiles', 'lastUpload'],
+  Table: ['selectedRow', 'value'],
+  TextInput: ['value'],
+  NumberInput: ['value'],
+  Select: ['value'],
+  ChatBox: ['value', 'lastQuestion'],
+};
+
+function bindingExpression(path: string, wrap = true): string {
+  return wrap ? `{{${path}}}` : path;
+}
+
+function BindingPicker({
+  label,
+  value,
+  onChange,
+  queryPathOptions = QUERY_BINDING_PATHS,
+  includeComponents = true,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  queryPathOptions?: typeof QUERY_BINDING_PATHS;
+  includeComponents?: boolean;
+}) {
+  const queriesConfig = useEditorStore((s) => s.queriesConfig);
+  const components = useEditorStore((s) => s.components);
+  const queryNames = queriesConfig
+    .map((query) => String(query?.name ?? '').trim())
+    .filter(Boolean);
+  const bindableComponents = components.filter((component) => {
+    if (!includeComponents) return false;
+    return component.type !== 'Container' && component.type !== 'TabbedContainer';
+  });
+
+  return (
+    <FormField label={label}>
+      <div className="mini-editor" style={{ gap: 8 }}>
+        <div className="mini-editor-row">
+          <select
+            className="form-select"
+            aria-label="Query"
+            onChange={(e) => {
+              const [queryName, path] = e.target.value.split('|');
+              const selected = queryPathOptions.find((option) => option.path === path);
+              if (!queryName || !selected) return;
+              onChange(bindingExpression(`queries.${queryName}.${selected.path}`, selected.wrap));
+            }}
+            value=""
+            disabled={queryNames.length === 0}
+          >
+            <option value="">
+              {queryNames.length === 0 ? 'No queries yet' : 'Bind from query...'}
+            </option>
+            {queryNames.flatMap((queryName) =>
+              queryPathOptions.map((option) => (
+                <option key={`${queryName}-${option.path}`} value={`${queryName}|${option.path}`}>
+                  {queryName} {'->'} {option.label}
+                </option>
+              )),
+            )}
+          </select>
+        </div>
+
+        {includeComponents && bindableComponents.length > 0 && (
+          <div className="mini-editor-row">
+            <select
+              className="form-select"
+              aria-label="Component state"
+              onChange={(e) => {
+                const [componentId, field] = e.target.value.split('|');
+                if (!componentId || !field) return;
+                onChange(bindingExpression(`componentState.${componentId}.${field}`));
+              }}
+              value=""
+            >
+              <option value="">Bind from component state...</option>
+              {bindableComponents.flatMap((component) => {
+                const fields = STATE_FIELDS_BY_TYPE[component.type] ?? COMMON_STATE_FIELDS;
+                return fields.map((field) => (
+                  <option key={`${component.id}-${field}`} value={`${component.id}|${field}`}>
+                    {component.label || component.id} {'->'} {field}
+                  </option>
+                ));
+              })}
+            </select>
+          </div>
+        )}
+
+        <input
+          type="text"
+          className="form-input"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Advanced binding, e.g. {{queries.getData.data}}"
+        />
+      </div>
+    </FormField>
+  );
+}
+
 export default function DataTab() {
   const lastSelectedComponentId = useEditorStore((s) => s.lastSelectedComponentId);
   const components = useEditorStore((s) => s.components);
@@ -434,11 +550,10 @@ export default function DataTab() {
         )}
       </FormField>
 
-      <TextField
-        label="DB Field Binding"
+      <BindingPicker
+        label="Data binding"
         value={String(data.dbBinding ?? '')}
         onChange={(value) => handleDataField('dbBinding', value)}
-        placeholder="e.g. {{queries.getData.data}}"
       />
 
       <QueryBindingSection
@@ -1072,7 +1187,12 @@ export default function DataTab() {
           />
           {data.optionsSource === 'From query' ? (
             <>
-              <TextField label="Query name" value={data.queryBinding ?? ''} onChange={(value) => handleDataField('queryBinding', value)} />
+              <BindingPicker
+                label="Options data"
+                value={String(data.dbBinding ?? '')}
+                onChange={(value) => handleDataField('dbBinding', value)}
+                includeComponents={false}
+              />
               <TextField label="Label field" value={data.labelField ?? 'label'} onChange={(value) => handleDataField('labelField', value)} />
               <TextField label="Value field" value={data.valueField ?? 'value'} onChange={(value) => handleDataField('valueField', value)} />
             </>
@@ -1136,7 +1256,13 @@ export default function DataTab() {
 
       {type === 'Button' && (
         <>
-          <TextField label="Target Query (onClick)" value={String(data.dbBinding ?? '')} onChange={(value) => handleDataField('dbBinding', value)} />
+          <BindingPicker
+            label="Target query"
+            value={String(data.dbBinding ?? '')}
+            onChange={(value) => handleDataField('dbBinding', value)}
+            queryPathOptions={BUTTON_QUERY_BINDING_PATHS}
+            includeComponents={false}
+          />
           <TextField label="Disabled when" value={data.disabled ?? 'false'} onChange={(value) => handleDataField('disabled', value)} />
           <BooleanField label="Show loading state" value={data.loadingState === true} onChange={(value) => handleDataField('loadingState', value)} />
           <BooleanField

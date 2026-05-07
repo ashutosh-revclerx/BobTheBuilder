@@ -2907,14 +2907,21 @@
   font-family: 'Fira Code', ui-monospace, monospace;
   font-size: 13px;
   color: #0f1117;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .resources-endpoint-summary {
   font-size: 12px;
   color: #4b5563;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .method-badge {
@@ -3077,14 +3084,21 @@
 
 .endpoint-picker-path {
   font-family: 'Fira Code', ui-monospace, monospace;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .endpoint-picker-summary {
   color: #4b5563;
   font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .endpoint-picker-empty {

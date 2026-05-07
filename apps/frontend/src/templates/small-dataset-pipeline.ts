@@ -3,13 +3,13 @@ import type { TemplateConfig } from '../types/template';
 // Hardcoded to the user's known resource name. The backend looks up resources
 // by name in the resources table, so as long as the imported resource is
 // named exactly this string, no UUID juggling is needed.
-const RESOURCE = 'Centralized Data Layer Backend';
+const RESOURCE = 'smallpipeline';
 
 const smallDatasetPipeline: TemplateConfig = {
   id: 'small-dataset-pipeline',
   name: 'Small Dataset Pipeline',
   description:
-    'Upload Excel/CSV/PDF docs → automatic cleaning + relationship detection → node-graph viz + RAG chat. Fully wired to "Centralized Data Layer Backend".',
+    'Upload Excel/CSV/PDF docs → automatic cleaning + relationship detection → node-graph viz + RAG chat. Fully wired to "smallpipeline".',
   components: [
     // ─── Header ─────────────────────────────────────────────────────────
     {
