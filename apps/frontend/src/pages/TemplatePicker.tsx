@@ -80,9 +80,19 @@ export default function TemplatePicker() {
     setCreatingFor(index);
     try {
       const variant = stash.configs[index];
+      // Stash the original generation prompt inside config.metadata so the
+      // builder's AI assistant has the user's intent on every chat turn.
+      const configWithMeta = {
+        ...variant.config,
+        metadata: {
+          ...((variant.config as any).metadata ?? {}),
+          generationPrompt: stash.prompt,
+          generatedAt: new Date().toISOString(),
+        },
+      };
       const payload = {
         name:   variant.name,
-        config: variant.config,
+        config: configWithMeta,
         status: 'draft',
       };
 

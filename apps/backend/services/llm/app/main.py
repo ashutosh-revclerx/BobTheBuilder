@@ -22,6 +22,7 @@ SERVICE_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(SERVICE_ENV_PATH, override=True)
 
 from .archetypes import classify_prompt
+from .chat import CHAT_SYSTEM_PROMPT_VERSION, ChatError, run_chat
 from .design_enrichment import enrich_config
 from .gemini_client import GeminiError, generate_dashboard_config
 from .openai_client import (
@@ -29,7 +30,7 @@ from .openai_client import (
     generate_dashboard_config as generate_dashboard_config_openai,
 )
 from .prompts import SYSTEM_PROMPT_VERSION, build_system_prompt, build_user_prompt
-from .schemas import GenerateRequest, GenerateResponse
+from .schemas import ChatRequest, ChatResponse, GenerateRequest, GenerateResponse
 from .variants import derive_variants
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -67,7 +68,51 @@ def health() -> dict:
         "fallback_provider": "openai",
         "fallback_model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         "has_openai_key": bool(os.getenv("OPENAI_API_KEY")),
+        "chat_prompt_version": CHAT_SYSTEM_PROMPT_VERSION,
     }
+
+
+@app.post("/chat", response_model=ChatResponse)
+def chat(req: ChatRequest, request: Request) -> ChatResponse:
+    """
+    Multi-turn chat with the builder assistant.
+
+    The assistant has full context of the dashboard's original generation prompt,
+    its current config, and the selected component. Returns a free-text reply
+    plus optional structured suggestions the user can apply with one click.
+    """
+    request_id = getattr(request.state, "request_id", "-")
+    started = time.perf_counter()
+
+    components_count = len(req.dashboard_config.components) if req.dashboard_config else 0
+    queries_count = len(req.dashboard_config.queries) if req.dashboard_config else 0
+    logger.info(
+        "chat.request id=%s msg_len=%d history=%d components=%d queries=%d selected=%s has_prompt=%s",
+        request_id,
+        len(req.message),
+        len(req.conversation_history),
+        components_count,
+        queries_count,
+        req.selected_component.id if req.selected_component else "-",
+        bool(req.generation_prompt),
+    )
+
+    try:
+        result = run_chat(req)
+    except ChatError as exc:
+        duration_ms = round((time.perf_counter() - started) * 1000)
+        logger.error("chat.failed id=%s duration_ms=%s error=%s", request_id, duration_ms, exc)
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    duration_ms = round((time.perf_counter() - started) * 1000)
+    logger.info(
+        "chat.success id=%s duration_ms=%s response_len=%d suggestions=%d",
+        request_id,
+        duration_ms,
+        len(result.response),
+        len(result.suggestions),
+    )
+    return result
 
 
 @app.post("/generate", response_model=GenerateResponse)
