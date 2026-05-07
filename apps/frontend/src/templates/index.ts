@@ -5,9 +5,11 @@ import emeraldGrove from './emerald-grove';
 import midnightIndigo from './midnight-indigo';
 import sunsetBlaze from './sunset-blaze';
 import smallDatasetPipeline from './small-dataset-pipeline';
+import demoBackendSuite from './demo-backend-suite';
 
 export const templates: TemplateConfig[] = [
   smallDatasetPipeline,
+  demoBackendSuite,
   majesticMaroon,
   oceanicTeal,
   emeraldGrove,
