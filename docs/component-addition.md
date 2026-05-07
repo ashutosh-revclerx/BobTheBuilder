@@ -151,6 +151,7 @@ Configuration enables:
 | **Property Panel** | `apps/frontend/src/components/editor/PropertiesPanel.tsx` | UI for editing component properties |
 | **Property Controls** | `apps/frontend/src/components/editor/properties/*` | Input fields for each property type |
 | **Export Service** | `apps/frontend/src/services/exportService.ts` | Ensures component exports correctly |
+| **AI Component Registry** | `apps/backend/services/llm/app/component_capabilities.py` | Registers component properties for both generation and editor assistant AI |
 | **Backend Schema** | `apps/backend/services/llm/app/schemas.py` | Python schema for API validation |
 | **LLM Prompts** | `apps/backend/services/llm/app/prompts.py` | Component examples for AI generation |
 | **Backend Generator** | `apps/backend/services/llm/app/generator.py` | Component creation logic for AI |
@@ -524,50 +525,102 @@ const sourceRuntimeFiles: Record<string, string> = {
 
 ### Step 9: AI Generation Compatibility
 
-Update the LLM system to understand ProgressCard. 
+The AI system needs to know about your component through **two independent paths**:
 
-Edit: `apps/backend/services/llm/app/prompts.py`
+1. **Dashboard generation** (`POST /generate`) — uses `component_capabilities.py` injected into the Gemini system prompt
+2. **Editor chat assistant** (`POST /chat`) — uses `component_capabilities.py` in every chat request to understand component properties
 
-Add to the `COMPONENT_EXAMPLES` section:
+Both paths read from a single source-of-truth file: `component_capabilities.py`. If you don't register your component there, **neither the AI generator nor the editor assistant will know it exists**.
+
+#### Part A — Register in `component_capabilities.py` (REQUIRED)
+
+Edit: `apps/backend/services/llm/app/component_capabilities.py`
+
+Add your component to the `COMPONENT_CAPABILITIES` dictionary:
 
 ```python
-{
-  "name": "ProgressCard",
-  "type": "ProgressCard",
-  "description": "Displays a metric with a visual progress bar. Ideal for showing completion rates, progress towards goals, or percentages.",
-  "example_config": {
-    "type": "ProgressCard",
-    "style": {
-      "backgroundColor": "#ffffff",
-      "textColor": "#0f1117",
-      "borderColor": "#e5e7eb",
+COMPONENT_CAPABILITIES: dict[str, dict] = {
+    # ... existing components ...
+    
+    "ProgressCard": {
+        "description": "Displays a metric with a visual progress bar. Ideal for showing completion rates, progress towards goals, or percentages.",
+        "visual_role": "KPI card with animated progress indicator.",
+        "style": COMMON_CARD_STYLE + [
+            "progressColor",        # hex color for progress bar fill
+            "trackColor",           # hex color for progress bar background
+        ],
+        "data": COMMON_VISIBILITY_DATA + [
+            "title",                # string label
+            "value",                # number 0-100
+            "unit",                 # string suffix (e.g. "%", "pts")
+            "trend",                # string (e.g. "+5%")
+            "trendValue",           # string details (e.g. "Up from last week")
+        ],
+        "required": {
+            "style": [],            # none are strictly required
+            "data": ["title", "value"],  # these properties must always be present
+        },
     },
-    "data": {
-      "title": "Project Completion",
-      "value": 85,
-      "unit": "%",
-      "trend": "+10%",
-      "trendValue": "Up from last week",
-    },
-  },
-  "best_for": [
-    "KPI tracking",
-    "Goal progress",
-    "Task completion",
-    "Metric thresholds",
-  ],
-  "avoid": [
-    "Displaying text-heavy content",
-    "Showing multiple unrelated metrics",
-  ],
 }
 ```
 
-Also add ProgressCard to the schema in `apps/backend/services/llm/app/schemas.py`:
+**Key fields:**
+- `description` — brief use case; appears in both generation and chat assistant prompts
+- `visual_role` — tells Gemini where/when to place the component (e.g., "KPI card", "Data explorer")
+- `style` — list of style property names the component accepts; only these are valid in generated configs
+- `data` — list of data property names the component accepts; only these are valid in generated configs
+- `required.style` / `required.data` — fields that must be present in every generated instance; prevents silent failures from missing required props
+
+**How `component_capabilities.py` is consumed:**
+
+1. **Generation flow** (`prompts.py::build_system_prompt()`):
+   - Calls `format_capabilities_for_prompt()` to render the entire `COMPONENT_CAPABILITIES` registry as a large structured text block
+   - Injects this block into the Gemini system prompt before every dashboard generation
+   - Gemini uses this to know what components exist and what properties to generate for each
+
+2. **Chat assistant flow** (`chat.py::build_chat_system_prompt()`):
+   - Every chat request calls `_component_capabilities_summary()` which iterates `COMPONENT_CAPABILITIES`
+   - Builds a compact reference: `- ProgressCard: style[backgroundColor, ...] data[title, value, ...]`
+   - Injects into the chat system prompt so the assistant knows valid properties for your component
+   - Also calls `COMPONENT_CAPABILITIES.keys()` to enumerate valid component type names
+
+**Critical rule:** Property names in `COMPONENT_CAPABILITIES` must exactly match what your React component reads from `config.style` and `config.data`. Mismatched names cause the component to silently ignore AI-generated properties (see Common Mistakes below).
+
+#### Part B — Register in `tools.py::PROPERTY_HINTS` (OPTIONAL but RECOMMENDED)
+
+During generation, Gemini can call the `get_component_capabilities` tool to ask for detailed property hints for a specific component. These rich descriptions help Gemini make better decisions.
+
+Edit: `apps/backend/services/llm/app/tools.py`
+
+Find the `PROPERTY_HINTS` dictionary and add:
+
+```python
+PROPERTY_HINTS: dict[str, dict[str, str]] = {
+    # ... existing components ...
+    
+    "ProgressCard": {
+        "value": "Integer 0-100. Represents completion percentage or progress toward goal.",
+        "progressColor": "Hex color (#RRGGBB) for the progress bar fill. Should contrast with trackColor.",
+        "trackColor": "Hex color for unfilled track background. Usually a muted shade.",
+        "unit": "Suffix appended to value display (e.g. '%', 'items', 'pts'). Max 10 chars.",
+        "trend": "Short trend label, e.g. '+5%' or '-3'. Displayed as a tag.",
+        "trendValue": "Full trend explanation (e.g. 'Up from last week'). Displayed below title.",
+        "title": "Component label (e.g. 'Project Completion'). Use short, action-oriented names.",
+    },
+}
+```
+
+These hints are returned when Gemini calls the `get_component_capabilities` tool during generation. Gemini uses them as guidance on what values to generate.
+
+#### Part C — Add Pydantic schema to `schemas.py` (OPTIONAL but RECOMMENDED)
+
+For request validation on the backend, add a Pydantic model for your component.
+
+Edit: `apps/backend/services/llm/app/schemas.py`
 
 ```python
 class ProgressCardComponent(BaseComponent):
-    """Progress indicator with visual bar and trend."""
+    """Progress indicator with visual bar and trend indicator."""
     type: Literal["ProgressCard"] = "ProgressCard"
     
     class Data(BaseModel):
@@ -577,14 +630,27 @@ class ProgressCardComponent(BaseComponent):
         trend: Optional[str] = None
         trendValue: Optional[str] = None
     
+    class Style(BaseModel):
+        backgroundColor: Optional[str] = None
+        textColor: Optional[str] = None
+        borderColor: Optional[str] = None
+        borderWidth: Optional[int] = 1
+        borderRadius: Optional[int] = 8
+        padding: Optional[int] = 16
+        progressColor: Optional[str] = "#6366f1"
+        trackColor: Optional[str] = "#e5e7eb"
+    
+    style: Optional[Style] = Field(default_factory=Style)
     data: Data = Field(default_factory=Data)
 ```
 
-**Why this matters:**
-- ✅ Gemini knows ProgressCard exists
-- ✅ AI can generate valid configurations
-- ✅ AI understands when to use ProgressCard
-- ✅ Prevents hallucinated components
+This validates incoming API requests and prevents invalid data from reaching the frontend.
+
+**Why this three-part process matters:**
+- ✅ **Part A (required):** Both AI generation and editor chat immediately know your component exists
+- ✅ **Part B (optional):** Gemini makes better property decisions during generation
+- ✅ **Part C (optional):** Backend validates data before sending to frontend; prevents corruption
+- ✅ Property names are centralized — change them in one place, both AI flows automatically update
 
 ---
 
@@ -828,6 +894,44 @@ return <Component config={c} />;
 
 ---
 
+### ❌ Wrong Property Names in `component_capabilities.py`
+
+```python
+# WRONG: Property names don't match React component
+"ProgressCard": {
+    "style": COMMON_CARD_STYLE + [
+        "barColor",        # Component reads "progressColor" — mismatch!
+        "backgroundColor",
+    ],
+    "data": COMMON_VISIBILITY_DATA + [
+        "percent",         # Component reads "value" — mismatch!
+        "progressValue",   # Wrong name entirely
+    ],
+}
+
+// React component reads:
+const { value } = config.data;
+const { progressColor } = config.style;
+// These don't exist in the AI-generated config!
+
+// CORRECT: Names match exactly
+"ProgressCard": {
+    "style": COMMON_CARD_STYLE + [
+        "progressColor",   # Matches config.style.progressColor
+        "trackColor",
+    ],
+    "data": COMMON_VISIBILITY_DATA + [
+        "value",           # Matches config.data.value
+        "unit",
+        "trend",
+    ],
+}
+```
+
+**Consequence:** AI generates valid-looking configs with properties that don't exist. React component silently renders with defaults (fallback values), ignoring all AI customization. Dashboard looks generic and wrong. The component appears broken, but no error is logged. Very hard to debug.
+
+---
+
 ## 7. Component Checklist
 
 Use this checklist before considering a component complete:
@@ -880,11 +984,13 @@ Use this checklist before considering a component complete:
 - [ ] No data loss in export cycle
 
 ### AI Generation
-- [ ] Component added to LLM examples
-- [ ] Gemini schema defined
-- [ ] Sample configurations in prompts
-- [ ] AI can generate valid configs
-- [ ] Component appears in AI output
+- [ ] `COMPONENT_CAPABILITIES` entry added with correct style/data property names
+- [ ] `description` and `visual_role` filled in (used by chat assistant and generation)
+- [ ] `required.style` and `required.data` fields defined
+- [ ] Property names in `COMPONENT_CAPABILITIES` match React component exactly
+- [ ] `PROPERTY_HINTS` entry added in `tools.py` (optional but recommended)
+- [ ] Pydantic schema added to `schemas.py` (optional but recommended)
+- [ ] AI-generated dashboard tested end-to-end (generate → preview → builder)
 
 ### Testing
 - [ ] Unit tests written (recommended)

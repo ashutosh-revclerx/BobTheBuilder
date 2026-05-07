@@ -22,10 +22,20 @@ import logging
 import os
 from typing import Any
 
+from google.genai import types
 from pydantic import ValidationError
 
 from .component_capabilities import COMPONENT_CAPABILITIES
+from .gemini_client import (
+    MAX_TOOL_CALL_TURNS,
+    _append_model_response,
+    _call_gemini_once,
+    _client,
+    _extract_function_calls,
+    _response_text,
+)
 from .schemas import ChatRequest, ChatResponse, Suggestion
+from .tools import execute_tool, gemini_tools
 
 logger = logging.getLogger("llm.chat")
 
@@ -74,6 +84,14 @@ For a label/caption → use **Text**.
 
 Component capability reference:
 {_component_capabilities_summary()}
+
+## Component Property Lookup Tool
+
+You have access to the `get_component_capabilities` tool.
+Call it with a component type name (e.g. "StatCard", "Table") to get the full
+list of style and data properties that component accepts — including descriptions
+and valid value ranges. Use it whenever you need to suggest specific property changes
+or verify that a property exists before recommending it.
 
 ## Response Format
 
@@ -241,43 +259,73 @@ def _parse_chat_json(raw: str) -> dict[str, Any]:
 
 
 def _call_gemini_chat(system_prompt: str, user_prompt: str, history: list[dict[str, str]]) -> str:
-    """Single-shot Gemini call returning raw text. No tools."""
-    from google import genai
-    from google.genai import types
+    """Gemini chat call with component tool support.
 
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ChatError("GEMINI_API_KEY not set")
-
-    client = genai.Client(api_key=api_key)
+    Runs the same tool-call loop as the generation flow so Gemini can call
+    get_component_capabilities during the conversation turn.
+    """
+    client = _client()
     model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
+    # Build contents: history + current user message
     contents: list[types.Content] = []
     for msg in history:
         role = "user" if msg["role"] == "user" else "model"
-        contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
-    contents.append(types.Content(role="user", parts=[types.Part.from_text(text=user_prompt)]))
-
-    try:
-        response = client.models.generate_content(
-            model=model,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                temperature=0.5,
-                response_mime_type="application/json",
-            ),
+        contents.append(
+            types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])])
         )
+    contents.append(
+        types.Content(role="user", parts=[types.Part.from_text(text=user_prompt)])
+    )
+
+    logger.info("chat.gemini.start max_tool_turns=%d", MAX_TOOL_CALL_TURNS)
+    try:
+        response = _call_gemini_once(client, system_prompt, contents, with_tools=True)
     except Exception as exc:
         raise ChatError(f"Gemini chat call failed: {exc}") from exc
 
+    for turn in range(MAX_TOOL_CALL_TURNS):
+        function_calls = _extract_function_calls(response)
+        logger.info("chat.tool_turn turn=%d calls=%d", turn + 1, len(function_calls))
+
+        if not function_calls:
+            # No tool calls — extract text and return it for JSON parsing
+            try:
+                return _response_text(response)
+            except Exception as exc:
+                raise ChatError(f"Gemini chat returned no usable text: {exc}") from exc
+
+        _append_model_response(contents, response)
+        tool_parts: list[types.Part] = []
+        for fc in function_calls:
+            name = fc.name or ""
+            args = fc.args or {}
+            result = execute_tool(name, args)
+            logger.info("chat.tool_call name=%s", name)
+            tool_parts.append(types.Part.from_function_response(name=name, response=result))
+
+        contents.append(types.Content(role="user", parts=tool_parts))
+        try:
+            response = _call_gemini_once(client, system_prompt, contents, with_tools=True)
+        except Exception as exc:
+            raise ChatError(f"Gemini chat tool turn failed: {exc}") from exc
+
+    # Exceeded max tool turns — force the final JSON answer without tools
+    logger.warning("chat.tool_turns.exceeded max=%d; forcing final answer", MAX_TOOL_CALL_TURNS)
+    contents.append(
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text(
+                text='Return your final answer now as JSON with "response" and "suggestions" keys. '
+                     "No prose, no markdown fences."
+            )],
+        )
+    )
     try:
-        text = response.text or ""
-    except Exception:
-        text = ""
-    if not text:
-        raise ChatError("Gemini returned empty chat response")
-    return text
+        response = _call_gemini_once(client, system_prompt, contents, with_tools=False)
+        return _response_text(response)
+    except Exception as exc:
+        raise ChatError(f"Gemini forced-final-answer call failed: {exc}") from exc
 
 
 def _call_openai_chat(system_prompt: str, user_prompt: str, history: list[dict[str, str]]) -> str:
