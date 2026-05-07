@@ -1,8 +1,9 @@
 import type { QueryConfig } from '@btb/shared';
 import { useEditorStore } from '../store/editorStore';
 import { resolve } from './bindingResolver';
+import { apiUrl } from '../services/apiBase';
 
-const BACKEND_URL = 'http://localhost:3001/api/execute';
+const BACKEND_URL = apiUrl('/api/execute');
 const inflight = new Set<string>();
 const previousDependencySnapshots = new Map<string, string>();
 const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();

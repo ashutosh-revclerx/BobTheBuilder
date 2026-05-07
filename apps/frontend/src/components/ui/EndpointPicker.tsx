@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import MethodBadge from './MethodBadge';
-
-const API_BASE = 'http://localhost:3001';
+import { API_BASE } from '../../services/apiBase';
 
 export interface ImportedEndpoint {
   id:         string;

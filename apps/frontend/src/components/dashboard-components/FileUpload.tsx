@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentConfig } from '../../types/template';
 import { useEditorStore } from '../../store/editorStore';
 import { resolveBackground } from '../../utils/styleUtils';
+import { API_BASE } from '../../services/apiBase';
 
 interface FileUploadProps {
   config: ComponentConfig;
@@ -21,7 +22,6 @@ interface ProgressState {
   done:      boolean;
 }
 
-const API_BASE = 'http://localhost:3001';
 const POLL_INTERVAL_MS = 2000;
 const POLL_MAX_ATTEMPTS = 60; // 2 minutes max
 

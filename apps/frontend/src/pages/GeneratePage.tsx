@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNav from '../components/ui/TopNav';
-
-const API_BASE = 'http://localhost:3001';
+import { API_BASE } from '../services/apiBase';
 
 interface Resource {
   id:        string;

@@ -24,8 +24,7 @@ import NodeGraph from '../components/dashboard-components/NodeGraph';
 import FileUpload from '../components/dashboard-components/FileUpload';
 import ChatBox from '../components/dashboard-components/ChatBox';
 import type { ComponentType } from '../types/template';
-
-const API_BASE = 'http://localhost:3001';
+import { API_BASE } from '../services/apiBase';
 
 const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
   StatCard,

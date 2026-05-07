@@ -11,8 +11,7 @@ import AssistantPanel from '../components/assistant/AssistantPanel';
 import { useKineticWidth } from '../hooks/useTextMeasure';
 import { exportProject, importProject } from '../services/ProjectService';
 import { downloadAsCode } from '../services/exportService';
-
-const API_BASE = 'http://localhost:3001';
+import { API_BASE } from '../services/apiBase';
 
 type ResetBaseline = {
   templateId: string;

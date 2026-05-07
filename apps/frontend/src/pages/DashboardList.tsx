@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AssignmentModal from '../components/editor/AssignmentModal';
 import { templates } from '../templates';
 import TopNav from '../components/ui/TopNav';
-
-const API_BASE = 'http://localhost:3001';
+import { API_BASE } from '../services/apiBase';
 
 interface DashboardSummary {
   id: string;

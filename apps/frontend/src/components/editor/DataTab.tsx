@@ -7,8 +7,7 @@ import type {
   TableColumn,
   TableConditionalRowColorRule,
 } from '../../types/template';
-
-const API_BASE = 'http://localhost:3001';
+import { API_BASE } from '../../services/apiBase';
 
 interface ResourceListItem {
   id:   string;

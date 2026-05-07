@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNav from '../components/ui/TopNav';
 import PreviewRenderer from '../components/preview/PreviewRenderer';
+import { API_BASE } from '../services/apiBase';
 
-const API_BASE = 'http://localhost:3001';
 const PREVIEW_SCALE = 292 / 1020; // card canvas ~292px wide, builder canvas ~1020px wide
 
 interface DashboardConfig {

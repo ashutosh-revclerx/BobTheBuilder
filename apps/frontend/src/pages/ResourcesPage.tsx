@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import MethodBadge from '../components/ui/MethodBadge';
 import TopNav from '../components/ui/TopNav';
 import type { ImportedEndpoint } from '../components/ui/EndpointPicker';
-
-const API_BASE = 'http://localhost:3001';
+import { API_BASE } from '../services/apiBase';
 
 type AuthType = 'none' | 'bearer' | 'api_key' | 'basic';
 type ResourceType = 'REST' | 'agent' | 'postgresql';

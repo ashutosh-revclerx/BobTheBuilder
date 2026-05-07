@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-
-const API_BASE = 'http://localhost:3001';
+import { API_BASE } from '../../services/apiBase';
 
 export default function PublishToggle() {
   const dashboardId = useEditorStore((s) => s.activeTemplateId);
