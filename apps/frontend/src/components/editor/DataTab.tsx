@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
+import { resolve } from '../../engine/bindingResolver';
 import EndpointPicker from '../ui/EndpointPicker';
+import DBQueryBuilder from './DBQueryBuilder';
 import type {
   ComponentData,
+  ComponentType,
   SelectOptionItem,
   TableColumn,
   TableConditionalRowColorRule,
@@ -29,14 +32,41 @@ interface QueryBinding {
   body?:         string;
 }
 
+function extractBindingDependencies(...values: Array<unknown>): string[] {
+  const paths = new Set<string>();
+  const visit = (value: unknown) => {
+    if (typeof value === 'string') {
+      for (const match of value.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)) {
+        const path = match[1].trim();
+        if (path.startsWith('componentState.') || path.startsWith('queries.')) {
+          paths.add(path);
+        }
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (value && typeof value === 'object') {
+      Object.values(value as Record<string, unknown>).forEach(visit);
+    }
+  };
+
+  values.forEach(visit);
+  return [...paths];
+}
+
 function QueryBindingSection({
   componentId,
   binding,
   onChange,
+  componentType,
 }: {
   componentId: string;
   binding: QueryBinding;
   onChange: (next: QueryBinding) => void;
+  componentType?: ComponentType;
 }) {
   const [resources, setResources] = useState<ResourceListItem[]>([]);
   const upsertQuery = useEditorStore((s) => s.upsertQuery);
@@ -57,6 +87,16 @@ function QueryBindingSection({
   // editor wires the same component back to the same query record.
   const queryName = binding.queryName ?? `${componentId}_query`;
 
+  // Auto-binding logic based on component type
+  function getSmartAutoBinding(componentType?: ComponentType): string {
+    // For buttons, use trigger (manual execution)
+    if (componentType === 'Button') {
+      return `{{queries.${queryName}.trigger}}`;
+    }
+    // For all data-display components, bind to query data
+    return `{{queries.${queryName}.data}}`;
+  }
+
   const syncQuery = (next: QueryBinding) => {
     onChange(next);
 
@@ -64,6 +104,7 @@ function QueryBindingSection({
     if (!next.resourceName || !next.path) return;
 
     const trigger = next.trigger ?? (next.method === 'GET' ? 'onLoad' : 'manual');
+    const dependsOn = extractBindingDependencies(next.path, next.body, next.pollUrlTemplate);
     upsertQuery({
       name:     queryName,
       resource: next.resourceName,
@@ -73,14 +114,14 @@ function QueryBindingSection({
       responseTransformer: next.responseTransformer,
       pollUrlTemplate: next.pollUrlTemplate,
       body: next.body,
+      dependsOn,
     });
 
-    // Auto-bind the component so it reads from the query result. For Buttons
-    // we use the trigger path so onClick fires the query.
-    const bindingPath = trigger === 'manual'
-      ? `{{queries.${queryName}.trigger}}`
-      : `{{queries.${queryName}.data}}`;
-    updateData(componentId, { dbBinding: bindingPath } as Partial<ComponentData>);
+    // Smart auto-bind based on component type
+    const bindingPath = getSmartAutoBinding(componentType);
+    const autoBindData: Partial<ComponentData> = { dbBinding: bindingPath };
+
+    updateData(componentId, autoBindData);
   };
 
   const selectedResource = resources.find((r) => r.id === binding.resourceId);
@@ -105,16 +146,11 @@ function QueryBindingSection({
       </select>
 
       {selectedResource?.type === 'postgresql' ? (
-        <div className="form-group" style={{ marginTop: '8px' }}>
-          <label className="form-label" style={{ fontSize: '10px', opacity: 0.7 }}>SQL Query</label>
-          <textarea
-            className="form-textarea"
-            style={{ fontFamily: 'monospace', minHeight: '80px' }}
-            placeholder="SELECT * FROM users WHERE id = {{components.input1.value}}"
-            value={binding.path ?? ''}
-            onChange={(e) => syncQuery({ ...binding, method: 'POST', path: e.target.value, queryName })}
-          />
-        </div>
+        <DBQueryBuilder
+          resourceId={binding.resourceId ?? ''}
+          value={binding}
+          onChange={(next) => syncQuery({ ...binding, ...next, queryName })}
+        />
       ) : (
         <EndpointPicker
           resourceId={binding.resourceId ?? null}
@@ -272,6 +308,281 @@ function SelectField({
   );
 }
 
+const QUERY_BINDING_PATHS = [
+  { label: 'Query data', path: 'data', wrap: true },
+  { label: 'Number of rows', path: 'data.length', wrap: true },
+  { label: 'Status', path: 'status', wrap: true },
+  { label: 'Error', path: 'error', wrap: true },
+  { label: 'Manual trigger', path: 'trigger', wrap: false },
+];
+
+const BUTTON_QUERY_BINDING_PATHS = [
+  { label: 'Manual trigger', path: 'trigger', wrap: false },
+];
+
+const COMMON_STATE_FIELDS = ['value'];
+
+const STATE_FIELDS_BY_TYPE: Partial<Record<string, string[]>> = {
+  FileUpload: ['sessionId', 'tables', 'message', 'progressPercent', 'cleaningComplete', 'uploadedFiles', 'uploadResponse', 'lastUpload'],
+  Table: ['selectedRow', 'value'],
+  TextInput: ['value'],
+  NumberInput: ['value'],
+  Select: ['value'],
+  ChatBox: ['value', 'lastQuestion'],
+};
+
+function bindingExpression(path: string, wrap = true): string {
+  return wrap ? `{{${path}}}` : path;
+}
+
+function formatBindingPreview(value: unknown): string {
+  if (value === undefined || value === null || value === '') return 'No value yet';
+  if (Array.isArray(value)) return `${value.length} rows`;
+  if (typeof value === 'object') return `Object with ${Object.keys(value as Record<string, unknown>).length} keys`;
+  return String(value);
+}
+
+function BindingPicker({
+  label,
+  value,
+  onChange,
+  queryPathOptions = QUERY_BINDING_PATHS,
+  includeComponents = true,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  queryPathOptions?: typeof QUERY_BINDING_PATHS;
+  includeComponents?: boolean;
+}) {
+  const queriesConfig = useEditorStore((s) => s.queriesConfig);
+  const components = useEditorStore((s) => s.components);
+  useEditorStore((s) => s.queryResults);
+  useEditorStore((s) => s.componentState);
+  const queryNames = queriesConfig
+    .map((query) => String(query?.name ?? '').trim())
+    .filter(Boolean);
+  const bindableComponents = components.filter((component) => {
+    if (!includeComponents) return false;
+    return component.type !== 'Container' && component.type !== 'TabbedContainer';
+  });
+
+  return (
+    <FormField label={label}>
+      <div className="mini-editor" style={{ gap: 8 }}>
+        <div className="mini-editor-row">
+          <select
+            className="form-select"
+            aria-label="Query"
+            onChange={(e) => {
+              const [queryName, path] = e.target.value.split('|');
+              const selected = queryPathOptions.find((option) => option.path === path);
+              if (!queryName || !selected) return;
+              onChange(bindingExpression(`queries.${queryName}.${selected.path}`, selected.wrap));
+            }}
+            value=""
+            disabled={queryNames.length === 0}
+          >
+            <option value="">
+              {queryNames.length === 0 ? 'No queries yet' : 'Bind from query...'}
+            </option>
+            {queryNames.flatMap((queryName) =>
+              queryPathOptions.map((option) => (
+                <option key={`${queryName}-${option.path}`} value={`${queryName}|${option.path}`}>
+                  {queryName} {'->'} {option.label}
+                </option>
+              )),
+            )}
+          </select>
+        </div>
+
+        {includeComponents && bindableComponents.length > 0 && (
+          <div className="mini-editor-row">
+            <select
+              className="form-select"
+              aria-label="Component state"
+              onChange={(e) => {
+                const [componentId, field] = e.target.value.split('|');
+                if (!componentId || !field) return;
+                onChange(bindingExpression(`componentState.${componentId}.${field}`));
+              }}
+              value=""
+            >
+              <option value="">Bind from component state...</option>
+              {bindableComponents.flatMap((component) => {
+                const fields = STATE_FIELDS_BY_TYPE[component.type] ?? COMMON_STATE_FIELDS;
+                return fields.map((field) => (
+                  <option key={`${component.id}-${field}`} value={`${component.id}|${field}`}>
+                    {component.label || component.id} {'->'} {field}
+                  </option>
+                ));
+              })}
+            </select>
+          </div>
+        )}
+
+        <input
+          type="text"
+          className="form-input"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Advanced binding, e.g. {{queries.getData.data}}"
+        />
+        {value.trim() && (
+          <p className="endpoint-picker-hint">
+            Preview: <code>{formatBindingPreview(resolve(value))}</code>
+          </p>
+        )}
+      </div>
+    </FormField>
+  );
+}
+
+function FileUploadSettings({
+  data,
+  onChange,
+}: {
+  data: ComponentData;
+  onChange: (key: keyof ComponentData, value: unknown) => void;
+}) {
+  const [resources, setResources] = useState<ResourceListItem[]>([]);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const restResources = useMemo(
+    () => resources.filter((resource) => resource.type === 'REST'),
+    [resources],
+  );
+  const selectedResource = resources.find((r) => r.id === (data as any).resourceId);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE}/api/resources`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((payload: ResourceListItem[]) => {
+        if (!cancelled) setResources(Array.isArray(payload) ? payload : []);
+      })
+      .catch(() => { if (!cancelled) setResources([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if ((data as any).resourceId || restResources.length !== 1) return;
+    onChange('resourceId' as keyof ComponentData, restResources[0].id);
+    onChange('resourceName' as keyof ComponentData, restResources[0].name);
+  }, [data, onChange, restResources]);
+
+  return (
+    <>
+      <div className="panel-section-divider">File Upload</div>
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          padding: 12,
+          border: '1px solid var(--border, #e3e6ec)',
+          borderRadius: 8,
+          background: 'var(--surface-muted, #f8f9fb)',
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <strong style={{ fontSize: 12, color: 'var(--text-primary, #0f1117)' }}>Simple setup</strong>
+          <span style={{ fontSize: 11, color: 'var(--text-muted, #5c6370)' }}>
+            {selectedResource && (data as any).endpointPath ? 'Ready' : 'Pick API + endpoint'}
+          </span>
+        </div>
+        <p className="endpoint-picker-hint" style={{ margin: 0 }}>
+          Choose where files should be sent. Defaults handle documents, multiple files, and the form field name.
+        </p>
+      </div>
+
+      <FormField label="Resource">
+        <select
+          className="form-select"
+          value={String((data as any).resourceId ?? '')}
+          onChange={(e) => {
+            const resource = resources.find((r) => r.id === e.target.value);
+            onChange('resourceId' as keyof ComponentData, resource?.id ?? '');
+            onChange('resourceName' as keyof ComponentData, resource?.name ?? '');
+          }}
+        >
+          <option value="">Pick upload resource...</option>
+          {restResources.map((resource) => (
+            <option key={resource.id} value={resource.id}>{resource.name}</option>
+          ))}
+        </select>
+      </FormField>
+
+      <FormField label="Upload endpoint">
+        <EndpointPicker
+          resourceId={String((data as any).resourceId || '') || null}
+          selectedMethod="POST"
+          selectedPath={String((data as any).endpointPath ?? '')}
+          onChange={(next) => onChange('endpointPath' as keyof ComponentData, next.path)}
+        />
+      </FormField>
+
+      <button
+        type="button"
+        className="mini-editor-add"
+        onClick={() => setAdvancedOpen((open) => !open)}
+      >
+        {advancedOpen ? 'Hide advanced upload options' : 'Show advanced upload options'}
+      </button>
+
+      {advancedOpen && (
+        <>
+          <TextField
+            label="Form field name"
+            value={String((data as any).fieldName ?? 'file')}
+            onChange={(value) => onChange('fieldName' as keyof ComponentData, value)}
+            placeholder="file"
+          />
+
+          <TextField
+            label="Accepted file types"
+            value={String((data as any).accept ?? '.xlsx,.xls,.csv,.pdf,.docx,.txt')}
+            onChange={(value) => onChange('accept' as keyof ComponentData, value)}
+            placeholder=".pdf,.docx,.txt"
+          />
+
+          <BooleanField
+            label="Allow multiple files"
+            value={((data as any).multiple as boolean | undefined) ?? true}
+            onChange={(value) => onChange('multiple' as keyof ComponentData, value)}
+          />
+
+          <FormField label="Progress endpoint">
+            <EndpointPicker
+              resourceId={String((data as any).resourceId || '') || null}
+              selectedMethod="GET"
+              selectedPath={String((data as any).progressEndpoint ?? '')}
+              onChange={(next) => onChange('progressEndpoint' as keyof ComponentData, next.path)}
+            />
+            <p className="endpoint-picker-hint">
+              Use <code>{'{session_id}'}</code> or <code>{'{sessionId}'}</code> where the uploaded session id belongs.
+            </p>
+          </FormField>
+
+          <TextField
+            label="Direct upload URL"
+            value={String((data as any).uploadUrl ?? '')}
+            onChange={(value) => onChange('uploadUrl' as keyof ComponentData, value)}
+            placeholder="Leave empty to use this app's upload proxy"
+          />
+        </>
+      )}
+
+      {selectedResource && (
+        <p className="endpoint-picker-hint">
+          Uploads will be proxied to <code>{selectedResource.name}</code>.
+        </p>
+      )}
+    </>
+  );
+}
+
 export default function DataTab() {
   const lastSelectedComponentId = useEditorStore((s) => s.lastSelectedComponentId);
   const components = useEditorStore((s) => s.components);
@@ -414,45 +725,56 @@ export default function DataTab() {
 
       <FormField label="Visible for roles">{renderRoleCheckboxes}</FormField>
 
-      <FormField label="Mock Value">
-        {isTable || isChart ? (
-          <textarea
-            className="form-textarea"
-            value={mockValueDisplay}
-            onChange={(e) => handleMockValueChange(e.target.value)}
-            placeholder="JSON array"
-            rows={5}
+      {type === 'FileUpload' && (
+        <FileUploadSettings
+          data={data}
+          onChange={(key, value) => handleDataField(key, value)}
+        />
+      )}
+
+      {type !== 'FileUpload' && (
+        <>
+          <FormField label="Mock Value">
+            {isTable || isChart ? (
+              <textarea
+                className="form-textarea"
+                value={mockValueDisplay}
+                onChange={(e) => handleMockValueChange(e.target.value)}
+                placeholder="JSON array"
+                rows={5}
+              />
+            ) : (
+              <input
+                type="text"
+                className="form-input"
+                value={mockValueDisplay}
+                onChange={(e) => handleMockValueChange(e.target.value)}
+                placeholder="Display value"
+              />
+            )}
+          </FormField>
+
+          <BindingPicker
+            label="Data binding"
+            value={String(data.dbBinding ?? '')}
+            onChange={(value) => handleDataField('dbBinding', value)}
           />
-        ) : (
-          <input
-            type="text"
-            className="form-input"
-            value={mockValueDisplay}
-            onChange={(e) => handleMockValueChange(e.target.value)}
-            placeholder="Display value"
+
+          <QueryBindingSection
+            componentId={selectedComponent.id}
+            binding={(data.queryBindingConfig as QueryBinding) ?? {}}
+            onChange={(next) => handleDataField('queryBindingConfig' as keyof ComponentData, next)}
+            componentType={type}
           />
-        )}
-      </FormField>
 
-      <TextField
-        label="DB Field Binding"
-        value={String(data.dbBinding ?? '')}
-        onChange={(value) => handleDataField('dbBinding', value)}
-        placeholder="e.g. {{queries.getData.data}}"
-      />
-
-      <QueryBindingSection
-        componentId={selectedComponent.id}
-        binding={(data.queryBindingConfig as QueryBinding) ?? {}}
-        onChange={(next) => handleDataField('queryBindingConfig' as keyof ComponentData, next)}
-      />
-
-      <SelectField
-        label="Refresh Trigger"
-        value={data.refreshOn || 'manual'}
-        onChange={(value) => handleDataField('refreshOn', value)}
-        options={['manual', 'onLoad', 'onRowSelect']}
-      />
+          <SelectField
+            label="Refresh Trigger"
+            value={data.refreshOn || 'manual'}
+            onChange={(value) => handleDataField('refreshOn', value)}
+            options={['manual', 'onLoad', 'onRowSelect']}
+          />
+        </>
+      )}
 
       {type === 'StatCard' && (
         <>
@@ -1072,7 +1394,12 @@ export default function DataTab() {
           />
           {data.optionsSource === 'From query' ? (
             <>
-              <TextField label="Query name" value={data.queryBinding ?? ''} onChange={(value) => handleDataField('queryBinding', value)} />
+              <BindingPicker
+                label="Options data"
+                value={String(data.dbBinding ?? '')}
+                onChange={(value) => handleDataField('dbBinding', value)}
+                includeComponents={false}
+              />
               <TextField label="Label field" value={data.labelField ?? 'label'} onChange={(value) => handleDataField('labelField', value)} />
               <TextField label="Value field" value={data.valueField ?? 'value'} onChange={(value) => handleDataField('valueField', value)} />
             </>
@@ -1136,7 +1463,13 @@ export default function DataTab() {
 
       {type === 'Button' && (
         <>
-          <TextField label="Target Query (onClick)" value={String(data.dbBinding ?? '')} onChange={(value) => handleDataField('dbBinding', value)} />
+          <BindingPicker
+            label="Target query"
+            value={String(data.dbBinding ?? '')}
+            onChange={(value) => handleDataField('dbBinding', value)}
+            queryPathOptions={BUTTON_QUERY_BINDING_PATHS}
+            includeComponents={false}
+          />
           <TextField label="Disabled when" value={data.disabled ?? 'false'} onChange={(value) => handleDataField('disabled', value)} />
           <BooleanField label="Show loading state" value={data.loadingState === true} onChange={(value) => handleDataField('loadingState', value)} />
           <BooleanField

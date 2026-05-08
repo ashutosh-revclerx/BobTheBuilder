@@ -3,13 +3,13 @@ import type { TemplateConfig } from '../types/template';
 // Hardcoded to the user's known resource name. The backend looks up resources
 // by name in the resources table, so as long as the imported resource is
 // named exactly this string, no UUID juggling is needed.
-const RESOURCE = 'Centralized Data Layer Backend';
+const RESOURCE = 'smallpipeline';
 
 const smallDatasetPipeline: TemplateConfig = {
   id: 'small-dataset-pipeline',
   name: 'Small Dataset Pipeline',
   description:
-    'Upload Excel/CSV/PDF docs → automatic cleaning + relationship detection → node-graph viz + RAG chat. Fully wired to "Centralized Data Layer Backend".',
+    'Upload Excel/CSV/PDF docs → automatic cleaning + relationship detection → node-graph viz + RAG chat. Fully wired to "smallpipeline".',
   components: [
     // ─── Header ─────────────────────────────────────────────────────────
     {
@@ -313,16 +313,16 @@ const smallDatasetPipeline: TemplateConfig = {
       data: {
         searchable: true,
         pagination: true,
-        columns: [
+      columns: [
           { name: 'Table ID',     fieldKey: 'table_id' },
-          { name: 'Name',         fieldKey: 'name' },
+          { name: 'Name',         fieldKey: 'table_name' },
           { name: 'Source File',  fieldKey: 'source_file' },
           { name: 'Rows',         fieldKey: 'row_count' },
           { name: 'Columns',      fieldKey: 'column_count' },
         ],
         dbBinding: '{{queries.get-tables.data}}',
         mockValue: [],
-        columnVisibility: { table_id: true, name: true, source_file: true, row_count: true, column_count: true },
+        columnVisibility: { table_id: true, table_name: true, source_file: true, row_count: true, column_count: true },
       },
     },
   ],
@@ -341,6 +341,7 @@ const smallDatasetPipeline: TemplateConfig = {
       endpoint: '/api/v1/pipelines/small-dataset/tables/{{componentState.upload-zone.sessionId}}',
       method: 'GET',
       trigger: 'onDependencyChange',
+      responseTransformer: 'return Array.isArray(data) ? data : (data?.tables ?? []);',
       dependsOn: [
         'componentState.upload-zone.sessionId',
         'componentState.upload-zone.cleaningComplete',
@@ -352,6 +353,8 @@ const smallDatasetPipeline: TemplateConfig = {
       endpoint: '/api/v1/pipelines/small-dataset/relationships/{{componentState.upload-zone.sessionId}}/detect',
       method: 'POST',
       trigger: 'onDependencyChange',
+      params: { force: true },
+      responseTransformer: 'return Array.isArray(data) ? data : (data?.relationships ?? data?.edges ?? []);',
       dependsOn: [
         'componentState.upload-zone.cleaningComplete',
       ],
@@ -362,6 +365,7 @@ const smallDatasetPipeline: TemplateConfig = {
       endpoint: '/api/v1/pipelines/small-dataset/relationships/{{componentState.upload-zone.sessionId}}',
       method: 'GET',
       trigger: 'onDependencyChange',
+      responseTransformer: 'return Array.isArray(data) ? data : (data?.relationships ?? data?.edges ?? []);',
       dependsOn: [
         'componentState.upload-zone.sessionId',
         'queries.detect-relationships.data',
@@ -373,6 +377,7 @@ const smallDatasetPipeline: TemplateConfig = {
       endpoint: '/api/v1/pipelines/small-dataset/chat/{{componentState.upload-zone.sessionId}}/history',
       method: 'GET',
       trigger: 'onDependencyChange',
+      responseTransformer: 'return Array.isArray(data) ? data : (data?.messages ?? data?.history ?? []);',
       dependsOn: [
         'componentState.upload-zone.sessionId',
         'queries.ask-rag.data',

@@ -211,6 +211,15 @@ export interface ComponentData {
   uploadedSrc?:   string;  // base64 data URL when user uploads from disk
   alt?:           string;
   fit?:           'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
+
+  // FileUpload component
+  accept?:           string;
+  multiple?:         boolean;
+  uploadUrl?:        string;
+  resourceId?:       string;
+  resourceName?:     string;
+  endpointPath?:     string;
+  progressEndpoint?: string;
 }
 
 export type ComponentType =

@@ -213,6 +213,92 @@ router.post('/import-swagger', async (req, res) => {
   }
 });
 
+// ─── GET /api/resources/:id/schema ──────────────────────────────────────────
+// Returns database schema (tables and columns) for PostgreSQL resources.
+
+router.get('/:id/schema', async (req, res) => {
+  try {
+    const { rows: resourceRows } = await pool.query<ResourceRow>(
+      `SELECT ${SAFE_COLS} FROM resources WHERE id = $1`,
+      [req.params.id],
+    );
+    if (resourceRows.length === 0) {
+      return res.status(404).json({ error: 'Resource not found' });
+    }
+    const resource = resourceRows[0];
+
+    // Only PostgreSQL resources have a schema
+    if (resource.type !== 'postgresql') {
+      return res.status(400).json({ error: 'Schema introspection only supports PostgreSQL' });
+    }
+
+    // Fetch all tables in public schema
+    const { rows: tableRows } = await pool.query<{ table_name: string }>(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+       ORDER BY table_name ASC`,
+    );
+
+    // For each table, fetch its columns
+    const tables = await Promise.all(
+      tableRows.map(async (t) => {
+        const { rows: colRows } = await pool.query<{ column_name: string; data_type: string }>(
+          `SELECT column_name, data_type FROM information_schema.columns
+           WHERE table_name = $1 AND table_schema = 'public'
+           ORDER BY ordinal_position ASC`,
+          [t.table_name],
+        );
+        return {
+          name: t.table_name,
+          columns: colRows.map((c) => ({
+            name: c.column_name,
+            type: c.data_type,
+          })),
+        };
+      }),
+    );
+
+    return res.json({ tables });
+  } catch (err) {
+    console.error('[resources] schema:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── POST /api/resources/:id/preview ─────────────────────────────────────────
+// Runs a SQL query and returns first 5 rows for preview purposes.
+
+router.post('/:id/preview', async (req, res) => {
+  try {
+    const { rows: resourceRows } = await pool.query<ResourceRow>(
+      `SELECT ${SAFE_COLS} FROM resources WHERE id = $1`,
+      [req.params.id],
+    );
+    if (resourceRows.length === 0) {
+      return res.status(404).json({ error: 'Resource not found' });
+    }
+
+    const { sql, params } = req.body as { sql: string; params: unknown[] };
+    if (!sql) {
+      return res.status(400).json({ error: 'sql is required' });
+    }
+
+    // Run query in read-only transaction, capped at 5 rows
+    const result = await pool.query(
+      sql + ' LIMIT 5',
+      params || [],
+    );
+
+    return res.json({ rows: result.rows });
+  } catch (err: any) {
+    console.error('[resources] preview:', err);
+    return res.status(400).json({
+      error: 'Query failed',
+      details: err.message,
+    });
+  }
+});
+
 // ─── GET /api/resources/:id/endpoints ────────────────────────────────────────
 // Also declared before /:id so the more specific route wins.
 
