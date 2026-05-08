@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { resolve } from '../../engine/bindingResolver';
 import EndpointPicker from '../ui/EndpointPicker';
+import DBQueryBuilder from './DBQueryBuilder';
 import type {
   ComponentData,
+  ComponentType,
   SelectOptionItem,
   TableColumn,
   TableConditionalRowColorRule,
@@ -59,10 +61,12 @@ function QueryBindingSection({
   componentId,
   binding,
   onChange,
+  componentType,
 }: {
   componentId: string;
   binding: QueryBinding;
   onChange: (next: QueryBinding) => void;
+  componentType?: ComponentType;
 }) {
   const [resources, setResources] = useState<ResourceListItem[]>([]);
   const upsertQuery = useEditorStore((s) => s.upsertQuery);
@@ -82,6 +86,16 @@ function QueryBindingSection({
   // Stable per-component query name. We use the component id so reopening the
   // editor wires the same component back to the same query record.
   const queryName = binding.queryName ?? `${componentId}_query`;
+
+  // Auto-binding logic based on component type
+  function getSmartAutoBinding(componentType?: ComponentType): string {
+    // For buttons, use trigger (manual execution)
+    if (componentType === 'Button') {
+      return `{{queries.${queryName}.trigger}}`;
+    }
+    // For all data-display components, bind to query data
+    return `{{queries.${queryName}.data}}`;
+  }
 
   const syncQuery = (next: QueryBinding) => {
     onChange(next);
@@ -103,12 +117,11 @@ function QueryBindingSection({
       dependsOn,
     });
 
-    // Auto-bind the component so it reads from the query result. For Buttons
-    // we use the trigger path so onClick fires the query.
-    const bindingPath = trigger === 'manual'
-      ? `{{queries.${queryName}.trigger}}`
-      : `{{queries.${queryName}.data}}`;
-    updateData(componentId, { dbBinding: bindingPath } as Partial<ComponentData>);
+    // Smart auto-bind based on component type
+    const bindingPath = getSmartAutoBinding(componentType);
+    const autoBindData: Partial<ComponentData> = { dbBinding: bindingPath };
+
+    updateData(componentId, autoBindData);
   };
 
   const selectedResource = resources.find((r) => r.id === binding.resourceId);
@@ -133,16 +146,11 @@ function QueryBindingSection({
       </select>
 
       {selectedResource?.type === 'postgresql' ? (
-        <div className="form-group" style={{ marginTop: '8px' }}>
-          <label className="form-label" style={{ fontSize: '10px', opacity: 0.7 }}>SQL Query</label>
-          <textarea
-            className="form-textarea"
-            style={{ fontFamily: 'monospace', minHeight: '80px' }}
-            placeholder="SELECT * FROM users WHERE id = {{components.input1.value}}"
-            value={binding.path ?? ''}
-            onChange={(e) => syncQuery({ ...binding, method: 'POST', path: e.target.value, queryName })}
-          />
-        </div>
+        <DBQueryBuilder
+          resourceId={binding.resourceId ?? ''}
+          value={binding}
+          onChange={(next) => syncQuery({ ...binding, ...next, queryName })}
+        />
       ) : (
         <EndpointPicker
           resourceId={binding.resourceId ?? null}
@@ -756,6 +764,7 @@ export default function DataTab() {
             componentId={selectedComponent.id}
             binding={(data.queryBindingConfig as QueryBinding) ?? {}}
             onChange={(next) => handleDataField('queryBindingConfig' as keyof ComponentData, next)}
+            componentType={type}
           />
 
           <SelectField
