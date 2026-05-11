@@ -27,6 +27,9 @@ import numberInputSource from '../components/dashboard-components/NumberInput.ts
 import selectSource from '../components/dashboard-components/Select.tsx?raw';
 import imageSource from '../components/dashboard-components/Image.tsx?raw';
 import embedSource from '../components/dashboard-components/Embed.tsx?raw';
+import nodeGraphSource from '../components/dashboard-components/NodeGraph.tsx?raw';
+import chatBoxSource from '../components/dashboard-components/ChatBox.tsx?raw';
+import fileUploadSource from '../components/dashboard-components/FileUpload.tsx?raw';
 
 const DATA_URL_PATTERN = /^data:([^;,]+);base64,(.+)$/;
 
@@ -124,6 +127,9 @@ const sourceRuntimeFiles: Record<string, string> = {
   'src/components/dashboard-components/Select.tsx': selectSource,
   'src/components/dashboard-components/Image.tsx': imageSource,
   'src/components/dashboard-components/Embed.tsx': embedSource,
+  'src/components/dashboard-components/NodeGraph.tsx': nodeGraphSource,
+  'src/components/dashboard-components/ChatBox.tsx': chatBoxSource,
+  'src/components/dashboard-components/FileUpload.tsx': fileUploadSource,
 };
 
 // Use shared deepClone utility instead of local definition
@@ -195,14 +201,17 @@ export const downloadAsCode = async (dashboardState: any) => {
     dashboardState.components || [],
   );
   const queriesConfig = dashboardState.queriesConfig || [];
+  const componentState = dashboardState.componentState || {};
 
   // Export includes all required fields for lossless round-trip:
-  // queries (required for bindings), canvasStyle (visual fidelity), and status metadata
+  // queries (required for bindings), canvasStyle (visual fidelity), componentState (runtime config),
+  // and status metadata
   const dashboardConfig = {
     name: dashboardName,
     components: exportedComponents,
     queries: queriesConfig,
     canvasStyle: dashboardState.canvasStyle || { backgroundColor: '#f3f4f6' },
+    componentState: componentState,
     status: dashboardState.status || 'draft',
     publishedAt: dashboardState.publishedAt || null,
   };

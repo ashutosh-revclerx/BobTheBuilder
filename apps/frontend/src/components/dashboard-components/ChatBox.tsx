@@ -24,30 +24,48 @@ const SEED_GREETING: ChatMessage = {
   ts: Date.now(),
 };
 
-// Probe a payload for the actual answer text. Walks one level deep so we
-// handle BOTH flat shapes ({ answer: "..." }) AND nested wrappers
-// ({ data: { answer: "..." } }, { result: { reply: "..." } }) without
-// configuration. Falls back to JSON dump so the user can ALWAYS see what
-// the API returned and tell us what key to use.
+// Probe a payload for the actual answer text. Handles streaming responses,
+// flat shapes ({ answer: "..." }), and nested wrappers.
 function extractAnswer(payload: unknown): string {
   if (payload == null) return 'No response.';
   if (typeof payload === 'string') return payload;
   if (typeof payload !== 'object') return String(payload);
 
+  // Handle streaming format with type: "chunk"
+  if (Array.isArray(payload)) {
+    const chunks = (payload as Array<Record<string, unknown>>)
+      .filter((item) => item?.type === 'chunk' && typeof item?.content === 'string')
+      .map((item) => item.content);
+    if (chunks.length > 0) {
+      return chunks.join('').trim();
+    }
+  }
+
+  const obj = payload as Record<string, unknown>;
+
+  // Handle single streaming chunk
+  if (obj.type === 'chunk' && typeof obj.content === 'string') {
+    return obj.content.trim();
+  }
+
+  // Skip metadata-only responses
+  if (obj.type === 'metadata' && !obj.result && !obj.content) {
+    return '';
+  }
+
   const KEYS = [
-    'answer', 'response', 'reply', 'text', 'message', 'content',
-    'output', 'completion', 'result', 'data',
+    'answer', 'response', 'reply', 'text', 'message', 'content', 'result',
+    'output', 'completion', 'data',
   ];
 
-  const tryRead = (obj: Record<string, unknown>): string | null => {
+  const tryRead = (candidate: Record<string, unknown>): string | null => {
     for (const k of KEYS) {
-      const v = obj[k];
+      const v = candidate[k];
       if (typeof v === 'string' && v.trim()) return v;
     }
     return null;
   };
 
-  const obj = payload as Record<string, unknown>;
   const direct = tryRead(obj);
   if (direct) return direct;
 
@@ -60,7 +78,7 @@ function extractAnswer(payload: unknown): string {
     }
   }
 
-  // Last resort: show the raw payload so user can identify the right field.
+  // Last resort: show raw payload for debugging
   try {
     return JSON.stringify(payload, null, 2);
   } catch {

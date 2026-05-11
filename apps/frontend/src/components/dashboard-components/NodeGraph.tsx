@@ -4,6 +4,8 @@ import {
   Background,
   Controls,
   MiniMap,
+  Handle,
+  Position,
   applyNodeChanges,
   type Node,
   type Edge,
@@ -15,6 +17,54 @@ import type { ComponentConfig } from '../../types/template';
 import { parseQueryName } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
 import { resolveBackground } from '../../utils/styleUtils';
+
+// Custom node component that renders handles for multiple edges
+function MultiHandleNode({ data }: any) {
+  const handleCount = data.handleCount || 1;
+  const handles = Array.from({ length: handleCount }, (_, i) => i);
+
+  return (
+    <div
+      style={{
+        background: data.nodeType === 'column' ? '#6366f1' : '#0ea5e9',
+        color: '#ffffff',
+        border: `2px solid ${data.borderColor || '#22d3ee'}`,
+        borderRadius: 10,
+        padding: '10px 14px',
+        fontSize: 13,
+        fontWeight: 600,
+        minWidth: 130,
+        textAlign: 'center',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+        position: 'relative',
+      }}
+    >
+      {handles.map((i) => (
+        <Handle
+          key={`handle-${i}`}
+          type="target"
+          position={handleCount === 1 ? Position.Left : i % 2 === 0 ? Position.Left : Position.Right}
+          id={`handle-${i}`}
+          style={{
+            top: `${((i + 1) / (handleCount + 1)) * 100}%`,
+          }}
+        />
+      ))}
+      {handles.map((i) => (
+        <Handle
+          key={`handle-out-${i}`}
+          type="source"
+          position={handleCount === 1 ? Position.Right : i % 2 === 0 ? Position.Right : Position.Left}
+          id={`handle-out-${i}`}
+          style={{
+            top: `${((i + 1) / (handleCount + 1)) * 100}%`,
+          }}
+        />
+      ))}
+      {data.label}
+    </div>
+  );
+}
 
 interface NodeGraphProps {
   config: ComponentConfig;
@@ -280,30 +330,33 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
     const positions = autoLayout(rawNodes);
     const savedPositions = componentState[config.id]?.nodePositions as Record<string, { x: number; y: number }> | undefined;
 
+    // Count how many edges connect to each node to determine handle count
+    const edgeCountPerNode = new Map<string, number>();
+    rawEdges.forEach((edge) => {
+      edgeCountPerNode.set(edge.source, (edgeCountPerNode.get(edge.source) || 0) + 1);
+      edgeCountPerNode.set(edge.target, (edgeCountPerNode.get(edge.target) || 0) + 1);
+    });
+
     return rawNodes.map((node) => {
       const position = savedPositions?.[node.id] ?? positions.get(node.id) ?? { x: 0, y: 0 };
       const nodeType = String(node.type ?? 'table');
+      const handleCount = edgeCountPerNode.get(node.id) || 1;
+
       return {
         id: node.id,
         position,
-        data: { label: node.label ?? node.id, source: node },
-        draggable: true,
-        style: {
-          background: nodeType === 'column' ? '#6366f1' : '#0ea5e9',
-          color: '#ffffff',
-          border: `2px solid ${style.borderColor || '#22d3ee'}`,
-          borderRadius: 10,
-          padding: '10px 14px',
-          fontSize: 13,
-          fontWeight: 600,
-          minWidth: 130,
-          textAlign: 'center' as const,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-          cursor: 'grab',
+        type: 'multiHandle',
+        data: {
+          label: node.label ?? node.id,
+          source: node,
+          nodeType,
+          borderColor: style.borderColor || '#22d3ee',
+          handleCount: Math.max(1, handleCount),
         },
+        draggable: true,
       };
     });
-  }, [componentState, config.id, rawNodes, style.borderColor]);
+  }, [componentState, config.id, rawNodes, style.borderColor, rawEdges]);
 
   const [nodes, setNodes] = useState<Node[]>(computedNodes);
 
@@ -324,22 +377,59 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
     setComponentState(config.id, 'selectedNode', node.data);
   }, [config.id, setComponentState]);
 
+  const nodeTypes = useMemo(() => ({
+    multiHandle: MultiHandleNode,
+  }), []);
+
   const edges = useMemo<Edge[]>(
-    () =>
-      rawEdges.map((edge, index) => {
+    () => {
+      // Count edges between each pair of nodes
+      const edgeCounts = new Map<string, RawEdge[]>();
+      rawEdges.forEach((edge) => {
+        const key = `${edge.source}|${edge.target}`;
+        const existing = edgeCounts.get(key) || [];
+        edgeCounts.set(key, [...existing, edge]);
+      });
+
+      return rawEdges.map((edge, index) => {
         const stroke = edgeColor(edge, style.borderColor || '#22d3ee');
         const weak = String(edge.strength ?? '').toLowerCase().includes('weak');
+        const key = `${edge.source}|${edge.target}`;
+        const edgesForPair = edgeCounts.get(key) || [];
+        const edgeIndex = edgesForPair.indexOf(edge);
+        const totalEdges = edgesForPair.length;
+
+        // For multiple edges between same nodes, use smoothstep to curve them
+        const edgeType = totalEdges > 1 ? 'smoothstep' : 'bezier';
+
         return {
           id: edge.id ?? `e-${edge.source}-${edge.target}-${index}`,
           source: edge.source,
           target: edge.target,
+          sourceHandle: `handle-out-${edgeIndex}`,
+          targetHandle: `handle-${edgeIndex}`,
           label: edge.label,
           animated: true,
+          type: edgeType,
+          markerEnd: { type: 'arrowclosed', color: stroke },
           style: { stroke, strokeWidth: 2, strokeDasharray: weak ? '6 4' : undefined },
-          labelStyle: { fill: style.textColor || '#e2e8f0', fontWeight: 600, fontSize: 11 },
-          labelBgStyle: { fill: '#0d1424', fillOpacity: 0.9 },
+          labelStyle: {
+            fill: style.textColor || '#e2e8f0',
+            fontWeight: 700,
+            fontSize: 12,
+            textAnchor: 'middle' as const,
+          },
+          labelBgStyle: {
+            fill: '#0d1424',
+            stroke: stroke,
+            strokeWidth: 1,
+            fillOpacity: 1,
+            rx: 4,
+            ry: 4,
+          },
         };
-      }),
+      });
+    },
     [rawEdges, style.borderColor, style.textColor],
   );
 
@@ -420,6 +510,7 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onNodeDragStop={onNodeDragStop}
         fitView
