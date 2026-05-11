@@ -365,7 +365,13 @@ const smallDatasetPipeline: TemplateConfig = {
       endpoint: '/api/v1/pipelines/small-dataset/relationships/{{componentState.upload-zone.sessionId}}',
       method: 'GET',
       trigger: 'onDependencyChange',
-      responseTransformer: 'return Array.isArray(data) ? data : (data?.relationships ?? data?.edges ?? []);',
+      responseTransformer: `
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.relationships)) return data.relationships;
+        if (Array.isArray(data?.edges)) return data.edges;
+        if (Array.isArray(data?.data)) return data.data;
+        return [];
+      `,
       dependsOn: [
         'componentState.upload-zone.sessionId',
         'queries.detect-relationships.data',

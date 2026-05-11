@@ -161,14 +161,84 @@ function graphFromRelationshipArray(rels: unknown[]): GraphPayload | null {
     nodeIds.add(edge.target);
   });
 
+  // Heuristic: if a target ID has no file extension and looks like a column name
+  // (snake_case/camelCase, no spaces), mark it as a column node so the bridge
+  // normalizer can convert it to an edge label later.
+  const hasFileExt = (id: string) => /\.(xlsx|xls|csv|pdf|docx|txt|json)$/i.test(id);
+  const looksLikeColumn = (id: string) => !hasFileExt(id) && /^[a-z_][a-z0-9_]*$/i.test(id);
+  const sourceIds = new Set(rawEdges.map(e => e.source));
+
   return {
-    rawNodes: Array.from(nodeIds).map((id) => ({ id, label: id, type: 'table' })),
+    rawNodes: Array.from(nodeIds).map((id) => ({
+      id,
+      label: id,
+      type: !sourceIds.has(id) && looksLikeColumn(id) ? 'column' : 'table',
+    })),
     rawEdges,
   };
 }
 
+// Convert column-bridge nodes (table A → column ← table B) to direct
+// table-to-table edges with the column name as a label.
+// Column nodes with only one connected table (orphans) are dropped since
+// no meaningful cross-table edge can be inferred.
+function normalizeColumnNodes(graph: GraphPayload): GraphPayload {
+  const columnNodeIds = new Set(
+    graph.rawNodes
+      .filter(n => String(n.type ?? '').toLowerCase() === 'column')
+      .map(n => n.id),
+  );
+  if (columnNodeIds.size === 0) return graph;
+
+  // Collect all tables connected to each column node (from either direction)
+  const colToTables = new Map<string, string[]>();
+  graph.rawEdges.forEach(edge => {
+    if (columnNodeIds.has(edge.target) && !columnNodeIds.has(edge.source)) {
+      const list = colToTables.get(edge.target) ?? [];
+      list.push(edge.source);
+      colToTables.set(edge.target, list);
+    }
+    if (columnNodeIds.has(edge.source) && !columnNodeIds.has(edge.target)) {
+      const list = colToTables.get(edge.source) ?? [];
+      list.push(edge.target);
+      colToTables.set(edge.source, list);
+    }
+  });
+
+  // For column nodes shared by 2+ tables, build direct table-to-table edges
+  const pairLabels = new Map<string, string[]>();
+  colToTables.forEach((tables, colId) => {
+    const unique = [...new Set(tables)];
+    if (unique.length < 2) return;
+    for (let i = 0; i < unique.length; i++) {
+      for (let j = i + 1; j < unique.length; j++) {
+        const key = `${unique[i]}|${unique[j]}`;
+        const existing = pairLabels.get(key) ?? [];
+        existing.push(colId);
+        pairLabels.set(key, existing);
+      }
+    }
+  });
+
+  const bridgeEdges: RawEdge[] = [];
+  pairLabels.forEach((labels, key) => {
+    const [src, tgt] = key.split('|');
+    bridgeEdges.push({ id: `bridge-${src}-${tgt}`, source: src, target: tgt, label: labels.join(', ') });
+  });
+
+  const tableNodes = graph.rawNodes.filter(n => !columnNodeIds.has(n.id));
+  const tableEdges = graph.rawEdges.filter(e => !columnNodeIds.has(e.source) && !columnNodeIds.has(e.target));
+
+  return {
+    rawNodes: tableNodes,
+    rawEdges: [...tableEdges, ...bridgeEdges],
+  };
+}
+
 function extractGraphData(payload: unknown): GraphPayload | null {
-  if (Array.isArray(payload)) return graphFromRelationshipArray(payload);
+  const normalize = (g: GraphPayload | null) => (g ? normalizeColumnNodes(g) : null);
+
+  if (Array.isArray(payload)) return normalize(graphFromRelationshipArray(payload));
   if (payload == null || typeof payload !== 'object') return null;
 
   const GRAPH_NODE_KEYS = ['nodes', 'vertices', 'items'] as const;
@@ -181,7 +251,7 @@ function extractGraphData(payload: unknown): GraphPayload | null {
         const nodes = candidate[nodeKey];
         const edges = candidate[edgeKey];
         if (Array.isArray(nodes) && Array.isArray(edges)) {
-          return { rawNodes: nodes as RawNode[], rawEdges: edges as RawEdge[] };
+          return normalizeColumnNodes({ rawNodes: nodes as RawNode[], rawEdges: edges as RawEdge[] });
         }
       }
     }
@@ -191,11 +261,11 @@ function extractGraphData(payload: unknown): GraphPayload | null {
   const direct = tryRead(obj);
   if (direct) return direct;
 
-  if (Array.isArray(obj.relationships)) return graphFromRelationshipArray(obj.relationships);
+  if (Array.isArray(obj.relationships)) return normalize(graphFromRelationshipArray(obj.relationships));
 
   for (const wrapper of ['data', 'result', 'response', 'output']) {
     const inner = obj[wrapper];
-    if (Array.isArray(inner)) return graphFromRelationshipArray(inner);
+    if (Array.isArray(inner)) return normalize(graphFromRelationshipArray(inner));
     if (inner && typeof inner === 'object') {
       const nested = extractGraphData(inner);
       if (nested) return nested;
@@ -268,7 +338,19 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
     rawEdges: RawEdge[];
     graphStatus: GraphStatus;
   }>(() => {
+    const queryName = parseQueryName(rawBinding) || parseQueryName(data.dbBinding);
+
     if (readOnly) {
+      // Prefer real query results over mockValue even in read-only/preview mode
+      if (queryName) {
+        const result = queryResults[queryName];
+        if (result?.status === 'success') {
+          const graph = extractGraphData(result.data);
+          if (graph && graph.rawNodes.length > 0) {
+            return { ...graph, graphStatus: 'loaded' };
+          }
+        }
+      }
       const graph = extractGraphData(data.mockValue);
       if (graph) return { ...graph, graphStatus: 'readOnly' };
       return { rawNodes: FALLBACK_NODES, rawEdges: FALLBACK_EDGES, graphStatus: 'readOnly' };
@@ -278,7 +360,6 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
       (state) => state && typeof state === 'object' && 'sessionId' in state && state.sessionId,
     );
     const uploadedTableNodes = extractUploadedTables(componentState);
-    const queryName = parseQueryName(rawBinding) || parseQueryName(data.dbBinding);
 
     if (queryName) {
       const result = queryResults[queryName];
