@@ -4,7 +4,7 @@ import { pool } from '../db/client.js';
 
 const router = Router();
 
-const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL ?? 'http://localhost:8000';
+const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL ?? 'http://localhost:8001';
 const DEFAULT_LLM_TIMEOUT_MS = 180_000;
 
 function readPositiveIntEnv(name: string, fallback: number): number {

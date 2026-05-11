@@ -1,5 +1,20 @@
 # React + TypeScript + Vite
 
+## Local Ports And Auth
+
+- Frontend Vite dev server: `5143`
+- Node/Express API server: `3001`
+- Python LLM service: `8001`
+
+The frontend defaults to same-origin API calls at `/api/v1`. In local Vite dev,
+`apps/frontend/vite.config.ts` proxies `/api` to
+`VITE_DEV_API_PROXY_TARGET` or `http://127.0.0.1:3001`.
+
+For deployment, leave `VITE_API_BASE_URL` unset when the browser reaches the
+API through the frontend origin, and configure the frontend server/reverse
+proxy to forward `/api` to the Node backend on port `3001`. Only set
+`VITE_API_BASE_URL` when the browser can directly reach that API origin.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

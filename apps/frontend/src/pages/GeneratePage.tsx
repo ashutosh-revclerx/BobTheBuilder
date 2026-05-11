@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopNav from '../components/ui/TopNav';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL, apiFetch } from '../config/api';
 
 interface Resource {
   id:        string;
@@ -41,7 +41,7 @@ export default function GeneratePage() {
   const [error, setError]                   = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/resources`)
+    apiFetch(`${API_BASE_URL}/resources`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Resource[]) => setResources(Array.isArray(data) ? data : []))
       .catch(() => setResources([]));
@@ -70,7 +70,7 @@ export default function GeneratePage() {
         .map((u) => u.trim())
         .filter(Boolean);
 
-      const response = await fetch(`${API_BASE}/api/dashboards/generate`, {
+      const response = await apiFetch(`${API_BASE_URL}/dashboards/generate`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({

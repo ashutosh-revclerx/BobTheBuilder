@@ -11,7 +11,7 @@ import type {
   TableConditionalRowColorRule,
 } from '../../types/template';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL, apiFetch } from '../../config/api';
 
 interface ResourceListItem {
   id:   string;
@@ -74,7 +74,7 @@ function QueryBindingSection({
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/api/resources`)
+    apiFetch(`${API_BASE_URL}/resources`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data: ResourceListItem[]) => {
         if (!cancelled) setResources(Array.isArray(data) ? data : []);
@@ -772,7 +772,7 @@ function FileUploadSettings({
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/api/resources`)
+    apiFetch(`${API_BASE_URL}/resources`)
       .then((r) => (r.ok ? r.json() : []))
       .then((payload: ResourceListItem[]) => {
         if (!cancelled) setResources(Array.isArray(payload) ? payload : []);

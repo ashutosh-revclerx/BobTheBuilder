@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { hasAuthTokens } from './config/api';
 
 const DashboardList = lazy(() => import('./pages/DashboardList'));
 const TemplateGallery = lazy(() => import('./pages/TemplateGallery'));
@@ -8,6 +9,7 @@ const CustomerView = lazy(() => import('./pages/CustomerView'));
 const ResourcesPage = lazy(() => import('./pages/ResourcesPage'));
 const GeneratePage = lazy(() => import('./pages/GeneratePage'));
 const TemplatePicker = lazy(() => import('./pages/TemplatePicker'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
 
 function Loading() {
   return (
@@ -17,18 +19,29 @@ function Loading() {
   );
 }
 
+function ProtectedRoutes() {
+  const location = useLocation();
+  if (!hasAuthTokens()) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+  return <Outlet />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Suspense fallback={<Loading />}>
         <Routes>
-          <Route path="/" element={<DashboardList />} />
-          <Route path="/templates" element={<TemplateGallery />} />
-          <Route path="/builder/:id" element={<BuilderPage />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/c/:slug" element={<CustomerView />} />
-          <Route path="/resources" element={<ResourcesPage />} />
-          <Route path="/new" element={<GeneratePage />} />
-          <Route path="/new/pick" element={<TemplatePicker />} />
+          <Route element={<ProtectedRoutes />}>
+            <Route path="/" element={<DashboardList />} />
+            <Route path="/templates" element={<TemplateGallery />} />
+            <Route path="/builder/:id" element={<BuilderPage />} />
+            <Route path="/resources" element={<ResourcesPage />} />
+            <Route path="/new" element={<GeneratePage />} />
+            <Route path="/new/pick" element={<TemplatePicker />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

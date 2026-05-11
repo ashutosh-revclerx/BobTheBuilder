@@ -12,7 +12,7 @@ import { useKineticWidth } from '../hooks/useTextMeasure';
 import { exportProject, importProject } from '../services/ProjectService';
 import { downloadAsCode } from '../services/exportService';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL, apiFetch } from '../config/api';
 
 type ResetBaseline = {
   templateId: string;
@@ -114,7 +114,7 @@ export default function BuilderPage() {
   const fetchAssignedCustomers = async () => {
     if (!id || id === 'blank' || id.length < 10) return;
     try {
-      const res = await fetch(`${API_BASE}/api/dashboards/${id}/customers`);
+      const res = await apiFetch(`${API_BASE_URL}/dashboards/${id}/customers`);
       if (res.ok) {
         const data = await res.json();
         setAssignedCustomers(data);
@@ -186,7 +186,7 @@ export default function BuilderPage() {
       // 1. UUID → fetch from DB unconditionally.
       if (isUuid) {
         try {
-          const response = await fetch(`${API_BASE}/api/dashboards/${id}`);
+          const response = await apiFetch(`${API_BASE_URL}/dashboards/${id}`);
           if (!response.ok) {
             navigate('/');
             return;
@@ -291,7 +291,7 @@ export default function BuilderPage() {
 
     const state = useEditorStore.getState();
     try {
-      const response = await fetch(`${API_BASE}/api/dashboards/${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/dashboards/${id}`, {
         method:  'PUT',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
@@ -319,7 +319,7 @@ export default function BuilderPage() {
   const persistAsNewDashboard = async (): Promise<string | null> => {
     const state = useEditorStore.getState();
     try {
-      const response = await fetch(`${API_BASE}/api/dashboards`, {
+      const response = await apiFetch(`${API_BASE_URL}/dashboards`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({

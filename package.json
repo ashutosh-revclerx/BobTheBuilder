@@ -6,8 +6,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w @btb/backend\" \"npm run dev -w @btb/frontend\"",
-    "preview": "concurrently \"npm run dev -w @btb/backend\" \"npm run preview -w @btb/frontend\"",
+    "dev": "node scripts/run-workspaces.mjs dev",
+    "preview": "node scripts/run-workspaces.mjs preview",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"
   },

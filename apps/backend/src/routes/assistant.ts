@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 const router = Router();
 
-const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL ?? 'http://localhost:8000';
+const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL ?? 'http://localhost:8001';
 const DEFAULT_LLM_TIMEOUT_MS = 60_000; // chat is faster than generation; tighter cap
 
 function readPositiveIntEnv(name: string, fallback: number): number {

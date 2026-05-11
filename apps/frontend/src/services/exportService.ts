@@ -269,7 +269,7 @@ export const downloadAsCode = async (dashboardState: any) => {
   zip.file('index.html', indexHtml);
   zip.file('src/main.tsx', mainTsx);
   zip.file('src/index.css', `${sourceIndexCss}\n${exportedShellCss}`);
-  zip.file('.env.example', 'VITE_BACKEND_URL=http://localhost:3001/api/execute\n');
+  zip.file('.env.example', 'VITE_BACKEND_URL=/api/v1/execute\n');
   zip.file('README.md', `# Exported Dashboard: ${dashboardName}
 
 This project was exported from BobTheBuilder.

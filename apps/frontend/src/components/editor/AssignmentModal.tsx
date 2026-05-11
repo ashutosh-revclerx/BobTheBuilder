@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL, apiFetch } from '../../config/api';
 
 interface Customer {
   id: string;
@@ -38,8 +38,8 @@ export default function AssignmentModal({ dashboardId: propDashboardId, onClose,
       setLoading(true);
       try {
         const [custRes, assignRes] = await Promise.all([
-          fetch(`${API_BASE}/api/customers`),
-          fetch(`${API_BASE}/api/dashboards/${dashboardId}/customers`)
+          apiFetch(`${API_BASE_URL}/customers`),
+          apiFetch(`${API_BASE_URL}/dashboards/${dashboardId}/customers`)
         ]);
 
         const custData = await custRes.json();
@@ -69,7 +69,7 @@ export default function AssignmentModal({ dashboardId: propDashboardId, onClose,
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`${API_BASE}/api/dashboards/${dashboardId}/assign`, {
+      const response = await apiFetch(`${API_BASE_URL}/dashboards/${dashboardId}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customer_ids: Array.from(assignedCustomerIds) }),
@@ -92,7 +92,7 @@ export default function AssignmentModal({ dashboardId: propDashboardId, onClose,
     
     setIsCreatingLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/customers`, {
+      const res = await apiFetch(`${API_BASE_URL}/customers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName, slug: newSlug }),
@@ -127,7 +127,7 @@ export default function AssignmentModal({ dashboardId: propDashboardId, onClose,
   const handleTokenAction = async (customer: Customer, action: 'rotate' | 'clear') => {
     setTokenBusyId(customer.id);
     try {
-      const res = await fetch(`${API_BASE}/api/customers/${customer.id}/${action}-token`, {
+      const res = await apiFetch(`${API_BASE_URL}/customers/${customer.id}/${action}-token`, {
         method: 'POST',
       });
 
@@ -151,7 +151,7 @@ export default function AssignmentModal({ dashboardId: propDashboardId, onClose,
     
     setTokenBusyId(customer.id);
     try {
-      const res = await fetch(`${API_BASE}/api/customers/${customer.id}`, {
+      const res = await apiFetch(`${API_BASE_URL}/customers/${customer.id}`, {
         method: 'DELETE',
       });
       

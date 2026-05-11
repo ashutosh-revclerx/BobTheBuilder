@@ -84,7 +84,7 @@ Why a separate service:
 ### 2.1 Python LLM service — `apps/backend/services/llm/` ← **done (v1)**
 
 - [x] Bootstrap a FastAPI app (folder `apps/backend/services/llm/`)
-- [x] Env: `GEMINI_API_KEY`, `GEMINI_MODEL`, `LLM_SERVICE_PORT` (default 8000)
+- [x] Env: `GEMINI_API_KEY`, `GEMINI_MODEL`, `LLM_SERVICE_PORT` (default 8001)
 - [x] Endpoint `POST /generate`:
   ```json
   {
@@ -116,7 +116,7 @@ Why a separate service:
 - [x] Loads referenced resources from DB + their `resource_endpoints` rows (single SQL with jsonb_agg)
 - [x] Calls `POST {LLM_SERVICE_URL}/generate` with the enriched payload
 - [x] Returns candidate configs to the browser; **does NOT save** to `dashboards` table
-- [x] Reads `LLM_SERVICE_URL` from env (default `http://localhost:8000`)
+- [x] Reads `LLM_SERVICE_URL` from env (default `http://localhost:8001`)
 - [x] 60s AbortController timeout + clear error mapping (502 on upstream fail, 504 on timeout)
 - [ ] (Polish) Cap total prompt size in tokens — currently caps endpoints at 60 per resource in the Python service
 

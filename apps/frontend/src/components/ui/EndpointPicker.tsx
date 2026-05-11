@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import MethodBadge from './MethodBadge';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL, apiFetch } from '../../config/api';
 
 export interface ImportedEndpoint {
   id:         string;
@@ -42,7 +42,7 @@ export default function EndpointPicker({
     }
     let cancelled = false;
     setLoading(true);
-    fetch(`${API_BASE}/api/resources/${resourceId}/endpoints`)
+    apiFetch(`${API_BASE_URL}/resources/${resourceId}/endpoints`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data: ImportedEndpoint[]) => {
         if (!cancelled) setEndpoints(Array.isArray(data) ? data : []);
