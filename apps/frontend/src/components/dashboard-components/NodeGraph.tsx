@@ -34,9 +34,15 @@ function MultiHandleNode({ data }: any) {
         fontSize: 13,
         fontWeight: 600,
         minWidth: 130,
+        maxWidth: 180,
         textAlign: 'center',
         boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
         position: 'relative',
+        wordWrap: 'break-word',
+        wordBreak: 'break-word',
+        whiteSpace: 'normal',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
       }}
     >
       {handles.map((i) => (
@@ -384,6 +390,11 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
       }
 
       if (!result) {
+        // In builder mode with bound query not yet fired: try mockValue first
+        const graph = extractGraphData(data.mockValue);
+        if (graph && graph.rawNodes.length > 0) {
+          return { ...graph, graphStatus: 'loaded' };
+        }
         return { rawNodes: uploadedTableNodes, rawEdges: [], graphStatus: uploadedTableNodes.length ? 'empty' : (hasSession ? 'loading' : 'noSession') };
       }
     }
@@ -396,7 +407,8 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
 
     if (!hasSession) {
       const graph = extractGraphData(data.mockValue);
-      if (graph) return { ...graph, graphStatus: 'noSession' };
+      // If mockValue has valid graph data, show it in the builder (not the "upload files" placeholder)
+      if (graph && graph.rawNodes.length > 0) return { ...graph, graphStatus: 'loaded' };
       return { rawNodes: [], rawEdges: [], graphStatus: 'noSession' };
     }
 
@@ -497,17 +509,19 @@ export default function NodeGraph({ config, readOnly }: NodeGraphProps) {
           labelStyle: {
             fill: style.textColor || '#e2e8f0',
             fontWeight: 700,
-            fontSize: 12,
+            fontSize: 11,
             textAnchor: 'middle' as const,
           },
           labelBgStyle: {
             fill: '#0d1424',
             stroke: stroke,
-            strokeWidth: 1,
-            fillOpacity: 1,
-            rx: 4,
-            ry: 4,
+            strokeWidth: 1.5,
+            fillOpacity: 0.95,
+            rx: 6,
+            ry: 6,
           },
+          labelBgPadding: [6, 10] as [number, number],
+          labelBgBorderRadius: 6,
         };
       });
     },
