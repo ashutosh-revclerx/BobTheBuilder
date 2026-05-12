@@ -334,36 +334,67 @@ async def get_resource_schema(resource_id: str):
 
 @router.post("/{resource_id}/preview")
 async def preview_query(resource_id: str, request: Request):
+    from ..utils.env_secret import resolve_env_secret
+
     pool = get_pool()
     try:
+        # Fetch the *full* row (including secret_ref) so we can connect to the
+        # resource's own database, not the internal dashboard DB.
         resource_row = await pool.fetchrow(
-            f"SELECT {_SAFE_COLS} FROM resources WHERE id = $1", resource_id
+            "SELECT id, name, type, base_url, auth_type, secret_ref FROM resources WHERE id = $1",
+            resource_id,
         )
     except asyncpg.PostgresError as err:
+        if pg_code(err) == PG_INVALID_UUID:
+            raise HTTPException(status_code=400, detail="Invalid resource ID")
         log.error("preview:", err)
         return JSONResponse(
-            status_code=400, content={"error": "Query failed", "details": str(err)}
+            status_code=500, content={"error": "Internal server error"}
         )
     if not resource_row:
         raise HTTPException(status_code=404, detail="Resource not found")
+    if resource_row["type"] != "postgresql":
+        raise HTTPException(status_code=400, detail="Preview is only supported for PostgreSQL resources")
+
+    connection_string = resolve_env_secret(resource_row["secret_ref"])
+    if not connection_string:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "No connection string resolved for this resource — check secret_ref and the corresponding env variable"
+            },
+        )
 
     try:
         payload = await request.json()
     except Exception:
         payload = {}
-    sql = payload.get("sql")
-    params = payload.get("params") or []
+    sql = payload.get("sql", "").strip()
+    params: list[Any] = payload.get("params") or []
     if not sql:
         raise HTTPException(status_code=400, detail="sql is required")
 
+    # Run against the *resource's* external database in a read-only transaction,
+    # capped at 5 rows (same as the Node implementation).
     try:
-        rows = await pool.fetch(sql + " LIMIT 5", *params)
-        return {"rows": rows_to_list(rows)}
+        conn = await asyncpg.connect(dsn=connection_string)
     except Exception as err:
-        log.error("preview:", err)
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Could not connect to resource database: {err}"},
+        )
+
+    try:
+        async with conn.transaction(readonly=True):
+            rows = await conn.fetch(sql + " LIMIT 5", *params)
+            return {"rows": [dict(r) for r in rows]}
+    except Exception as err:
+        log.error("preview query failed:", err)
         return JSONResponse(
             status_code=400, content={"error": "Query failed", "details": str(err)}
         )
+    finally:
+        await conn.close()
 
 
 @router.get("/{resource_id}/endpoints")

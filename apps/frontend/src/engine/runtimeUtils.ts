@@ -48,7 +48,7 @@ export function parseQueryName(binding: unknown): string | null {
 
   return normalizeExpression(binding)
     .replace(/^queries\./, '')
-    .replace(/\.(data|trigger|isLoading|error)$/, '')
+    .replace(/\.(data|trigger|isLoading|error)(\..+)?$/, '')
     .trim();
 }
 

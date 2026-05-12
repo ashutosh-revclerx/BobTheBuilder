@@ -13,7 +13,9 @@ export const ComponentStyleSchema = z.object({
 
 export const ComponentConfigSchema = z.object({
   id: z.string(),
-  type: z.enum(['StatCard', 'Table', 'BarChart', 'LineChart', 'StatusBadge', 'Button', 'LogsViewer']),
+  type: z.enum(['StatCard', 'Table', 'BarChart', 'LineChart', 'StatusBadge', 'Button', 'LogsViewer',
+    'Container', 'TabbedContainer', 'Text', 'TextInput', 'NumberInput', 'Select',
+    'Image', 'Embed', 'NodeGraph', 'FileUpload', 'ChatBox']),
   label: z.string().default(''),
   style: ComponentStyleSchema.optional().default({}),
   data: z.any().optional(),
@@ -25,7 +27,7 @@ export const QueryConfigSchema = z.object({
   name: z.string(),
   resource: z.string(),
   endpoint: z.string(),
-  method: z.enum(['GET', 'POST', 'PUT', 'DELETE']).optional().default('POST'),
+  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional().default('GET'),
   trigger: z.enum(['onLoad', 'manual', 'onDependencyChange']).default('onLoad'),
   params: z.record(z.string(), z.any()).optional(),
   body: z.any().optional(),

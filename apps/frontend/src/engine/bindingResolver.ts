@@ -62,6 +62,20 @@ export function resolveBindings<T>(dataObject: T): T {
       continue;
     }
 
+    // Recursively resolve nested arrays and objects so chart series,
+    // conditional row colours, and similar nested bindings work.
+    if (Array.isArray(value)) {
+      resolved[key] = value.map((item) =>
+        item && typeof item === 'object' ? resolveBindings(item) : item
+      );
+      continue;
+    }
+
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      resolved[key] = resolveBindings(value as Record<string, unknown>);
+      continue;
+    }
+
     resolved[key] = value;
   }
 
