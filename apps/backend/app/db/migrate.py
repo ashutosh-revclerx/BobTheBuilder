@@ -24,8 +24,11 @@ MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 async def run() -> int:
     conn = await asyncpg.connect(dsn=settings.database_url)
     try:
+        await conn.execute("SELECT pg_advisory_lock(80671001)")
         await conn.execute(
             """
+            CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
             CREATE TABLE IF NOT EXISTS migrations (
               name   TEXT        PRIMARY KEY,
               run_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -55,6 +58,10 @@ async def run() -> int:
         print(f"[migrate] done — {ran} migration(s) applied.")
         return 0
     finally:
+        try:
+            await conn.execute("SELECT pg_advisory_unlock(80671001)")
+        except Exception:
+            pass
         await conn.close()
 
 

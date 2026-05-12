@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .auth import nervesparks
+from .db import migrate
 from .db.pool import close_pool, get_pool, init_pool
 from .http_client import close_client, get_client, init_client
 from .logger import create_logger
@@ -19,6 +20,7 @@ log = create_logger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    await migrate.run()
     await init_pool()
     await init_client()
     try:
