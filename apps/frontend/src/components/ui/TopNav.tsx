@@ -1,4 +1,6 @@
-import { Link, NavLink } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { clearAuthTokens } from '../../config/api';
 
 interface TopNavProps {
   /** Optional right-side slot — usually a primary CTA like "+ New Dashboard". */
@@ -17,6 +19,13 @@ const NAV_ITEMS: Array<{ to: string; label: string; end?: boolean }> = [
  * facing page so jumping between sections is one click.
  */
 export default function TopNav({ right }: TopNavProps) {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    clearAuthTokens();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <header className="topnav">
       <div className="topnav__left">
@@ -36,7 +45,13 @@ export default function TopNav({ right }: TopNavProps) {
           ))}
         </nav>
       </div>
-      {right ? <div className="topnav__right">{right}</div> : null}
+      <div className="topnav__right">
+        {right}
+        <button className="btn-topbar" onClick={handleLogout} title="Sign out" type="button">
+          <LogOut size={14} />
+          <span>Sign out</span>
+        </button>
+      </div>
     </header>
   );
 }

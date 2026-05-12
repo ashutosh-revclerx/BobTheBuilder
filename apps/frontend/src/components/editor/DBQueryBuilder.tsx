@@ -21,7 +21,7 @@ interface Props {
   onChange: (value: { path: string; method: string; params?: Record<string, unknown> }) => void;
 }
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL, apiFetch } from '../../config/api';
 
 function DBQueryBuilder({ resourceId, onChange }: Props) {
   const [tables, setTables] = useState<Table[]>([]);
@@ -36,7 +36,7 @@ function DBQueryBuilder({ resourceId, onChange }: Props) {
   // Fetch schema
   useEffect(() => {
     setSchemaLoading(true);
-    fetch(`${API_BASE}/api/resources/${resourceId}/schema`)
+    apiFetch(`${API_BASE_URL}/resources/${resourceId}/schema`)
       .then((r) => r.json())
       .then((data: { tables: Table[] }) => {
         setTables(data.tables || []);
@@ -129,7 +129,7 @@ function DBQueryBuilder({ resourceId, onChange }: Props) {
     setPreviewLoading(true);
     try {
       const { sql, params } = buildSQL();
-      const res = await fetch(`${API_BASE}/api/resources/${resourceId}/preview`, {
+      const res = await apiFetch(`${API_BASE_URL}/resources/${resourceId}/preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sql, params: Object.values(params) }),

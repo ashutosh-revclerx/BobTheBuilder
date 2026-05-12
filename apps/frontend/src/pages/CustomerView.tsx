@@ -25,7 +25,7 @@ import FileUpload from '../components/dashboard-components/FileUpload';
 import ChatBox from '../components/dashboard-components/ChatBox';
 import type { ComponentType } from '../types/template';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL } from '../config/api';
 
 const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
   StatCard,
@@ -92,7 +92,7 @@ export default function CustomerView() {
         const params = new URLSearchParams(location.search);
         const token = params.get('token') || '';
 
-        const url = new URL(`${API_BASE}/api/customers/${encodeURIComponent(slug)}/dashboard`);
+        const url = new URL(`${API_BASE_URL}/customers/${encodeURIComponent(slug)}/dashboard`, window.location.origin);
         if (token) {
           url.searchParams.set('token', token);
         }

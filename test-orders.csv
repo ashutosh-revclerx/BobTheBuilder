@@ -1,7 +1,7 @@
-order_id,customer_id,order_date,total_amount,status
-O1001,C001,2026-05-01,125.50,paid
-O1002,C002,2026-05-02,89.99,paid
-O1003,C001,2026-05-03,240.00,pending
-O1004,C004,2026-05-04,19.95,paid
-O1005,C005,2026-05-05,310.20,paid
-O1006,C003,2026-05-06,72.45,cancelled
+order_id,customer_id,email,city,order_date,total_amount,status
+O1001,C001,ada@example.com,London,2026-05-01,125.50,paid
+O1002,C002,grace@example.com,Arlington,2026-05-02,89.99,paid
+O1003,C001,ada@example.com,London,2026-05-03,240.00,pending
+O1004,C004,alan@example.com,Manchester,2026-05-04,19.95,paid
+O1005,C005,dorothy@example.com,Kansas City,2026-05-05,310.20,paid
+O1006,C003,katherine@example.com,White Sulphur Springs,2026-05-06,72.45,cancelled

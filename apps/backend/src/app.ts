@@ -6,6 +6,8 @@ import resourcesRouter  from './routes/resources.js';
 import executeRouter    from './routes/execute.js';
 import customersRouter  from './routes/customers.js';
 import assistantRouter  from './routes/assistant.js';
+import authRouter       from './routes/auth.js';
+import { requireAuth, requireAuthUnlessPublicCustomerDashboard } from './middleware/auth.js';
 import { createLogger } from './utils/logger.js';
 
 const log = createLogger('http');
@@ -31,11 +33,17 @@ export function createApp() {
     next();
   });
 
-  app.use('/api/dashboards', dashboardsRouter);
-  app.use('/api/resources',  resourcesRouter);
-  app.use('/api/execute',    executeRouter);
-  app.use('/api/customers',  customersRouter);
-  app.use('/api/assistant',  assistantRouter);
+  const mountApi = (prefix: string) => {
+    app.use(`${prefix}/auth`, authRouter);
+    app.use(`${prefix}/dashboards`, requireAuth, dashboardsRouter);
+    app.use(`${prefix}/resources`,  requireAuth, resourcesRouter);
+    app.use(`${prefix}/execute`,    requireAuth, executeRouter);
+    app.use(`${prefix}/customers`,  requireAuthUnlessPublicCustomerDashboard, customersRouter);
+    app.use(`${prefix}/assistant`,  requireAuth, assistantRouter);
+  };
+
+  mountApi('/api/v1');
+  mountApi('/api');
 
   app.get('/health', async (_req, res) => {
     try {

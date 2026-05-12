@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import TopNav from '../components/ui/TopNav';
 import PreviewRenderer from '../components/preview/PreviewRenderer';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL, apiFetch } from '../config/api';
 const PREVIEW_SCALE = 292 / 1020; // card canvas ~292px wide, builder canvas ~1020px wide
 
 interface DashboardConfig {
@@ -102,10 +102,10 @@ export default function TemplatePicker() {
       const isUpdate = !!stash.dashboardId;
       const method = isUpdate ? 'PUT' : 'POST';
       const endpoint = isUpdate
-        ? `${API_BASE}/api/dashboards/${stash.dashboardId}`
-        : `${API_BASE}/api/dashboards`;
+        ? `${API_BASE_URL}/dashboards/${stash.dashboardId}`
+        : `${API_BASE_URL}/dashboards`;
 
-      const response = await fetch(endpoint, {
+      const response = await apiFetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(payload),

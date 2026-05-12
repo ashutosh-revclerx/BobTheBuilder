@@ -4,7 +4,7 @@ import AssignmentModal from '../components/editor/AssignmentModal';
 import { templates } from '../templates';
 import TopNav from '../components/ui/TopNav';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL, apiFetch } from '../config/api';
 
 interface DashboardSummary {
   id: string;
@@ -257,8 +257,8 @@ export default function DashboardList() {
       setLoading(true);
       try {
         const [dashboardsResponse, customersResponse] = await Promise.all([
-          fetch(`${API_BASE}/api/dashboards`),
-          fetch(`${API_BASE}/api/customers`),
+          apiFetch(`${API_BASE_URL}/dashboards`),
+          apiFetch(`${API_BASE_URL}/customers`),
         ]);
 
         if (cancelled) return;
@@ -296,7 +296,7 @@ export default function DashboardList() {
 
   const refreshData = async () => {
     try {
-      const dashboardsResponse = await fetch(`${API_BASE}/api/dashboards`);
+      const dashboardsResponse = await apiFetch(`${API_BASE_URL}/dashboards`);
       if (dashboardsResponse.ok) {
         const json = await dashboardsResponse.json();
         if (Array.isArray(json)) setDashboards(json);
@@ -314,7 +314,7 @@ export default function DashboardList() {
   const handleCreateDashboard = async () => {
     setCreating(true);
     try {
-      const response = await fetch(`${API_BASE}/api/dashboards`, {
+      const response = await apiFetch(`${API_BASE_URL}/dashboards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -333,7 +333,7 @@ export default function DashboardList() {
   };
 
   const handleDeleteDashboard = async (dashboardId: string) => {
-    const response = await fetch(`${API_BASE}/api/dashboards/${dashboardId}`, {
+    const response = await apiFetch(`${API_BASE_URL}/dashboards/${dashboardId}`, {
       method: 'DELETE',
     });
     if (!response.ok) {

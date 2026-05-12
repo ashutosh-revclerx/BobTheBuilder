@@ -3,7 +3,7 @@ import MethodBadge from '../components/ui/MethodBadge';
 import TopNav from '../components/ui/TopNav';
 import type { ImportedEndpoint } from '../components/ui/EndpointPicker';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL, apiFetch } from '../config/api';
 
 type AuthType = 'none' | 'bearer' | 'api_key' | 'basic';
 type ResourceType = 'REST' | 'agent' | 'postgresql';
@@ -60,7 +60,7 @@ export default function ResourcesPage() {
   const [confirmDeleteId, setConfirmDeleteId]     = useState<string | null>(null);
 
   const refreshResources = () => {
-    fetch(`${API_BASE}/api/resources`)
+    apiFetch(`${API_BASE_URL}/resources`)
       .then((r) => r.json())
       .then((data: Resource[]) => setResources(Array.isArray(data) ? data : []))
       .catch(() => setResources([]));
@@ -87,7 +87,7 @@ export default function ResourcesPage() {
     setImporting(true);
     setBanner(null);
     try {
-      const response = await fetch(`${API_BASE}/api/resources/import-swagger`, {
+      const response = await apiFetch(`${API_BASE_URL}/resources/import-swagger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -110,7 +110,7 @@ export default function ResourcesPage() {
       setImportedResource(payload.resource);
 
       // Fetch the freshly-imported endpoint list
-      const endpointsRes = await fetch(`${API_BASE}/api/resources/${payload.resource.id}/endpoints`);
+      const endpointsRes = await apiFetch(`${API_BASE_URL}/resources/${payload.resource.id}/endpoints`);
       setImportedEndpoints(endpointsRes.ok ? await endpointsRes.json() : []);
 
       refreshResources();
@@ -159,7 +159,7 @@ export default function ResourcesPage() {
       // For postgresql, secret_ref carries the connection string — accept it on any auth type
       if (manualType === 'postgresql' && manualSecretRef.trim()) body.secret_ref = manualSecretRef.trim();
 
-      const response = await fetch(`${API_BASE}/api/resources`, {
+      const response = await apiFetch(`${API_BASE_URL}/resources`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -196,7 +196,7 @@ export default function ResourcesPage() {
     setExpandedId(resource.id);
     setExpandedEndpoints([]);
     try {
-      const r = await fetch(`${API_BASE}/api/resources/${resource.id}/endpoints`);
+      const r = await apiFetch(`${API_BASE_URL}/resources/${resource.id}/endpoints`);
       setExpandedEndpoints(r.ok ? await r.json() : []);
     } catch {
       setExpandedEndpoints([]);
@@ -205,7 +205,7 @@ export default function ResourcesPage() {
 
   const handleDeleteResource = async (id: string) => {
     try {
-      const r = await fetch(`${API_BASE}/api/resources/${id}`, { method: 'DELETE' });
+      const r = await apiFetch(`${API_BASE_URL}/resources/${id}`, { method: 'DELETE' });
       if (!r.ok) {
         setBanner({ kind: 'error', text: 'Could not delete resource.' });
         return;

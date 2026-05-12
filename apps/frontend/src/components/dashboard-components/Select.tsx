@@ -11,7 +11,15 @@ const Select = React.memo(function Select({ config }: { config: ComponentConfig 
 
   const bg = useMemo(() => resolveBackground(style), [style.backgroundColor, style.backgroundGradient]);
 
-  const staticOptions = (data.optionsList?.length ? data.optionsList : (data.options || []).map((option) => ({ label: option, value: option })));
+  const normalizeOption = (opt: unknown): { label: string; value: string } => {
+    if (typeof opt === 'string') return { label: opt, value: opt };
+    if (opt && typeof opt === 'object' && 'label' in opt && 'value' in opt) {
+      return { label: String(opt.label), value: String(opt.value) };
+    }
+    return { label: String(opt ?? ''), value: String(opt ?? '') };
+  };
+
+  const staticOptions = (data.optionsList?.length ? (data.optionsList as unknown[]).map(normalizeOption) : (data.options || []).map((option) => normalizeOption(option)));
   const dynamicOptions = Array.isArray(data.dbBinding)
     ? (data.dbBinding as Record<string, unknown>[]).map((item) => ({
         label: String(item[data.labelField || 'label'] ?? ''),

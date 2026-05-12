@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL, apiFetch } from '../../config/api';
 
 export default function PublishToggle() {
   const dashboardId = useEditorStore((s) => s.activeTemplateId);
@@ -21,7 +21,7 @@ export default function PublishToggle() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/api/dashboards/${dashboardId}/publish`, {
+      const response = await apiFetch(`${API_BASE_URL}/dashboards/${dashboardId}/publish`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),

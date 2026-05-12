@@ -1338,15 +1338,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   
   importDashboard: (data) => {
-    const { metadata, config, queries, state } = data;
+    const { metadata, config, queries, state, componentState: importedComponentState } = data;
     const normalizedComponents = normalizeComponents(clone(config.components || []));
 
     set({
-      dashboardName: metadata.name,
+      dashboardName: metadata.name || config.name,
       components: normalizedComponents,
       queriesConfig: clone(queries || []),
-      status: metadata.status || 'draft',
-      publishedAt: metadata.publishedAt || null,
+      status: metadata?.status || config.status || 'draft',
+      publishedAt: metadata?.publishedAt || config.publishedAt || null,
       activeTabs: state?.activeTabs || {},
       selectedComponentId: null,
       lastSelectedComponentId: normalizedComponents[0]?.id ?? null,
@@ -1356,7 +1356,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       dirtyStyleMap: {},
       dirtyDataMap: {},
       queryResults: {},
-      componentState: {},
+      componentState: clone(importedComponentState || {}),
       // Preserve canvasStyle from imported config (full round-trip fidelity)
       canvasStyle: config.canvasStyle || { backgroundColor: '#f3f4f6' },
     });

@@ -11,7 +11,7 @@ import type {
   TableConditionalRowColorRule,
 } from '../../types/template';
 
-const API_BASE = 'http://localhost:3001';
+import { API_BASE_URL, apiFetch } from '../../config/api';
 
 interface ResourceListItem {
   id:   string;
@@ -74,7 +74,7 @@ function QueryBindingSection({
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/api/resources`)
+    apiFetch(`${API_BASE_URL}/resources`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data: ResourceListItem[]) => {
         if (!cancelled) setResources(Array.isArray(data) ? data : []);
@@ -161,15 +161,76 @@ function QueryBindingSection({
       )}
 
       {binding.path && (
-        <select
-          className="form-select"
-          value={binding.trigger ?? (binding.method === 'GET' ? 'onLoad' : 'manual')}
-          onChange={(e) => syncQuery({ ...binding, trigger: e.target.value as QueryBinding['trigger'] })}
-        >
-          <option value="onLoad">Trigger: on page load</option>
-          <option value="manual">Trigger: manual (e.g. button click)</option>
-          <option value="onDependencyChange">Trigger: on dependency change</option>
-        </select>
+        <>
+          <select
+            className="form-select"
+            value={binding.trigger ?? (binding.method === 'GET' ? 'onLoad' : 'manual')}
+            onChange={(e) => syncQuery({ ...binding, trigger: e.target.value as QueryBinding['trigger'] })}
+          >
+            <option value="onLoad">Trigger: on page load</option>
+            <option value="manual">Trigger: manual (e.g. button click)</option>
+            <option value="onDependencyChange">Trigger: on dependency change</option>
+          </select>
+
+          {/* Quick-Bind Chips */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
+            <button
+              onClick={() => updateData(componentId, { dbBinding: getSmartAutoBinding(componentType) })}
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                background: '#dbeafe',
+                border: '1px solid #bfdbfe',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                color: '#1e40af',
+                fontWeight: '500',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#bfdbfe')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#dbeafe')}
+            >
+              → Bind {componentType === 'Button' ? 'Trigger' : 'Data'}
+            </button>
+            {componentType !== 'Button' && (
+              <button
+                onClick={() => updateData(componentId, { dbBinding: `{{queries.${queryName}.data.length}}` })}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  background: '#dcfce7',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  color: '#166534',
+                  fontWeight: '500',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#bbf7d0')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = '#dcfce7')}
+              >
+                → Bind Count
+              </button>
+            )}
+            {componentType === 'Button' && (
+              <button
+                onClick={() => updateData(componentId, { dbBinding: `queries.${queryName}.trigger` })}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  background: '#fed7aa',
+                  border: '1px solid #fdba74',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  color: '#92400e',
+                  fontWeight: '500',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#fdba74')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = '#fed7aa')}
+              >
+                → Manual Trigger
+              </button>
+            )}
+          </div>
+        </>
       )}
 
       {binding.path && (
@@ -342,6 +403,23 @@ function formatBindingPreview(value: unknown): string {
   return String(value);
 }
 
+function getDataTypeLabel(value: unknown): string {
+  if (value === undefined || value === null) return 'No data';
+  if (Array.isArray(value)) return `Array · ${value.length} rows`;
+  if (typeof value === 'object') return 'Object';
+  return typeof value;
+}
+
+function fuzzyMatch(query: string, text: string): boolean {
+  let queryIdx = 0;
+  for (let i = 0; i < text.length && queryIdx < query.length; i++) {
+    if (text[i].toLowerCase() === query[queryIdx].toLowerCase()) {
+      queryIdx++;
+    }
+  }
+  return queryIdx === query.length;
+}
+
 function BindingPicker({
   label,
   value,
@@ -357,82 +435,321 @@ function BindingPicker({
 }) {
   const queriesConfig = useEditorStore((s) => s.queriesConfig);
   const components = useEditorStore((s) => s.components);
-  useEditorStore((s) => s.queryResults);
-  useEditorStore((s) => s.componentState);
-  const queryNames = queriesConfig
-    .map((query) => String(query?.name ?? '').trim())
-    .filter(Boolean);
+  const queryResults = useEditorStore((s) => s.queryResults);
+
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
+  const [autocompleteFilter, setAutocompleteFilter] = useState('');
+  const [explorerOpen, setExplorerOpen] = useState(false);
+
   const bindableComponents = components.filter((component) => {
     if (!includeComponents) return false;
     return component.type !== 'Container' && component.type !== 'TabbedContainer';
   });
 
+  // Autocomplete candidates
+  const autocompleteCandidates = useMemo(() => {
+    const candidates: Array<{
+      label: string;
+      group: string;
+      value: string;
+      queryName?: string;
+      componentId?: string;
+    }> = [];
+
+    // Add query paths
+    queriesConfig.forEach((query) => {
+      const queryName = String(query?.name ?? '').trim();
+      if (!queryName) return;
+      queryPathOptions.forEach((opt) => {
+        candidates.push({
+          label: `${queryName} → ${opt.label}`,
+          group: 'Queries',
+          value: bindingExpression(`queries.${queryName}.${opt.path}`, opt.wrap),
+          queryName,
+        });
+      });
+    });
+
+    // Add component state paths
+    if (includeComponents) {
+      bindableComponents.forEach((comp) => {
+        const fields = STATE_FIELDS_BY_TYPE[comp.type] ?? COMMON_STATE_FIELDS;
+        fields.forEach((field) => {
+          candidates.push({
+            label: `${comp.label || comp.id} → ${field}`,
+            group: 'Component State',
+            value: bindingExpression(`componentState.${comp.id}.${field}`),
+            componentId: comp.id,
+          });
+        });
+      });
+    }
+
+    return candidates;
+  }, [queriesConfig, bindableComponents, queryPathOptions, includeComponents]);
+
+  // Filter autocomplete candidates
+  const filteredCandidates = useMemo(() => {
+    if (!autocompleteFilter) return [];
+    return autocompleteCandidates.filter((c) => fuzzyMatch(autocompleteFilter, c.label)).slice(0, 8);
+  }, [autocompleteCandidates, autocompleteFilter]);
+
+  const resolved = resolve(value);
+  const dataType = getDataTypeLabel(resolved);
+
+  const handleInputChange = (newValue: string) => {
+    onChange(newValue);
+    setAutocompleteFilter(newValue.slice(newValue.lastIndexOf('{{')));
+    setAutocompleteOpen(true);
+  };
+
+  const handleAutocompletePick = (candidate: {
+    label: string;
+    group: string;
+    value: string;
+    queryName?: string;
+    componentId?: string;
+  }) => {
+    onChange(candidate.value);
+    setAutocompleteOpen(false);
+    setAutocompleteFilter('');
+  };
+
   return (
     <FormField label={label}>
-      <div className="mini-editor" style={{ gap: 8 }}>
-        <div className="mini-editor-row">
-          <select
-            className="form-select"
-            aria-label="Query"
-            onChange={(e) => {
-              const [queryName, path] = e.target.value.split('|');
-              const selected = queryPathOptions.find((option) => option.path === path);
-              if (!queryName || !selected) return;
-              onChange(bindingExpression(`queries.${queryName}.${selected.path}`, selected.wrap));
-            }}
-            value=""
-            disabled={queryNames.length === 0}
-          >
-            <option value="">
-              {queryNames.length === 0 ? 'No queries yet' : 'Bind from query...'}
-            </option>
-            {queryNames.flatMap((queryName) =>
-              queryPathOptions.map((option) => (
-                <option key={`${queryName}-${option.path}`} value={`${queryName}|${option.path}`}>
-                  {queryName} {'->'} {option.label}
-                </option>
-              )),
-            )}
-          </select>
+      <div className="mini-editor" style={{ gap: 8, position: 'relative' }}>
+        <div className="mini-editor-row" style={{ position: 'relative' }}>
+          <input
+            type="text"
+            className="form-input"
+            value={value}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onFocus={() => autocompleteFilter && setAutocompleteOpen(true)}
+            onBlur={() => setTimeout(() => setAutocompleteOpen(false), 150)}
+            placeholder="Type {{ for autocomplete or manually bind"
+            style={{ paddingRight: value.trim() ? '32px' : '12px', position: 'relative', zIndex: 1 }}
+          />
+          {value.trim() && (
+            <button
+              onClick={() => {
+                onChange('');
+                setAutocompleteOpen(false);
+                setAutocompleteFilter('');
+              }}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#6b7280',
+                fontSize: '18px',
+                padding: '0 4px',
+                zIndex: 2,
+              }}
+              title="Clear binding"
+            >
+              ✕
+            </button>
+          )}
+
+          {/* Autocomplete dropdown */}
+          {autocompleteOpen && filteredCandidates.length > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: '#ffffff',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                zIndex: 50,
+                maxHeight: '240px',
+                overflowY: 'auto',
+                marginTop: '4px',
+              }}
+            >
+              {filteredCandidates.map((candidate, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleAutocompletePick(candidate)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: '#111827',
+                    borderBottom: idx < filteredCandidates.length - 1 ? '1px solid #f3f4f6' : 'none',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f9fafb')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                >
+                  <span>{candidate.label}</span>
+                  <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '8px' }}>
+                    {candidate.group}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {includeComponents && bindableComponents.length > 0 && (
-          <div className="mini-editor-row">
-            <select
-              className="form-select"
-              aria-label="Component state"
-              onChange={(e) => {
-                const [componentId, field] = e.target.value.split('|');
-                if (!componentId || !field) return;
-                onChange(bindingExpression(`componentState.${componentId}.${field}`));
-              }}
-              value=""
-            >
-              <option value="">Bind from component state...</option>
-              {bindableComponents.flatMap((component) => {
-                const fields = STATE_FIELDS_BY_TYPE[component.type] ?? COMMON_STATE_FIELDS;
-                return fields.map((field) => (
-                  <option key={`${component.id}-${field}`} value={`${component.id}|${field}`}>
-                    {component.label || component.id} {'->'} {field}
-                  </option>
-                ));
-              })}
-            </select>
-          </div>
-        )}
+        {/* Improved preview */}
+        <div
+          style={{
+            padding: '8px 12px',
+            background: '#f9fafb',
+            borderRadius: '6px',
+            fontSize: '12px',
+            color: '#6b7280',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span style={{ fontWeight: '600', color: '#111827' }}>Preview:</span>
+          <code style={{ color: '#111827', fontSize: '11px' }}>
+            {formatBindingPreview(resolved)}
+          </code>
+          <span style={{ marginLeft: '8px', padding: '2px 6px', background: '#e5e7eb', borderRadius: '4px' }}>
+            {dataType}
+          </span>
+        </div>
 
-        <input
-          type="text"
-          className="form-input"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Advanced binding, e.g. {{queries.getData.data}}"
-        />
-        {value.trim() && (
-          <p className="endpoint-picker-hint">
-            Preview: <code>{formatBindingPreview(resolve(value))}</code>
-          </p>
-        )}
+        {/* Live Data Explorer */}
+        <details
+          open={explorerOpen}
+          onToggle={(e) => setExplorerOpen(e.currentTarget.open)}
+          style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: '6px',
+            padding: '8px 12px',
+            background: '#f9fafb',
+          }}
+        >
+          <summary style={{ cursor: 'pointer', fontWeight: '600', fontSize: '12px', color: '#111827' }}>
+            📊 Browse available data
+          </summary>
+          <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Queries section */}
+            {queriesConfig.length > 0 && (
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px' }}>
+                  Queries
+                </div>
+                {queriesConfig.map((query) => {
+                  const queryName = String(query?.name ?? '').trim();
+                  const result = queryResults[queryName];
+                  const statusIcon =
+                    result?.status === 'success' ? '✓' : result?.status === 'loading' ? '⏳' : '✗';
+                  const statusColor =
+                    result?.status === 'success' ? '#10b981' : result?.status === 'loading' ? '#f59e0b' : '#ef4444';
+
+                  return (
+                    <div key={queryName} style={{ marginBottom: '8px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          paddingBottom: '6px',
+                          borderBottom: '1px solid #e5e7eb',
+                        }}
+                      >
+                        <span style={{ color: statusColor, fontSize: '12px' }}>{statusIcon}</span>
+                        <span style={{ fontSize: '12px', flex: 1, color: '#111827' }}>{queryName}</span>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                        {queryPathOptions.map((opt) => (
+                          <button
+                            key={opt.path}
+                            onClick={() =>
+                              handleAutocompletePick({
+                                label: `${queryName} → ${opt.label}`,
+                                group: 'Queries',
+                                value: bindingExpression(`queries.${queryName}.${opt.path}`, opt.wrap),
+                                queryName,
+                              })
+                            }
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              background: '#e5e7eb',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              color: '#374151',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#d1d5db')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = '#e5e7eb')}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Component State section */}
+            {includeComponents && bindableComponents.length > 0 && (
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '8px' }}>
+                  Component States
+                </div>
+                {bindableComponents.map((component) => {
+                  const fields = STATE_FIELDS_BY_TYPE[component.type] ?? COMMON_STATE_FIELDS;
+                  return (
+                    <div key={component.id} style={{ marginBottom: '8px' }}>
+                      <div style={{ fontSize: '12px', color: '#111827', paddingBottom: '6px', borderBottom: '1px solid #e5e7eb' }}>
+                        {component.label || component.id}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                        {fields.map((field) => (
+                          <button
+                            key={field}
+                            onClick={() =>
+                              handleAutocompletePick({
+                                label: `${component.label || component.id} → ${field}`,
+                                group: 'Component State',
+                                value: bindingExpression(`componentState.${component.id}.${field}`),
+                                componentId: component.id,
+                              })
+                            }
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              background: '#dbeafe',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              color: '#1e40af',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#bfdbfe')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = '#dbeafe')}
+                          >
+                            {field}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </details>
       </div>
     </FormField>
   );
@@ -455,7 +772,7 @@ function FileUploadSettings({
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/api/resources`)
+    apiFetch(`${API_BASE_URL}/resources`)
       .then((r) => (r.ok ? r.json() : []))
       .then((payload: ResourceListItem[]) => {
         if (!cancelled) setResources(Array.isArray(payload) ? payload : []);

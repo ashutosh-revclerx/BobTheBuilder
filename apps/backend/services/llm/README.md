@@ -15,7 +15,7 @@ docker compose up -d --build
 Verify:
 
 ```
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 ```
 
 Should return `{"status":"ok","model":"gemini-2.5-flash","has_api_key":true}`.
@@ -27,13 +27,13 @@ cd apps/backend/services/llm
 python -m venv .venv
 .venv\Scripts\activate          # Windows; use source .venv/bin/activate elsewhere
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8001
 ```
 
 ## Smoke test the /generate endpoint
 
 ```
-curl -X POST http://localhost:8000/generate \
+curl -X POST http://localhost:8001/generate \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Show me a dashboard with the total user count and a table of users",
@@ -69,4 +69,4 @@ app/
 |---|---|---|
 | `GEMINI_API_KEY` | (required) | Gemini API key |
 | `GEMINI_MODEL` | `gemini-2.5-flash` | Model id; bump to `gemini-2.5-pro` for harder prompts |
-| `LLM_SERVICE_PORT` | `8000` | Uvicorn port |
+| `LLM_SERVICE_PORT` | `8001` | Uvicorn port |

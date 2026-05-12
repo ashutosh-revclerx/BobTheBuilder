@@ -1,8 +1,9 @@
 import type { QueryConfig } from '@btb/shared';
 import { useEditorStore } from '../store/editorStore';
+import { API_BASE_URL, apiFetch } from '../config/api';
 import { resolve } from './bindingResolver';
 
-const BACKEND_URL = 'http://localhost:3001/api/execute';
+const BACKEND_URL = `${API_BASE_URL}/execute`;
 const inflight = new Set<string>();
 const previousDependencySnapshots = new Map<string, string>();
 const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -89,7 +90,7 @@ export async function executeQuery(query: QueryConfig, params: Record<string, un
       ? (resolveJsonTemplate(parsedBody) as Record<string, unknown>)
       : undefined;
 
-    const response = await fetch(BACKEND_URL, {
+    const response = await apiFetch(BACKEND_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
