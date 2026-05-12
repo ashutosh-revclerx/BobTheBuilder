@@ -8,16 +8,17 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import re
 import time
 from typing import Any, Literal
 
 import asyncpg
 import httpx
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Header, Request, UploadFile
+from fastapi import APIRouter, Header, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from ..auth.deps import require_auth
+from ..auth.nervesparks import AuthError, extract_bearer_token, verify_access_token
 from ..db.pool import get_pool
 from ..executors.agent import agent_executor
 from ..executors.db import db_executor
@@ -27,12 +28,13 @@ from ..logger import create_logger
 from ..utils.env_secret import resolve_env_secret
 
 log = create_logger("execute")
-router = APIRouter(dependencies=[Depends(require_auth)])
+router = APIRouter()
 
 _MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
 
 
 class ExecuteSchema(BaseModel):
+    queryName: str | None = None
     resource: str = Field(min_length=1)
     endpoint: str = Field(min_length=1)
     method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = "GET"
@@ -40,6 +42,152 @@ class ExecuteSchema(BaseModel):
     body: dict[str, Any] | None = None
     dashboardId: str | None = None
     pollUrlTemplate: str | None = None
+
+
+def _template_matches(template: str | None, resolved: str) -> bool:
+    if not template:
+        return False
+    if template == resolved:
+        return True
+    if "{" not in template:
+        return False
+
+    pattern = re.escape(template)
+    pattern = re.sub(r"\\\{\\\{.*?\\\}\\\}", r".+", pattern)
+    pattern = re.sub(r"\\\{[^{}]+\\\}", r"[^/]+", pattern)
+    return bool(re.fullmatch(pattern, resolved))
+
+
+def _query_is_allowed(config: Any, body: ExecuteSchema) -> bool:
+    if not isinstance(config, dict):
+        return False
+    if body.queryName and body.queryName.endswith(":progress"):
+        return _progress_query_is_allowed(config, body)
+
+    queries = config.get("queries")
+    if not isinstance(queries, list):
+        return False
+
+    for query in queries:
+        if not isinstance(query, dict):
+            continue
+        if body.queryName and query.get("name") != body.queryName:
+            continue
+        if query.get("resource") != body.resource:
+            continue
+        configured_method = str(query.get("method") or "GET").upper()
+        if configured_method != body.method.upper():
+            continue
+        if _template_matches(str(query.get("endpoint") or ""), body.endpoint):
+            return True
+    return False
+
+
+def _progress_query_is_allowed(config: Any, body: ExecuteSchema) -> bool:
+    if not isinstance(config, dict):
+        return False
+    component_id = (body.queryName or "").removesuffix(":progress")
+    components = config.get("components")
+    if not isinstance(components, list):
+        return False
+
+    for component in components:
+        if not isinstance(component, dict):
+            continue
+        if component.get("id") != component_id or component.get("type") != "FileUpload":
+            continue
+        data = component.get("data")
+        if not isinstance(data, dict):
+            continue
+        if data.get("resourceName") != body.resource:
+            continue
+        if _template_matches(str(data.get("progressEndpoint") or ""), body.endpoint):
+            return True
+    return False
+
+
+def _upload_is_allowed(config: Any, *, resource_id: str, resource_name: str, endpoint_path: str) -> bool:
+    if not isinstance(config, dict):
+        return False
+    components = config.get("components")
+    if not isinstance(components, list):
+        return False
+
+    for component in components:
+        if not isinstance(component, dict) or component.get("type") != "FileUpload":
+            continue
+        data = component.get("data")
+        if not isinstance(data, dict):
+            continue
+        same_resource = (
+            bool(resource_id and data.get("resourceId") == resource_id)
+            or bool(resource_name and data.get("resourceName") == resource_name)
+        )
+        if same_resource and _template_matches(str(data.get("endpointPath") or ""), endpoint_path):
+            return True
+    return False
+
+
+async def _load_public_dashboard_config(dashboard_id: str | None, dashboard_token: str | None) -> Any | None:
+    if not dashboard_id or not dashboard_token:
+        return None
+    pool = get_pool()
+    try:
+        row = await pool.fetchrow(
+            """SELECT d.config
+               FROM dashboards d
+               WHERE d.id = $1
+                 AND d.status = 'live'
+                 AND EXISTS (
+                   SELECT 1
+                   FROM customers c
+                   WHERE c.access_token = $2
+                     AND (
+                       c.dashboard_id = d.id
+                       OR EXISTS (
+                         SELECT 1
+                         FROM dashboard_assignments da
+                         WHERE da.customer_id = c.id
+                           AND da.dashboard_id = d.id
+                       )
+                     )
+                 )""",
+            dashboard_id,
+            dashboard_token,
+        )
+    except asyncpg.PostgresError as err:
+        log.error("public dashboard auth lookup failed:", err)
+        return None
+    return row["config"] if row else None
+
+
+async def _is_authorized(
+    *,
+    authorization: str | None,
+    dashboard_id: str | None,
+    dashboard_token: str | None,
+    body: ExecuteSchema | None = None,
+    upload_resource_id: str = "",
+    upload_resource_name: str = "",
+    upload_endpoint_path: str = "",
+) -> bool:
+    token = extract_bearer_token(authorization)
+    if token:
+        try:
+            await verify_access_token(token, get_client())
+            return True
+        except AuthError:
+            pass
+
+    config = await _load_public_dashboard_config(dashboard_id, dashboard_token)
+    if body is not None:
+        return _query_is_allowed(config, body)
+    return _upload_is_allowed(
+        config,
+        resource_id=upload_resource_id,
+        resource_name=upload_resource_name,
+        endpoint_path=upload_endpoint_path,
+    )
 
 
 async def _log_query(
@@ -79,7 +227,21 @@ def _schedule_log_query(
 
 @router.post("")
 @router.post("/")
-async def execute(body: ExecuteSchema):
+async def execute(
+    body: ExecuteSchema,
+    authorization: str | None = Header(default=None),
+    x_dashboard_token: str | None = Header(default=None, alias="x-dashboard-token"),
+    x_btb_dashboard_id: str | None = Header(default=None, alias="x-btb-dashboard-id"),
+):
+    dashboard_id = body.dashboardId or x_btb_dashboard_id
+    if not await _is_authorized(
+        authorization=authorization,
+        dashboard_id=dashboard_id,
+        dashboard_token=x_dashboard_token,
+        body=body,
+    ):
+        return JSONResponse(status_code=401, content={"success": False, "error": "Unauthorized"})
+
     start_ms = time.time()
     pool = get_pool()
 
@@ -159,7 +321,7 @@ async def execute(body: ExecuteSchema):
 
     duration_ms = int((time.time() - start_ms) * 1000)
     _schedule_log_query(
-        body.dashboardId,
+        dashboard_id,
         body.resource,
         body.endpoint,
         "success" if result.get("success") else "error",
@@ -172,6 +334,9 @@ async def execute(body: ExecuteSchema):
 @router.post("/upload")
 async def upload_file(
     request: Request,
+    authorization: str | None = Header(default=None),
+    x_dashboard_token: str | None = Header(default=None, alias="x-dashboard-token"),
+    x_btb_dashboard_id: str | None = Header(default=None, alias="x-btb-dashboard-id"),
     x_btb_resource_id: str | None = Header(default=None, alias="x-btb-resource-id"),
     x_btb_resource_name: str | None = Header(default=None, alias="x-btb-resource-name"),
     x_btb_endpoint_path: str | None = Header(default=None, alias="x-btb-endpoint-path"),
@@ -193,6 +358,16 @@ async def upload_file(
                 ),
             },
         )
+
+    if not await _is_authorized(
+        authorization=authorization,
+        dashboard_id=x_btb_dashboard_id,
+        dashboard_token=x_dashboard_token,
+        upload_resource_id=resource_id,
+        upload_resource_name=resource_name,
+        upload_endpoint_path=endpoint_path,
+    ):
+        return JSONResponse(status_code=401, content={"success": False, "error": "Unauthorized"})
 
     form = await request.form()
     files: list[UploadFile] = []

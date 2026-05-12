@@ -98,11 +98,17 @@ export default function FileUpload({ config }: FileUploadProps) {
     try {
       const target = uploadUrl ? uploadUrl : `${API_BASE_URL}/execute/upload`;
       const headers: Record<string, string> = {};
+      const customerToken = window.location.pathname.startsWith('/customer/')
+        ? new URLSearchParams(window.location.search).get('token')
+        : null;
+      const dashboardId = useEditorStore.getState().activeTemplateId;
       if (!uploadUrl) {
         if (resourceId)   headers['x-btb-resource-id']   = resourceId;
         if (resourceName) headers['x-btb-resource-name'] = resourceName;
         if (endpointPath) headers['x-btb-endpoint-path'] = endpointPath;
         if (fieldName)    headers['x-btb-field-name']    = fieldName;
+        if (customerToken) headers['x-dashboard-token'] = customerToken;
+        if (dashboardId)   headers['x-btb-dashboard-id'] = dashboardId;
       }
 
       const res = uploadUrl
@@ -224,11 +230,21 @@ export default function FileUpload({ config }: FileUploadProps) {
           );
           const res = await apiFetch(`${API_BASE_URL}/execute`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(window.location.pathname.startsWith('/customer/')
+                ? { 'x-dashboard-token': new URLSearchParams(window.location.search).get('token') || '' }
+                : {}),
+              ...(useEditorStore.getState().activeTemplateId
+                ? { 'x-btb-dashboard-id': useEditorStore.getState().activeTemplateId || '' }
+                : {}),
+            },
             body: JSON.stringify({
+              queryName: `${config.id}:progress`,
               resource: resourceName, // friendly name path
               endpoint: path,
               method: 'GET',
+              dashboardId: useEditorStore.getState().activeTemplateId,
             }),
           });
           if (res.ok) {

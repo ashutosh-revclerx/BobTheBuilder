@@ -38,6 +38,14 @@ function resolveParams(params: Record<string, unknown> | undefined): Record<stri
   );
 }
 
+function getCustomerDashboardToken(): string | null {
+  const path = window.location.pathname;
+  if (!path.startsWith('/customer/')) {
+    return null;
+  }
+  return new URLSearchParams(window.location.search).get('token');
+}
+
 // Walk a JSON-like structure and replace any "{{path}}" string with the
 // resolved store value. Lets a query.body reference componentState/queries
 // the same way endpoints do.
@@ -89,11 +97,20 @@ export async function executeQuery(query: QueryConfig, params: Record<string, un
     const resolvedBody = parsedBody
       ? (resolveJsonTemplate(parsedBody) as Record<string, unknown>)
       : undefined;
+    const customerToken = getCustomerDashboardToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (customerToken) {
+      headers['x-dashboard-token'] = customerToken;
+    }
+    if (store.activeTemplateId) {
+      headers['x-btb-dashboard-id'] = store.activeTemplateId;
+    }
 
     const response = await apiFetch(BACKEND_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
+        queryName: query.name,
         resource: query.resource,
         endpoint: resolveQueryTemplate(query.endpoint),
         method: query.method ?? 'GET',
@@ -102,6 +119,7 @@ export async function executeQuery(query: QueryConfig, params: Record<string, un
           ...params,
         },
         pollUrlTemplate: query.pollUrlTemplate,
+        dashboardId: store.activeTemplateId,
         ...(resolvedBody ? { body: resolvedBody } : {}),
       }),
     });
