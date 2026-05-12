@@ -31,20 +31,21 @@ export default function LoginPage() {
       const json = await response.json().catch(() => null);
 
       if (!response.ok) {
+        setSubmitting(false);
         setError((json as { error?: string; detail?: string } | null)?.error ?? (json as { detail?: string } | null)?.detail ?? 'Login failed');
         return;
       }
 
       if (!storeAuthTokensFromResponse(json)) {
+        setSubmitting(false);
         setError('Login succeeded, but no access token was returned.');
         return;
       }
 
       navigate(from, { replace: true });
     } catch {
-      setError('Failed to fetch');
-    } finally {
       setSubmitting(false);
+      setError('Failed to fetch');
     }
   };
 
