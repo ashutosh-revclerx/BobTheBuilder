@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 
 const mode = process.argv[2] ?? 'dev';
 const npmCli = process.env.npm_execpath;
+const pythonCli = process.env.PYTHON ?? 'python';
 
 if (!npmCli) {
   console.error('npm_execpath is not set. Run this script through npm, for example: npm run dev');
@@ -10,18 +11,20 @@ if (!npmCli) {
 
 const commands = mode === 'preview'
   ? [
-      { name: 'backend', args: ['run', 'dev', '-w', '@btb/backend'] },
-      { name: 'frontend', args: ['run', 'preview', '-w', '@btb/frontend'] },
+      { name: 'backend', command: pythonCli, args: ['-m', 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '3001'], cwd: 'apps/backend' },
+      { name: 'frontend', command: process.execPath, args: [npmCli, 'run', 'preview', '-w', '@btb/frontend'] },
     ]
   : [
-      { name: 'backend', args: ['run', 'dev', '-w', '@btb/backend'] },
-      { name: 'frontend', args: ['run', 'dev', '-w', '@btb/frontend'] },
+      { name: 'backend', command: pythonCli, args: ['-m', 'uvicorn', 'app.main:app', '--reload', '--host', '0.0.0.0', '--port', '3001'], cwd: 'apps/backend' },
+      { name: 'frontend', command: process.execPath, args: [npmCli, 'run', 'dev', '-w', '@btb/frontend'] },
     ];
 
-const children = commands.map(({ name, args }) => {
-  const child = spawn(process.execPath, [npmCli, ...args], {
+const children = commands.map(({ name, command, args, cwd }) => {
+  const child = spawn(command, args, {
+    cwd,
     stdio: ['inherit', 'pipe', 'pipe'],
     env: process.env,
+    shell: process.platform === 'win32',
   });
 
   const prefix = `[${name}] `;

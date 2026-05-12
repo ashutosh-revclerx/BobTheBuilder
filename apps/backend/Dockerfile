@@ -1,33 +1,15 @@
-# ── Stage 1: build ────────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM python:3.12-slim AS runner
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-COPY packages/shared/package.json ./packages/shared/
-COPY apps/backend/package.json    ./apps/backend/
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-RUN npm ci
+COPY apps/backend/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY packages/shared ./packages/shared
-COPY apps/backend    ./apps/backend
-
-RUN npm run build -w @btb/backend
-
-# ── Stage 2: run ──────────────────────────────────────────────────────────────
-FROM node:22-alpine AS runner
-
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-COPY packages/shared/package.json ./packages/shared/
-COPY apps/backend/package.json    ./apps/backend/
-
-RUN npm ci --omit=dev
-
-COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
-COPY packages/shared ./packages/shared
+COPY apps/backend/app ./app
 
 EXPOSE 3001
 
-CMD ["node", "apps/backend/dist/server.js"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3001", "--workers", "2"]

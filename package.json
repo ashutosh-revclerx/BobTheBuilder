@@ -2,7 +2,7 @@
   "name": "bob-the-builder",
   "private": true,
   "workspaces": [
-    "apps/*",
+    "apps/frontend",
     "packages/*"
   ],
   "scripts": {

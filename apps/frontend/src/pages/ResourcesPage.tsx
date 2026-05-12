@@ -101,7 +101,7 @@ export default function ResourcesPage() {
       const json = await response.json();
 
       if (!response.ok || !json.success) {
-        setBanner({ kind: 'error', text: json.error || 'Import failed' });
+        setBanner({ kind: 'error', text: json.error || json.detail || 'Import failed' });
         return;
       }
 

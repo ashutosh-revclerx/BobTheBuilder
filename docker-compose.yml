@@ -33,17 +33,6 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
-  llm:
-    build: ./apps/llm-service
-    container_name: dashboard_llm
-    env_file:
-      - ./apps/llm-service/.env
-    ports:
-      - "8001:8001"
-    volumes:
-      - ./apps/llm-service/app:/service/app
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
-
   backend:
     build:
       context: .
@@ -53,7 +42,6 @@ services:
       - ./apps/backend/.env
     environment:
       DATABASE_URL: postgresql://dashboard_user:dashboard_pass@postgres:5432/dashboard_db
-      LLM_SERVICE_URL: http://llm:8001
     ports:
       - "3001:3001"
     depends_on:
