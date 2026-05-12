@@ -31,7 +31,11 @@ export default function LoginPage() {
       const json = await response.json().catch(() => null);
 
       if (!response.ok) {
-        const errorMessage = (json as { error?: string; detail?: string } | null)?.error ?? (json as { detail?: string } | null)?.detail ?? 'Login failed';
+        let errorMessage = 'Login failed';
+        if (json && typeof json === 'object') {
+          const obj = json as Record<string, unknown>;
+          errorMessage = (obj.error as string) || (obj.detail as string) || (obj.message as string) || 'Login failed';
+        }
         setSubmitting(false);
         setError(errorMessage);
         return;
@@ -47,7 +51,8 @@ export default function LoginPage() {
     } catch (err) {
       console.error('Login error:', err);
       setSubmitting(false);
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      const message = err instanceof Error ? err.message : 'An error occurred';
+      setError(typeof message === 'string' ? message : 'An error occurred');
     }
   };
 
