@@ -31,8 +31,9 @@ export default function LoginPage() {
       const json = await response.json().catch(() => null);
 
       if (!response.ok) {
+        const errorMessage = (json as { error?: string; detail?: string } | null)?.error ?? (json as { detail?: string } | null)?.detail ?? 'Login failed';
         setSubmitting(false);
-        setError((json as { error?: string; detail?: string } | null)?.error ?? (json as { detail?: string } | null)?.detail ?? 'Login failed');
+        setError(errorMessage);
         return;
       }
 
@@ -43,9 +44,10 @@ export default function LoginPage() {
       }
 
       navigate(from, { replace: true });
-    } catch {
+    } catch (err) {
+      console.error('Login error:', err);
       setSubmitting(false);
-      setError('Failed to fetch');
+      setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
