@@ -3,6 +3,29 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Activity, AlertCircle, Lock, Mail } from 'lucide-react';
 import { API_BASE_URL, storeAuthTokensFromResponse } from '../config/api';
 
+function extractErrorMessage(payload: unknown, fallback = 'Login failed'): string {
+  if (typeof payload === 'string') {
+    return payload || fallback;
+  }
+  if (!payload || typeof payload !== 'object') {
+    return fallback;
+  }
+  const obj = payload as Record<string, unknown>;
+  for (const key of ['error', 'detail', 'message', 'msg', 'error_description']) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.length > 0) {
+      return value;
+    }
+    if (value && typeof value === 'object') {
+      const nested = extractErrorMessage(value, '');
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+  return fallback;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,11 +54,7 @@ export default function LoginPage() {
       const json = await response.json().catch(() => null);
 
       if (!response.ok) {
-        let errorMessage = 'Login failed';
-        if (json && typeof json === 'object') {
-          const obj = json as Record<string, unknown>;
-          errorMessage = (obj.error as string) || (obj.detail as string) || (obj.message as string) || 'Login failed';
-        }
+        const errorMessage = extractErrorMessage(json, response.status === 401 ? 'Invalid email or password' : 'Login failed');
         setSubmitting(false);
         setError(errorMessage);
         return;
@@ -51,8 +70,7 @@ export default function LoginPage() {
     } catch (err) {
       console.error('Login error:', err);
       setSubmitting(false);
-      const message = err instanceof Error ? err.message : 'An error occurred';
-      setError(typeof message === 'string' ? message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'An error occurred. Please try again.');
     }
   };
 
@@ -68,7 +86,7 @@ export default function LoginPage() {
         {error ? (
           <div className="login-error" role="alert">
             <AlertCircle size={16} />
-            <span>{error}</span>
+            <span>{typeof error === 'string' ? error : 'Login failed'}</span>
           </div>
         ) : null}
 
