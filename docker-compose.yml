@@ -11,6 +11,12 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dashboard_user -d dashboard_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -22,22 +28,54 @@ services:
     ports:
       - "5050:80"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
   llm:
-    build: ./apps/backend/services/llm
+    build: ./apps/llm-service
     container_name: dashboard_llm
     env_file:
-      - ./apps/backend/services/llm/.env
+      - ./apps/llm-service/.env
     ports:
       - "8001:8001"
-    # Mount the source for hot-reload during development. Remove this volume
-    # in production if you want the baked-in image to be authoritative.
     volumes:
-      - ./apps/backend/services/llm/app:/service/app
+      - ./apps/llm-service/app:/service/app
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: dashboard_backend
+    env_file:
+      - ./apps/backend/.env
+    environment:
+      DATABASE_URL: postgresql://dashboard_user:dashboard_pass@postgres:5432/dashboard_db
+      LLM_SERVICE_URL: http://llm:8001
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      # VITE_API_BASE_URL is left unset so the app defaults to /api/v1,
+      # which nginx proxies to the backend container. Override here if your
+      # API lives at a different origin (e.g. a separate subdomain).
+      # args:
+      #   VITE_API_BASE_URL: https://api.yourdomain.com/api/v1
+    container_name: dashboard_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   pgdata:

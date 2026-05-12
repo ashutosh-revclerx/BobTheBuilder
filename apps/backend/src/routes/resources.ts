@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/client.js';
 import { parseSwaggerDoc } from '../utils/swaggerParser.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('resources');
 
 const router = Router();
 
@@ -98,7 +101,7 @@ router.post('/', async (req, res) => {
     if (pgCode(err) === PG_UNIQUE_VIOLATION) {
       return res.status(409).json({ error: `Resource name "${name}" is already taken` });
     }
-    console.error('[resources] create:', err);
+    log.error('create:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -112,7 +115,7 @@ router.get('/', async (_req, res) => {
     );
     return res.json(rows);
   } catch (err) {
-    console.error('[resources] list:', err);
+    log.error('list:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -206,7 +209,7 @@ router.post('/import-swagger', async (req, res) => {
     });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined);
-    console.error('[resources] import-swagger:', err);
+    log.error('import-swagger:', err);
     return res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
@@ -260,7 +263,7 @@ router.get('/:id/schema', async (req, res) => {
 
     return res.json({ tables });
   } catch (err) {
-    console.error('[resources] schema:', err);
+    log.error('schema:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -291,7 +294,7 @@ router.post('/:id/preview', async (req, res) => {
 
     return res.json({ rows: result.rows });
   } catch (err: any) {
-    console.error('[resources] preview:', err);
+    log.error('preview:', err);
     return res.status(400).json({
       error: 'Query failed',
       details: err.message,
@@ -322,7 +325,7 @@ router.get('/:id/endpoints', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid resource ID' });
     }
-    console.error('[resources] endpoints:', err);
+    log.error('endpoints:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -343,7 +346,7 @@ router.get('/:id', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid resource ID' });
     }
-    console.error('[resources] get:', err);
+    log.error('get:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -396,7 +399,7 @@ router.put('/:id', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid resource ID' });
     }
-    console.error('[resources] update:', err);
+    log.error('update:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -417,7 +420,7 @@ router.delete('/:id', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid resource ID' });
     }
-    console.error('[resources] delete:', err);
+    log.error('delete:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

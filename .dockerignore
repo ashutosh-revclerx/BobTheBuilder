@@ -1,0 +1,13 @@
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+**/dist
+**/.vite
+**/coverage
+**/__pycache__
+**/*.pyc
+**/.venv
+**/pgadmin_data
+apps/backend-py
+apps/llm-service

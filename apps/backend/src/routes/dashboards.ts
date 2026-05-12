@@ -1,20 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/client.js';
+import { env } from '../config/env.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('dashboards');
 
 const router = Router();
 
-const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL ?? 'http://localhost:8001';
-const DEFAULT_LLM_TIMEOUT_MS = 180_000;
-
-function readPositiveIntEnv(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-const LLM_TIMEOUT_MS = readPositiveIntEnv('LLM_TIMEOUT_MS', DEFAULT_LLM_TIMEOUT_MS);
+const LLM_TIMEOUT_MS = env.llmTimeoutMs;
 
 const GenerateSchema = z.object({
   prompt:        z.string().min(3),
@@ -95,7 +89,7 @@ router.post('/', async (req, res) => {
         slug = `${parsed.data.slug ?? toSlug(name)}-${attempts}`;
         continue;
       }
-      console.error('[dashboards] create:', err);
+      log.error('create:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -136,7 +130,7 @@ router.get('/', async (_req, res) => {
     );
     return res.json(rows);
   } catch (err) {
-    console.error('[dashboards] list:', err);
+    log.error('list:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -157,12 +151,8 @@ router.post('/generate', async (req, res) => {
     });
   }
   const { prompt, resourceIds, docsUrls, variantCount } = parsed.data;
-  console.info(
-    '[dashboards] generate request prompt_len=%d resource_ids=%d docs=%d variants=%d',
-    prompt.length,
-    resourceIds.length,
-    docsUrls.length,
-    variantCount,
+  log.info(
+    `generate request prompt_len=${prompt.length} resource_ids=${resourceIds.length} docs=${docsUrls.length} variants=${variantCount}`,
   );
 
   // Hydrate the resource IDs into the shape the LLM service expects.
@@ -206,7 +196,7 @@ router.post('/generate', async (req, res) => {
         endpoints: r.endpoints ?? [],
       }));
     } catch (err) {
-      console.error('[dashboards] generate resource lookup:', err);
+      log.error('generate resource lookup:', err);
       return res.status(500).json({ error: 'Could not load resources for the LLM' });
     }
   }
@@ -218,7 +208,7 @@ router.post('/generate', async (req, res) => {
 
   try {
     const upstreamStartedAt = Date.now();
-    const response = await fetch(`${LLM_SERVICE_URL}/generate`, {
+    const response = await fetch(`${env.llmServiceUrl}/generate`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
@@ -239,34 +229,20 @@ router.post('/generate', async (req, res) => {
       const detail = (json && typeof json === 'object' && 'detail' in json)
         ? String((json as Record<string, unknown>).detail)
         : text || `LLM service returned ${response.status}`;
-      console.error(
-        '[dashboards] generate upstream_error status=%d duration_ms=%d detail=%s',
-        response.status,
-        upstreamDurationMs,
-        detail.slice(0, 500),
-      );
+      log.error(`generate upstream_error status=${response.status} duration_ms=${upstreamDurationMs} detail=${detail.slice(0, 500)}`);
       return res.status(502).json({ error: detail });
     }
 
     const totalDurationMs = Date.now() - startedAt;
-    console.info(
-      '[dashboards] generate success upstream_status=%d upstream_ms=%d total_ms=%d',
-      response.status,
-      upstreamDurationMs,
-      totalDurationMs,
-    );
+    log.info(`generate success upstream_status=${response.status} upstream_ms=${upstreamDurationMs} total_ms=${totalDurationMs}`);
     return res.json(json);
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
       const seconds = Math.round(LLM_TIMEOUT_MS / 1000);
-      console.error(
-        '[dashboards] generate timeout timeout_ms=%d llm_url=%s',
-        LLM_TIMEOUT_MS,
-        `${LLM_SERVICE_URL}/generate`,
-      );
+      log.error(`generate timeout timeout_ms=${LLM_TIMEOUT_MS} llm_url=${env.llmServiceUrl}/generate`);
       return res.status(504).json({ error: `LLM service took longer than ${seconds} seconds` });
     }
-    console.error('[dashboards] generate proxy error:', err);
+    log.error('generate proxy error:', err);
     return res.status(502).json({ error: 'Could not reach the LLM service' });
   } finally {
     clearTimeout(timer);
@@ -291,7 +267,7 @@ router.get('/:id', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid dashboard ID' });
     }
-    console.error('[dashboards] get:', err);
+    log.error('get:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -372,7 +348,7 @@ router.put('/:id', async (req, res) => {
       if (pgCode(err) === PG_INVALID_UUID) {
         return res.status(400).json({ error: 'Invalid dashboard ID' });
       }
-      console.error('[dashboards] update:', err);
+      log.error('update:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -413,7 +389,7 @@ router.patch('/:id/publish', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid dashboard ID' });
     }
-    console.error('[dashboards] publish:', err);
+    log.error('publish:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -443,25 +419,25 @@ router.post('/:id/assign', async (req, res) => {
       return res.status(404).json({ error: 'Dashboard not found' });
     }
 
-    // 2. Sync assignments (delete existing, then insert new)
-    await pool.query('BEGIN');
+    // 2. Sync assignments atomically — dedicated client guarantees all queries
+    //    run on the same connection, which pool.query('BEGIN') does NOT guarantee.
+    const client = await pool.connect();
     try {
-      await pool.query('DELETE FROM dashboard_assignments WHERE dashboard_id = $1', [dashboardId]);
-      
+      await client.query('BEGIN');
+      await client.query('DELETE FROM dashboard_assignments WHERE dashboard_id = $1', [dashboardId]);
       if (customer_ids.length > 0) {
-        // Use a single query for multiple inserts if possible, or loop for simplicity
-        for (const cid of customer_ids) {
-          await pool.query(
-            `INSERT INTO dashboard_assignments (dashboard_id, customer_id)
-             VALUES ($1, $2)`,
-            [dashboardId, cid]
-          );
-        }
+        await client.query(
+          `INSERT INTO dashboard_assignments (dashboard_id, customer_id)
+           SELECT $1, UNNEST($2::uuid[])`,
+          [dashboardId, customer_ids],
+        );
       }
-      await pool.query('COMMIT');
+      await client.query('COMMIT');
     } catch (e) {
-      await pool.query('ROLLBACK');
+      await client.query('ROLLBACK');
       throw e;
+    } finally {
+      client.release();
     }
 
     // 3. Return updated list of assigned customers
@@ -479,7 +455,7 @@ router.post('/:id/assign', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid ID' });
     }
-    console.error('[dashboards] assign:', err);
+    log.error('assign:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -519,7 +495,7 @@ router.get('/:id/customers', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid dashboard ID' });
     }
-    console.error('[dashboards] get assigned customers:', err);
+    log.error('get assigned customers:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -543,7 +519,7 @@ router.delete('/:id', async (req, res) => {
     if (pgCode(err) === '23503') {
       return res.status(409).json({ error: 'Dashboard is still referenced — unassign any customers first' });
     }
-    console.error('[dashboards] delete:', err);
+    log.error('delete:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

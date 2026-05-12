@@ -42,16 +42,19 @@ coverage/
 .vite/
 *.tsbuildinfo
 
-# Python (LLM service)
-apps/backend/services/llm/.venv/
-apps/backend/services/llm/.env
-apps/backend/services/llm/.env.*
-!apps/backend/services/llm/.env.example
+# Python (LLM service — apps/llm-service/)
+apps/llm-service/.venv/
+apps/llm-service/.env
+apps/llm-service/.env.*
+!apps/llm-service/.env.example
 __pycache__/
 *.pyc
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Deprecated Python backend (untracked — ignored if it reappears after branch switch)
+apps/backend-py/
 
 # Dashboard Exports
 *-export.zip

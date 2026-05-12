@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { pool } from '../db/client.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('customers');
 
 const router = Router();
 
@@ -89,7 +92,7 @@ router.post('/', async (req, res) => {
     if (pgCode(err) === PG_FOREIGN_KEY) {
       return res.status(400).json({ error: 'dashboard_id does not reference an existing dashboard' });
     }
-    console.error('[customers] create:', err);
+    log.error('create:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -105,7 +108,7 @@ router.get('/', async (_req, res) => {
     );
     return res.json(rows);
   } catch (err) {
-    console.error('[customers] list:', err);
+    log.error('list:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -202,7 +205,7 @@ router.get('/:slug/dashboard', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('[customers] slug→dashboard:', err);
+    log.error('slug→dashboard:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -225,7 +228,7 @@ router.get('/:id', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid customer ID' });
     }
-    console.error('[customers] get:', err);
+    log.error('get:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -280,7 +283,7 @@ router.put('/:id', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid customer ID' });
     }
-    console.error('[customers] update:', err);
+    log.error('update:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -301,7 +304,7 @@ router.delete('/:id', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid customer ID' });
     }
-    console.error('[customers] delete:', err);
+    log.error('delete:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -323,7 +326,7 @@ router.get('/:id/dashboards', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid customer ID' });
     }
-    console.error('[customers] list dashboards:', err);
+    log.error('list dashboards:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -349,7 +352,7 @@ router.post('/:id/rotate-token', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid customer ID' });
     }
-    console.error('[customers] rotate-token:', err);
+    log.error('rotate-token:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -374,7 +377,7 @@ router.post('/:id/clear-token', async (req, res) => {
     if (pgCode(err) === PG_INVALID_UUID) {
       return res.status(400).json({ error: 'Invalid customer ID' });
     }
-    console.error('[customers] clear-token:', err);
+    log.error('clear-token:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

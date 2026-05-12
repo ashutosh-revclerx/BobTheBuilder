@@ -5,10 +5,10 @@
   "scripts": {
     "start": "tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
+    "build": "tsc --project tsconfig.json",
     "migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
-    "@btb/shared": "*",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^4.21.2",

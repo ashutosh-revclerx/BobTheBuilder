@@ -1,19 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { env } from '../config/env.js';
+import { createLogger } from '../utils/logger.js';
+
+const log = createLogger('assistant');
 
 const router = Router();
 
-const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL ?? 'http://localhost:8001';
-const DEFAULT_LLM_TIMEOUT_MS = 60_000; // chat is faster than generation; tighter cap
-
-function readPositiveIntEnv(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-const LLM_CHAT_TIMEOUT_MS = readPositiveIntEnv('LLM_CHAT_TIMEOUT_MS', DEFAULT_LLM_TIMEOUT_MS);
+const LLM_CHAT_TIMEOUT_MS = env.llmChatTimeoutMs;
 
 const ChatMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -63,7 +57,7 @@ router.post('/chat', async (req, res) => {
   const timer = setTimeout(() => controller.abort(), LLM_CHAT_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${LLM_SERVICE_URL}/chat`, {
+    const response = await fetch(`${env.llmServiceUrl}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(parsed.data),
@@ -78,20 +72,20 @@ router.post('/chat', async (req, res) => {
       const detail = (json && typeof json === 'object' && 'detail' in json)
         ? String((json as Record<string, unknown>).detail)
         : text || `LLM service returned ${response.status}`;
-      console.error('[assistant] chat upstream error status=%d detail=%s', response.status, detail.slice(0, 300));
+      log.error(`chat upstream error status=${response.status} detail=${detail.slice(0, 300)}`);
       return res.status(502).json({ error: detail });
     }
 
     const totalDurationMs = Date.now() - startedAt;
-    console.info('[assistant] chat success duration_ms=%d', totalDurationMs);
+    log.info(`chat success duration_ms=${totalDurationMs}`);
     return res.json(json);
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
       const seconds = Math.round(LLM_CHAT_TIMEOUT_MS / 1000);
-      console.error('[assistant] chat timeout timeout_ms=%d', LLM_CHAT_TIMEOUT_MS);
+      log.error(`chat timeout timeout_ms=${LLM_CHAT_TIMEOUT_MS}`);
       return res.status(504).json({ error: `Assistant took longer than ${seconds} seconds` });
     }
-    console.error('[assistant] chat proxy error:', err);
+    log.error('chat proxy error:', err);
     return res.status(502).json({ error: 'Could not reach the LLM service' });
   } finally {
     clearTimeout(timer);
