@@ -371,13 +371,20 @@ async def upload_file(
     field_name = (x_btb_field_name or "file").strip() or "file"
 
     if (not resource_id and not resource_name) or not endpoint_path:
+        log.warn(
+            f"upload 400 missing-headers: resource_id={bool(resource_id)} "
+            f"resource_name={bool(resource_name)} endpoint_path={bool(endpoint_path)} "
+            f"— configure the FileUpload component's Data panel"
+        )
         return JSONResponse(
             status_code=400,
             content={
                 "success": False,
                 "error": (
                     "Missing x-btb-resource-id or x-btb-resource-name, "
-                    "or missing x-btb-endpoint-path header"
+                    "or missing x-btb-endpoint-path header. "
+                    "Open the FileUpload in the builder → Data tab → "
+                    "select Resource and Upload endpoint."
                 ),
             },
         )
@@ -392,18 +399,53 @@ async def upload_file(
     ):
         return JSONResponse(status_code=401, content={"success": False, "error": "Unauthorized"})
 
-    form = await request.form()
+    try:
+        form = await request.form()
+    except Exception as parse_err:
+        log.error(f"upload form parse failed: {parse_err}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": f"Could not parse multipart body: {parse_err}",
+            },
+        )
+
+    # Duck-typed file detection. `form.multi_items()` returns Starlette's
+    # `starlette.datastructures.UploadFile`, but `fastapi.UploadFile` is a
+    # different subclass — isinstance would silently miss every file.
     files: list[UploadFile] = []
     body_fields: dict[str, str] = {}
     for k, v in form.multi_items():
-        if isinstance(v, UploadFile):
-            files.append(v)
+        if hasattr(v, "filename") and hasattr(v, "read"):
+            files.append(v)  # type: ignore[arg-type]
         elif isinstance(v, str):
             body_fields[k] = v
 
     if not files:
+        # Diagnostic: surface what actually arrived so the cause is obvious in
+        # the next failed upload. Most common: Content-Type isn't multipart
+        # (form-data), browser sent an empty body, or nginx truncated it.
+        keys_seen = list(form.keys())
+        types_seen = [type(v).__name__ for _, v in form.multi_items()]
+        ct = request.headers.get("content-type", "<none>")
+        cl = request.headers.get("content-length", "<none>")
+        log.warn(
+            f"upload 400 no-files: content_type={ct!r} content_length={cl} "
+            f"form_keys={keys_seen} value_types={types_seen} expected_field_name={field_name!r}"
+        )
         return JSONResponse(
-            status_code=400, content={"success": False, "error": "No files in request"}
+            status_code=400,
+            content={
+                "success": False,
+                "error": "No files in request",
+                "debug": {
+                    "content_type": ct,
+                    "content_length": cl,
+                    "form_keys": keys_seen,
+                    "expected_field_name": field_name,
+                },
+            },
         )
 
     # Enforce 50 MB cap (matches Node multer limit)

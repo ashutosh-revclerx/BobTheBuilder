@@ -63,6 +63,57 @@ export default function ResourcesPage() {
   const [expandedEndpoints, setExpandedEndpoints] = useState<ImportedEndpoint[]>([]);
   const [confirmDeleteId, setConfirmDeleteId]     = useState<string | null>(null);
 
+  // ── Inline edit state ──────────────────────────────────────────────────────
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editBaseUrl, setEditBaseUrl] = useState('');
+  const [editAuthType, setEditAuthType] = useState<AuthType>('none');
+  const [editSecretRef, setEditSecretRef] = useState('');
+  const [editPollUrlTemplate, setEditPollUrlTemplate] = useState('');
+  const [editType, setEditType] = useState<ResourceType>('REST');
+  const [editSaving, setEditSaving] = useState(false);
+
+  const openEdit = (resource: Resource) => {
+    setEditingId(resource.id);
+    setEditBaseUrl(resource.base_url ?? '');
+    setEditAuthType((resource.auth_type as AuthType) || 'none');
+    setEditSecretRef(''); // never returned by API; user types to overwrite, blank = keep current
+    setEditPollUrlTemplate(resource.poll_url_template ?? '');
+    setEditType((resource.type as ResourceType) || 'REST');
+  };
+
+  const saveEdit = async (resourceId: string) => {
+    setEditSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        type: editType,
+        base_url: editBaseUrl.trim() || null,
+        auth_type: editAuthType,
+        poll_url_template: editPollUrlTemplate.trim() || null,
+      };
+      // Only send secret_ref if the user typed something — empty string means "keep current"
+      if (editSecretRef.trim()) {
+        body.secret_ref = editSecretRef.trim();
+      }
+      const response = await apiFetch(`${API_BASE_URL}/resources/${resourceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setBanner({ kind: 'error', text: json.error || json.detail || 'Could not update resource.' });
+        return;
+      }
+      setBanner({ kind: 'success', text: 'Resource updated.' });
+      setEditingId(null);
+      refreshResources();
+    } catch {
+      setBanner({ kind: 'error', text: 'Network error while updating.' });
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const refreshResources = () => {
     apiFetch(`${API_BASE_URL}/resources`)
       .then((r) => r.json())
@@ -560,6 +611,7 @@ export default function ResourcesPage() {
               {resources.map((resource) => {
                 const isExpanded = expandedId === resource.id;
                 const isConfirming = confirmDeleteId === resource.id;
+                const isEditing = editingId === resource.id;
                 return (
                   <li key={resource.id} className="resources-list-item">
                     <div className="resources-list-row">
@@ -575,6 +627,12 @@ export default function ResourcesPage() {
                         <button className="btn-topbar" onClick={() => void handleToggleExpand(resource)}>
                           {isExpanded ? 'Hide' : 'View Endpoints'}
                         </button>
+                        <button
+                          className="btn-topbar"
+                          onClick={() => (isEditing ? setEditingId(null) : openEdit(resource))}
+                        >
+                          {isEditing ? 'Cancel' : 'Edit'}
+                        </button>
                         {isConfirming ? (
                           <div className="dashboard-card-delete-confirm">
                             <span>Delete?</span>
@@ -588,6 +646,100 @@ export default function ResourcesPage() {
                         )}
                       </div>
                     </div>
+
+                    {isEditing && (
+                      <div className="resources-list-expanded">
+                        <div className="resources-form" style={{ marginBottom: 0 }}>
+                          <label className="form-group">
+                            <span className="form-label">Type</span>
+                            <select
+                              className="form-select"
+                              value={editType}
+                              onChange={(e) => setEditType(e.target.value as ResourceType)}
+                            >
+                              <option value="REST">REST</option>
+                              <option value="agent">agent</option>
+                              <option value="postgresql">postgresql</option>
+                            </select>
+                          </label>
+
+                          {(editType === 'REST' || editType === 'agent') && (
+                            <label className="form-group">
+                              <span className="form-label">Base URL</span>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={editBaseUrl}
+                                onChange={(e) => setEditBaseUrl(e.target.value)}
+                                placeholder="https://api.example.com"
+                              />
+                            </label>
+                          )}
+
+                          {editType !== 'postgresql' && (
+                            <label className="form-group">
+                              <span className="form-label">Auth type</span>
+                              <select
+                                className="form-select"
+                                value={editAuthType}
+                                onChange={(e) => setEditAuthType(e.target.value as AuthType)}
+                              >
+                                <option value="none">None</option>
+                                <option value="bearer">Bearer</option>
+                                <option value="api_key">API Key</option>
+                                <option value="basic">Basic</option>
+                              </select>
+                            </label>
+                          )}
+
+                          <label className="form-group">
+                            <span className="form-label">
+                              {editType === 'postgresql' ? 'Connection string' : 'Secret value'}
+                            </span>
+                            <input
+                              type="password"
+                              className="form-input"
+                              value={editSecretRef}
+                              onChange={(e) => setEditSecretRef(e.target.value)}
+                              placeholder={
+                                resource.has_secret
+                                  ? '••••••• (leave blank to keep current)'
+                                  : 'Paste the secret value here'
+                              }
+                              autoComplete="new-password"
+                            />
+                            <span className="form-help">
+                              Leave blank to keep the existing secret unchanged. Typing here overwrites it.
+                            </span>
+                          </label>
+
+                          {editType === 'agent' && (
+                            <label className="form-group">
+                              <span className="form-label">Poll URL template</span>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={editPollUrlTemplate}
+                                onChange={(e) => setEditPollUrlTemplate(e.target.value)}
+                                placeholder="/v1/person-lookup/{{jobId}}"
+                              />
+                              <span className="form-help">
+                                Use <code>{`{{jobId}}`}</code>. Only needed if the kickoff response doesn't return a <code>poll_url</code>.
+                              </span>
+                            </label>
+                          )}
+
+                          <button
+                            type="button"
+                            className="btn-topbar primary"
+                            disabled={editSaving}
+                            onClick={() => void saveEdit(resource.id)}
+                          >
+                            {editSaving ? 'Saving…' : 'Save changes'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {isExpanded && (
                       <div className="resources-list-expanded">
