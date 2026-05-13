@@ -44,7 +44,7 @@ _TYPES = ("REST", "postgresql", "agent")
 _AUTH_TYPES = ("none", "bearer", "api_key", "basic")
 
 _SAFE_COLS = (
-    "id, name, type, base_url, auth_type, "
+    "id, name, type, base_url, auth_type, poll_url_template, "
     "(secret_ref IS NOT NULL) AS has_secret, created_at"
 )
 
@@ -142,6 +142,8 @@ class ImportSwaggerSchema(BaseModel):
     baseUrl: str
     authType: Literal["none", "bearer", "api_key", "basic"] = "none"
     secretRef: str | None = None
+    resourceType: Literal["REST", "agent"] = "REST"
+    pollUrlTemplate: str | None = None
 
 
 class CreateSchema(BaseModel):
@@ -150,6 +152,7 @@ class CreateSchema(BaseModel):
     base_url: str | None = None
     auth_type: Literal["none", "bearer", "api_key", "basic"] = "none"
     secret_ref: str | None = None
+    poll_url_template: str | None = None
 
     @model_validator(mode="after")
     def _check_base_url(self):
@@ -164,6 +167,7 @@ class UpdateSchema(BaseModel):
     base_url: str | None = None
     auth_type: Literal["none", "bearer", "api_key", "basic"] | None = None
     secret_ref: str | None = None
+    poll_url_template: str | None = None
 
     @model_validator(mode="after")
     def _check_base_url(self):
@@ -181,14 +185,15 @@ async def create_resource(body: CreateSchema):
     pool = get_pool()
     try:
         row = await pool.fetchrow(
-            f"""INSERT INTO resources (name, type, base_url, auth_type, secret_ref)
-                VALUES ($1, $2, $3, $4, $5)
+            f"""INSERT INTO resources (name, type, base_url, auth_type, secret_ref, poll_url_template)
+                VALUES ($1, $2, $3, $4, $5, $6)
                 RETURNING {_SAFE_COLS}""",
             body.name,
             body.type,
             body.base_url,
             body.auth_type,
             body.secret_ref,
+            body.poll_url_template,
         )
         return JSONResponse(status_code=201, content=row_to_dict(row))
     except asyncpg.PostgresError as err:
@@ -237,17 +242,22 @@ async def import_swagger(body: ImportSwaggerSchema):
         try:
             async with conn.transaction():
                 resource_row = await conn.fetchrow(
-                    """INSERT INTO resources (name, type, base_url, auth_type, secret_ref)
-                       VALUES ($1, 'REST', $2, $3, $4)
+                    """INSERT INTO resources
+                         (name, type, base_url, auth_type, secret_ref, poll_url_template)
+                       VALUES ($1, $2, $3, $4, $5, $6)
                        ON CONFLICT (name) DO UPDATE
-                         SET base_url   = EXCLUDED.base_url,
-                             auth_type  = EXCLUDED.auth_type,
-                             secret_ref = EXCLUDED.secret_ref
+                         SET type              = EXCLUDED.type,
+                             base_url          = EXCLUDED.base_url,
+                             auth_type         = EXCLUDED.auth_type,
+                             secret_ref        = EXCLUDED.secret_ref,
+                             poll_url_template = EXCLUDED.poll_url_template
                        RETURNING id, name""",
                     body.resourceName,
+                    body.resourceType,
                     body.baseUrl,
                     body.authType,
                     body.secretRef,
+                    body.pollUrlTemplate,
                 )
                 resource_id = resource_row["id"]
 
@@ -442,7 +452,7 @@ async def update_resource(resource_id: str, body: UpdateSchema):
     set_clauses: list[str] = []
     values: list[Any] = []
     i = 1
-    for k in ("name", "type", "base_url", "auth_type", "secret_ref"):
+    for k in ("name", "type", "base_url", "auth_type", "secret_ref", "poll_url_template"):
         if k in data:
             set_clauses.append(f"{k} = ${i}")
             values.append(data[k])

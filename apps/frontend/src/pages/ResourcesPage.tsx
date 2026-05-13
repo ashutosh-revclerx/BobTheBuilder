@@ -9,13 +9,14 @@ type AuthType = 'none' | 'bearer' | 'api_key' | 'basic';
 type ResourceType = 'REST' | 'agent' | 'postgresql';
 
 interface Resource {
-  id:         string;
-  name:       string;
-  type:       string;
-  base_url:   string | null;
-  auth_type:  string | null;
-  has_secret: boolean;
-  created_at: string;
+  id:                 string;
+  name:               string;
+  type:               string;
+  base_url:           string | null;
+  auth_type:          string | null;
+  poll_url_template:  string | null;
+  has_secret:         boolean;
+  created_at:         string;
 }
 
 interface ImportResponse {
@@ -36,6 +37,8 @@ export default function ResourcesPage() {
   const [baseUrl, setBaseUrl]           = useState('');
   const [authType, setAuthType]         = useState<AuthType>('none');
   const [secretRef, setSecretRef]       = useState('');
+  const [importType, setImportType]                 = useState<'REST' | 'agent'>('REST');
+  const [importPollUrlTemplate, setImportPollUrlTemplate] = useState('');
   const [importing, setImporting]       = useState(false);
   const [banner, setBanner]             = useState<Banner | null>(null);
 
@@ -51,6 +54,7 @@ export default function ResourcesPage() {
   const [manualBaseUrl, setManualBaseUrl]         = useState('');
   const [manualAuthType, setManualAuthType]       = useState<AuthType>('none');
   const [manualSecretRef, setManualSecretRef]     = useState('');
+  const [manualPollUrlTemplate, setManualPollUrlTemplate] = useState('');
   const [manualSubmitting, setManualSubmitting]   = useState(false);
 
   // ── Existing resources list ────────────────────────────────────────────────
@@ -96,6 +100,10 @@ export default function ResourcesPage() {
           baseUrl,
           authType,
           secretRef: authType !== 'none' ? secretRef : undefined,
+          resourceType: importType,
+          pollUrlTemplate: importType === 'agent' && importPollUrlTemplate.trim()
+            ? importPollUrlTemplate.trim()
+            : undefined,
         }),
       });
       const json = await response.json();
@@ -158,6 +166,11 @@ export default function ResourcesPage() {
       if (manualAuthType !== 'none') body.secret_ref = manualSecretRef.trim();
       // For postgresql, secret_ref carries the connection string — accept it on any auth type
       if (manualType === 'postgresql' && manualSecretRef.trim()) body.secret_ref = manualSecretRef.trim();
+      // Agent resources may carry a poll URL template (used when the kickoff
+      // response doesn't include one).
+      if (manualType === 'agent' && manualPollUrlTemplate.trim()) {
+        body.poll_url_template = manualPollUrlTemplate.trim();
+      }
 
       const response = await apiFetch(`${API_BASE_URL}/resources`, {
         method: 'POST',
@@ -176,6 +189,7 @@ export default function ResourcesPage() {
       setManualName('');
       setManualBaseUrl('');
       setManualSecretRef('');
+      setManualPollUrlTemplate('');
       setManualAuthType('none');
       setManualType('REST');
       setManualOpen(false);
@@ -276,6 +290,40 @@ export default function ResourcesPage() {
             </label>
 
             <label className="form-group">
+              <span className="form-label">Resource type</span>
+              <select
+                className="form-select"
+                value={importType}
+                onChange={(e) => setImportType(e.target.value as 'REST' | 'agent')}
+              >
+                <option value="REST">REST — synchronous API</option>
+                <option value="agent">Agent — async job (kickoff + poll)</option>
+              </select>
+              <span className="form-help">
+                {importType === 'REST'
+                  ? 'Standard request/response — the upstream returns the result immediately.'
+                  : 'Kickoff + polling — POST returns a jobId, we poll until status is done/complete/success (60s cap).'}
+              </span>
+            </label>
+
+            {importType === 'agent' && (
+              <label className="form-group">
+                <span className="form-label">Poll URL template (optional)</span>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="/public/result/{{jobId}}"
+                  value={importPollUrlTemplate}
+                  onChange={(e) => setImportPollUrlTemplate(e.target.value)}
+                />
+                <span className="form-help">
+                  Use <code>{`{{jobId}}`}</code> as the placeholder. Only needed if the kickoff response
+                  doesn't include a <code>poll_url</code> / <code>pollUrl</code> field.
+                </span>
+              </label>
+            )}
+
+            <label className="form-group">
               <span className="form-label">Auth type</span>
               <select
                 className="form-select"
@@ -292,15 +340,19 @@ export default function ResourcesPage() {
 
             {authType !== 'none' && (
               <label className="form-group">
-                <span className="form-label">Secret reference</span>
+                <span className="form-label">Secret value</span>
                 <input
-                  type="text"
+                  type="password"
                   className="form-input"
-                  placeholder="{{env.MY_API_KEY}}"
+                  placeholder="Paste the raw API key, token, or credentials"
                   value={secretRef}
                   onChange={(e) => setSecretRef(e.target.value)}
+                  autoComplete="new-password"
                 />
-                <span className="form-help">Use <code>{`{{env.YOUR_VAR_NAME}}`}</code> — never paste the raw key.</span>
+                <span className="form-help">
+                  Stored in Postgres and never returned via the API (responses show <code>has_secret: true</code> only).
+                  Advanced: you can also use <code>{`{{env.VAR_NAME}}`}</code> to reference a backend env var instead of the raw value.
+                </span>
               </label>
             )}
 
@@ -428,17 +480,40 @@ export default function ResourcesPage() {
               {(manualAuthType !== 'none' || manualType === 'postgresql') && (
                 <label className="form-group">
                   <span className="form-label">
-                    {manualType === 'postgresql' ? 'Connection string (env placeholder)' : 'Secret reference'}
+                    {manualType === 'postgresql' ? 'Connection string' : 'Secret value'}
                   </span>
+                  <input
+                    type="password"
+                    className="form-input"
+                    placeholder={
+                      manualType === 'postgresql'
+                        ? 'postgresql://user:pass@host:5432/db'
+                        : 'Paste the raw API key, token, or credentials'
+                    }
+                    value={manualSecretRef}
+                    onChange={(e) => setManualSecretRef(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                  <span className="form-help">
+                    Stored in Postgres and never returned via the API (responses show <code>has_secret: true</code> only).
+                    Advanced: use <code>{`{{env.VAR_NAME}}`}</code> to reference a backend env var instead.
+                  </span>
+                </label>
+              )}
+
+              {manualType === 'agent' && (
+                <label className="form-group">
+                  <span className="form-label">Poll URL template (optional)</span>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder={manualType === 'postgresql' ? '{{env.READONLY_DB_URL}}' : '{{env.MY_API_KEY}}'}
-                    value={manualSecretRef}
-                    onChange={(e) => setManualSecretRef(e.target.value)}
+                    placeholder="/public/result/{{jobId}}"
+                    value={manualPollUrlTemplate}
+                    onChange={(e) => setManualPollUrlTemplate(e.target.value)}
                   />
                   <span className="form-help">
-                    Use <code>{`{{env.YOUR_VAR_NAME}}`}</code> to reference a backend env var. Never paste the raw key here — it's stored as-is.
+                    Use <code>{`{{jobId}}`}</code> as the placeholder. Only needed if the kickoff response
+                    doesn't include a <code>poll_url</code> / <code>pollUrl</code> field.
                   </span>
                 </label>
               )}

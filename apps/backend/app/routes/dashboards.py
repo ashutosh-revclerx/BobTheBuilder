@@ -207,7 +207,7 @@ async def generate_dashboard(body: GenerateSchema):
             )
 
     # In-process LLM call — no HTTP hop.
-    from ..llm.variants import generate_variants
+    from ..llm.facade import generate_variants
 
     try:
         upstream_started = time.time()

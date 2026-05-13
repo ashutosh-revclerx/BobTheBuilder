@@ -764,8 +764,12 @@ function FileUploadSettings({
 }) {
   const [resources, setResources] = useState<ResourceListItem[]>([]);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  // FileUpload accepts both REST and agent resources. REST endpoints respond
+  // immediately; agent endpoints kick off a job and the FileUpload component
+  // polls a separate progressEndpoint via /execute. The backend upload route
+  // mirrors this allowlist.
   const restResources = useMemo(
-    () => resources.filter((resource) => resource.type === 'REST'),
+    () => resources.filter((resource) => resource.type === 'REST' || resource.type === 'agent'),
     [resources],
   );
   const selectedResource = resources.find((r) => r.id === (data as any).resourceId);

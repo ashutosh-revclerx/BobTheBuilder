@@ -58,7 +58,7 @@ async def chat(body: ChatSchema):
 
     # In-process LLM call. Import here so module load order works even if
     # the LLM module has heavyweight deps.
-    from ..llm.chat import run_chat
+    from ..llm.facade import run_chat
 
     try:
         result = await asyncio.wait_for(

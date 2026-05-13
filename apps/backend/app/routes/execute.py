@@ -128,15 +128,28 @@ def _upload_is_allowed(config: Any, *, resource_id: str, resource_name: str, end
     return False
 
 
+_UUID_RE_LOG = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+)
+
+
 async def _load_public_dashboard_config(dashboard_id: str | None, dashboard_token: str | None) -> Any | None:
+    """Load the dashboard config if the given (id-or-slug, token) pair is valid.
+
+    Accepts either the dashboard UUID or its slug — the frontend's customer
+    view sometimes only has one or the other at call time.
+    """
     if not dashboard_id or not dashboard_token:
         return None
     pool = get_pool()
+    # Cast the candidate to text in SQL so asyncpg never tries to coerce a slug
+    # into UUID. The `d.id::text = $1 OR d.slug = $1` branch handles both forms
+    # without two round trips.
     try:
         row = await pool.fetchrow(
             """SELECT d.config
                FROM dashboards d
-               WHERE d.id = $1
+               WHERE (d.id::text = $1 OR d.slug = $1)
                  AND d.status = 'live'
                  AND EXISTS (
                    SELECT 1
@@ -197,7 +210,15 @@ async def _log_query(
     status: str,
     duration_ms: int,
 ) -> None:
-    """Fire-and-forget query log — never blocks the response."""
+    """Fire-and-forget query log — never blocks the response.
+
+    `dashboard_id` may be a slug when called from the customer-facing dashboard
+    (frontend doesn't always have the UUID handy). The `query_logs.dashboard_id`
+    column is UUID-typed, so we null it out unless it parses as a UUID — keeps
+    the row but avoids polluting logs with DataError noise.
+    """
+    if dashboard_id and not _UUID_RE_LOG.match(dashboard_id):
+        dashboard_id = None
     try:
         pool = get_pool()
         await pool.execute(
@@ -248,7 +269,7 @@ async def execute(
     # 1. Look up resource — only place secret_ref is read
     try:
         resource = await pool.fetchrow(
-            """SELECT id, name, type, base_url, auth_type, secret_ref
+            """SELECT id, name, type, base_url, auth_type, secret_ref, poll_url_template
                FROM resources
                WHERE name = $1""",
             body.resource,
@@ -301,7 +322,9 @@ async def execute(
                     endpoint=body.endpoint,
                     params=body.params,
                     body=body.body,
-                    poll_url_template=body.pollUrlTemplate,
+                    # Query-level template wins; otherwise fall back to the
+                    # template stored on the resource itself.
+                    poll_url_template=body.pollUrlTemplate or resource["poll_url_template"],
                 )
         elif resource["type"] == "postgresql":
             sql_params: list[Any] = []
@@ -425,12 +448,15 @@ async def upload_file(
             },
         )
 
-    if resource["type"] != "REST" or not resource["base_url"]:
+    # Allow REST + agent uploads. Both are single-POST multipart at the upload
+    # itself; agent endpoints typically return a jobId synchronously and the
+    # FileUpload component polls a separate progressEndpoint via /execute.
+    if resource["type"] not in ("REST", "agent") or not resource["base_url"]:
         return JSONResponse(
             status_code=400,
             content={
                 "success": False,
-                "error": "Upload is only supported for REST resources with a base_url",
+                "error": "Upload is only supported for REST and agent resources with a base_url",
             },
         )
 
