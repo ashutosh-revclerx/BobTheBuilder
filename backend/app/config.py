@@ -11,7 +11,7 @@ from typing import Literal
 
 from dotenv import load_dotenv
 
-# Load .env from apps/backend/.env (next to this app/ package)
+# Load .env from backend/.env (next to this app/ package)
 _ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(_ENV_PATH, override=False)
 

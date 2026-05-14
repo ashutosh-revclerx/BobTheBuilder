@@ -36,10 +36,10 @@ services:
   backend:
     build:
       context: .
-      dockerfile: apps/backend/Dockerfile
+      dockerfile: backend/Dockerfile
     container_name: dashboard_backend
     env_file:
-      - ./apps/backend/.env
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://dashboard_user:dashboard_pass@postgres:5432/dashboard_db
     ports:
@@ -52,7 +52,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: apps/frontend/Dockerfile
+      dockerfile: frontend/Dockerfile
       # VITE_API_BASE_URL is left unset so the app defaults to /api/v1,
       # which nginx proxies to the backend container. Override here if your
       # API lives at a different origin (e.g. a separate subdomain).

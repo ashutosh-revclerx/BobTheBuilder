@@ -9,5 +9,4 @@
 **/*.pyc
 **/.venv
 **/pgadmin_data
-apps/backend-py
-apps/llm-service
+docs

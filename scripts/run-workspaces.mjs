@@ -1,23 +1,16 @@
 import { spawn } from 'node:child_process';
 
 const mode = process.argv[2] ?? 'dev';
-const npmCli = process.env.npm_execpath;
 const pythonCli = process.env.PYTHON ?? 'python';
+const npmScript = mode === 'preview' ? 'preview' : 'dev';
+const backendArgs = mode === 'preview'
+  ? ['-m', 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '3001']
+  : ['-m', 'uvicorn', 'app.main:app', '--reload', '--host', '0.0.0.0', '--port', '3001'];
 
-if (!npmCli) {
-  console.error('npm_execpath is not set. Run this script through npm, for example: npm run dev');
-  process.exit(1);
-}
-
-const commands = mode === 'preview'
-  ? [
-      { name: 'backend', command: pythonCli, args: ['-m', 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '3001'], cwd: 'apps/backend' },
-      { name: 'frontend', command: process.execPath, args: [npmCli, 'run', 'preview', '-w', '@btb/frontend'] },
-    ]
-  : [
-      { name: 'backend', command: pythonCli, args: ['-m', 'uvicorn', 'app.main:app', '--reload', '--host', '0.0.0.0', '--port', '3001'], cwd: 'apps/backend' },
-      { name: 'frontend', command: process.execPath, args: [npmCli, 'run', 'dev', '-w', '@btb/frontend'] },
-    ];
+const commands = [
+  { name: 'backend',  command: pythonCli, args: backendArgs,                   cwd: 'backend'  },
+  { name: 'frontend', command: 'npm',     args: ['run', npmScript],            cwd: 'frontend' },
+];
 
 const children = commands.map(({ name, command, args, cwd }) => {
   const child = spawn(command, args, {

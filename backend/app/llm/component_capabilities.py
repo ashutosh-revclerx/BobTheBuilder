@@ -2,8 +2,8 @@
 Structured catalog of supported dashboard component capabilities.
 
 This mirrors the current frontend implementation in:
-  - apps/frontend/src/types/template.ts
-  - apps/frontend/src/components/dashboard-components/*
+  - frontend/src/types/template.ts
+  - frontend/src/components/dashboard-components/*
 
 The registry is injected into the prompt and exposed through the LLM tool layer,
 so keep it conservative: include properties the current components actually

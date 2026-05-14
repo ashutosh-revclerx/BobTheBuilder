@@ -1,4 +1,4 @@
-import type { QueryConfig } from '@btb/shared';
+import type { QueryConfig } from '../shared';
 import { useEditorStore } from '../store/editorStore';
 import { API_BASE_URL, apiFetch } from '../config/api';
 import { resolve } from './bindingResolver';

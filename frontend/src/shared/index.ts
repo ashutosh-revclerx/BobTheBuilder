@@ -40,7 +40,7 @@ export const ResourceConfigSchema = z.object({
   id: z.string(),
   type: z.enum(['rest_api', 'agent', 'postgres']),
   baseUrl: z.string().optional(),
-  endpoint: z.string().optional() // For agents
+  endpoint: z.string().optional()
 });
 
 export const DashboardTemplateSchema = z.object({

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { QueryConfig } from '@btb/shared';
+import type { QueryConfig } from '../../shared';
 import type { ComponentConfig } from '../../types/template';
 import { executeQuery } from '../../engine/queryEngine';
 import { evaluateBooleanExpression, humanizeQueryError, parseQueryName, runAction } from '../../engine/runtimeUtils';

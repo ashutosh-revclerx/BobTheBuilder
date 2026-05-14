@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { QueryConfig } from '@btb/shared';
+import type { QueryConfig } from '../../shared';
 import { truncateTexts } from '../../hooks/useTextMeasure';
 import { executeQuery } from '../../engine/queryEngine';
 import { parseQueryName } from '../../engine/runtimeUtils';

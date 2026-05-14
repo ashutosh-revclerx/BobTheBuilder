@@ -70,7 +70,6 @@ Each container is independently deployable. The frontend is a static bundle; the
 | Database    | PostgreSQL 16                                                   |
 | Auth        | NerveSparks JWT (RS256, JWKS-verified)                          |
 | Container   | Docker, Docker Compose                                          |
-| Monorepo    | npm workspaces (`apps/frontend`, `packages/*`)                  |
 
 ---
 
@@ -78,38 +77,35 @@ Each container is independently deployable. The frontend is a static bundle; the
 
 ```
 BTB/
-├── apps/
-│   ├── backend/                 # FastAPI API + in-process LLM (port 3001)
-│   │   ├── app/
-│   │   │   ├── routes/          # FastAPI route handlers
-│   │   │   ├── executors/       # REST / DB / Agent query executors
-│   │   │   ├── auth/            # NerveSparks JWT verification (JWKS)
-│   │   │   ├── db/              # asyncpg pool + migrations
-│   │   │   ├── llm/             # Gemini/OpenAI generation and assistant
-│   │   │   └── main.py          # FastAPI entry point
-│   │   ├── requirements.txt
-│   │   └── Dockerfile
-│   ├── frontend/                # React SPA (served via nginx, port 80)
-│   │   ├── src/
-│   │   │   ├── pages/           # Top-level routed views
-│   │   │   ├── components/      # Editor, preview, UI primitives
-│   │   │   │   └── dashboard-components/    # 18 user-facing widgets
-│   │   │   ├── engine/          # Query/binding resolution engine
-│   │   │   ├── store/           # Zustand state (editorStore.ts)
-│   │   │   ├── services/        # API clients (assistant, export)
-│   │   │   ├── config/          # API base URL + auth token mgmt
-│   │   │   └── templates/       # Dashboard templates
-│   │   ├── nginx.conf           # Production nginx config
-│   │   └── Dockerfile
-├── packages/
-│   └── shared/                  # Shared TypeScript types (Zod schemas)
-├── docs/                        # Internal design docs
+├── backend/                     # FastAPI API + in-process LLM (port 3001)
+│   ├── app/
+│   │   ├── routes/              # FastAPI route handlers
+│   │   ├── executors/           # REST / DB / Agent query executors
+│   │   ├── auth/                # NerveSparks JWT verification (JWKS)
+│   │   ├── db/                  # asyncpg pool + migrations
+│   │   ├── llm/                 # Gemini/OpenAI generation and assistant
+│   │   └── main.py              # FastAPI entry point
+│   ├── requirements.txt
+│   └── Dockerfile
+├── frontend/                    # React SPA (served via nginx, port 80)
+│   ├── src/
+│   │   ├── pages/               # Top-level routed views
+│   │   ├── components/          # Editor, preview, UI primitives
+│   │   │   └── dashboard-components/    # 18 user-facing widgets
+│   │   ├── engine/              # Query/binding resolution engine
+│   │   ├── store/               # Zustand state (editorStore.ts)
+│   │   ├── services/            # API clients (assistant, export)
+│   │   ├── config/              # API base URL + auth token mgmt
+│   │   ├── shared/              # Shared TypeScript types (Zod schemas)
+│   │   └── templates/           # Dashboard templates
+│   ├── nginx.conf               # Production nginx config
+│   └── Dockerfile
 ├── scripts/
-│   └── run-workspaces.mjs       # Multi-workspace dev runner
+│   └── run-workspaces.mjs       # Concurrent backend + frontend dev runner
 ├── docker-compose.yml           # Full-stack orchestration
 ├── .dockerignore
 ├── .gitignore
-├── package.json                 # Workspace root
+├── package.json                 # Root orchestration scripts
 └── README.md
 ```
 
@@ -121,8 +117,8 @@ BTB/
 | -------------- | -------- | ---------------------------------- |
 | Docker         | ≥ 24.0   | Docker-based runs (recommended)    |
 | Docker Compose | v2 (`docker compose`, not `docker-compose`) | "                                  |
-| Node.js        | 22.x LTS | Frontend/package workspace tooling |
-| npm            | ≥ 10     | Frontend/package workspace tooling |
+| Node.js        | 22.x LTS | Frontend dev/build                 |
+| npm            | ≥ 10     | Frontend dependency management     |
 | Python         | 3.12     | Local backend without Docker       |
 
 API keys you will need:
@@ -146,7 +142,7 @@ cd BTB
 
 ### 2. Create `.env` files
 
-**`apps/backend/.env`** (copy from `.env.example`; Docker Compose overrides `DATABASE_URL` automatically):
+**`backend/.env`** (copy from `.env.example`; Docker Compose overrides `DATABASE_URL` automatically):
 
 ```env
 DATABASE_URL=postgresql://dashboard_user:dashboard_pass@localhost:5432/dashboard_db
@@ -165,13 +161,12 @@ Bring up Postgres only, then apply migrations from the host:
 
 ```bash
 docker compose up postgres -d
-npm install
-cd apps/backend
+cd backend
 pip install -r requirements.txt
 python -m app.db.migrate
 ```
 
-> Migrations live in `apps/backend/app/db/migrations/` and are applied in numeric order. They are idempotent — re-running is safe.
+> Migrations live in `backend/app/db/migrations/` and are applied in numeric order. They are idempotent — re-running is safe.
 
 ### 4. Start the full stack
 
@@ -220,13 +215,14 @@ Use this for the fastest inner-loop feedback (hot reload, no rebuilds).
 ### Start everything
 
 ```bash
-npm install
-cd apps/backend
+cd backend
 python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python -m app.db.migrate             # one-time
-cd ../..
+cd ../frontend
+npm install                          # one-time
+cd ..
 npm run dev                          # runs Python backend + frontend concurrently
 ```
 
@@ -236,7 +232,7 @@ Frontend: http://localhost:5143 · Backend: http://localhost:3001
 
 ## Environment Variables
 
-### Backend (`apps/backend/.env`)
+### Backend (`backend/.env`)
 
 | Variable               | Default                                    | Description                                    |
 | ---------------------- | ------------------------------------------ | ---------------------------------------------- |
@@ -265,10 +261,10 @@ Frontend: http://localhost:5143 · Backend: http://localhost:3001
 
 ## Database & Migrations
 
-Migrations live in `apps/backend/app/db/migrations/` as numbered SQL files and run in order via:
+Migrations live in `backend/app/db/migrations/` as numbered SQL files and run in order via:
 
 ```bash
-cd apps/backend
+cd backend
 python -m app.db.migrate
 ```
 
@@ -289,9 +285,9 @@ python -m app.db.migrate
 
 **Adding a new migration:**
 
-1. Create `apps/backend/app/db/migrations/0NN_description.sql`.
+1. Create `backend/app/db/migrations/0NN_description.sql`.
 2. Write idempotent SQL (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
-3. Run `python -m app.db.migrate` locally from `apps/backend`.
+3. Run `python -m app.db.migrate` locally from `backend`.
 4. Commit the file. Run the migration command before deploying the new backend image.
 
 ---
@@ -312,7 +308,7 @@ The backend verifies **RS256 JWTs issued by NerveSparks** (https://auth.nervespa
 
 **Protected routes** require `Authorization: Bearer <access_token>`. Tokens are stored in `localStorage` by the frontend (`apiFetch` wrapper handles automatic refresh on 401).
 
-Route mounting in `apps/backend/app/main.py`:
+Route mounting in `backend/app/main.py`:
 
 ```python
 for api_prefix in ("/api/v1", "/api"):
@@ -340,7 +336,7 @@ Backend OpenAPI/Swagger UI is available at http://localhost:3001/docs.
 
 ## Component Library
 
-Dashboard widgets in `apps/frontend/src/components/dashboard-components/`:
+Dashboard widgets in `frontend/src/components/dashboard-components/`:
 
 | Category   | Components                                                |
 | ---------- | --------------------------------------------------------- |
@@ -371,10 +367,10 @@ The provided `docker-compose.yml` is suitable for single-host deployments. For m
 1. **Build and push images** to your registry:
    ```bash
    docker build -t your-registry/btb-frontend:$(git rev-parse --short HEAD) \
-     -f apps/frontend/Dockerfile \
+     -f frontend/Dockerfile \
      --build-arg VITE_API_BASE_URL=https://api.yourdomain.com/api/v1 .
    docker build -t your-registry/btb-backend:$(git rev-parse --short HEAD) \
-     -f apps/backend/Dockerfile .
+     -f backend/Dockerfile .
    ```
 2. **Run migrations** as a one-off job before deploying the new backend image.
 3. **Set production env vars**:
@@ -401,7 +397,7 @@ The provided `docker-compose.yml` is suitable for single-host deployments. For m
 | LLM `502` errors                                     | Missing/invalid `GEMINI_API_KEY` or `OPENAI_API_KEY`. Check `docker compose logs backend`. |
 | `401 Unauthorized` immediately after login           | JWKS cache may be stale. Restart backend.                                          |
 | Migrations fail with "relation already exists"       | Migration was partially applied. Inspect the DB and either `DROP` the table or skip the file. |
-| Frontend bundle very large                           | Run `npm run build -w @btb/frontend -- --mode analyze` to inspect chunks.          |
+| Frontend bundle very large                           | Run `npm run build -- --mode analyze` from `frontend/` to inspect chunks.          |
 
 Logs are tagged by scope — filter with:
 
@@ -423,8 +419,8 @@ docker compose logs backend | grep '\[assistant\]'
 ### Code style
 
 - TypeScript: strict mode is on for frontend/shared code. Do not weaken types to silence errors — narrow them.
-- Backend routes are async FastAPI handlers using shared `asyncpg` and `httpx` resources; see `apps/backend/app/routes/dashboards.py` as the reference style.
-- Frontend components follow the `props → store binding → memoized render` pattern; see `apps/frontend/src/components/dashboard-components/StatCard.tsx`.
+- Backend routes are async FastAPI handlers using shared `asyncpg` and `httpx` resources; see `backend/app/routes/dashboards.py` as the reference style.
+- Frontend components follow the `props → store binding → memoized render` pattern; see `frontend/src/components/dashboard-components/StatCard.tsx`.
 - Logging: never use `console.*` in backend code — use `createLogger('<scope>')`.
 - Errors: route handlers should return the same JSON shape/status codes the frontend expects.
 
@@ -441,7 +437,6 @@ refactor(backend): centralize env parsing
 ### Pre-merge checklist
 
 - [ ] `npm run build` passes from the repo root
-- [ ] `cd apps/backend && python -m unittest discover -s tests` passes
 - [ ] `npm run lint` passes
 - [ ] New code paths covered by manual smoke test (UI flow or `curl` against the running stack)
 - [ ] Migrations are idempotent

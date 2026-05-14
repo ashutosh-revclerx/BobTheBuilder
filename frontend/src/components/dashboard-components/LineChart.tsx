@@ -1,27 +1,26 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import type { QueryConfig } from '../../shared';
 import {
-  BarChart as RechartsBarChart,
-  Bar,
+  Area,
   CartesianGrid,
-  Cell,
   Label,
   LabelList,
   Legend,
+  Line,
+  LineChart as RechartsLineChart,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
-import type { QueryConfig } from '@btb/shared';
 import type { ComponentConfig } from '../../types/template';
 import { executeQuery } from '../../engine/queryEngine';
-import { parseQueryName } from '../../engine/runtimeUtils';
+import { parseQueryName, runAction } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
-import { runAction } from '../../engine/runtimeUtils';
 import QueryErrorBanner from '../ui/QueryErrorBanner';
 import { resolveBackground } from '../../utils/styleUtils';
 
 const COLOR_SCHEMES = {
-  Blue: ['#2563eb', '#3b82f6', '#60a5fa'],
+  Blue: ['#2563eb', '#60a5fa', '#3b82f6'],
   Green: ['#059669', '#10b981', '#6ee7b7'],
   Amber: ['#d97706', '#f59e0b', '#fbbf24'],
   Multi: ['#2563eb', '#059669', '#d97706', '#dc2626'],
@@ -65,7 +64,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
-const BarChart = React.memo(function BarChart({ config }: { config: ComponentConfig }) {
+const LineChart = React.memo(function LineChart({ config }: { config: ComponentConfig }) {
   const { style, data, label } = config;
   const queryResults = useEditorStore((state) => state.queryResults);
   const queriesConfig = useEditorStore((state) => state.queriesConfig);
@@ -82,7 +81,6 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
   const activeSeries = data.yField ? [{ name: 'Value', fieldKey: data.yField }] : series;
   const palette = style.seriesColors?.length ? style.seriesColors : COLOR_SCHEMES[data.colorScheme || 'Blue'];
   const xKey = data.xField || 'label';
-  const isHorizontal = data.orientation === 'Horizontal';
   const chartRef = useRef<HTMLDivElement>(null);
   const chartSize = useChartSize(chartRef);
   const canRenderChart = chartSize.width > 0 && chartSize.height > 0;
@@ -117,23 +115,21 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
             <QueryErrorBanner queryName={queryConfig.name} error={queryState.error || ''} onRetry={() => executeQuery(queryConfig)} />
           </div>
         ) : canRenderChart ? (
-            <RechartsBarChart 
+            <RechartsLineChart 
               width={chartSize.width}
               height={chartSize.height}
-              data={chartData as Record<string, unknown>[]} 
-              layout={isHorizontal ? 'vertical' : 'horizontal'}
+              data={chartData as Record<string, unknown>[]}
               margin={{ top: 10, right: 30, left: 20, bottom: 20 }}
             >
               {data.showGrid !== false ? (
                 <CartesianGrid 
                   strokeDasharray="3 3" 
                   stroke={style.gridColor || "rgba(0,0,0,0.06)"} 
-                  vertical={!isHorizontal} 
+                  vertical={false} 
                 />
               ) : null}
               <XAxis 
-                dataKey={isHorizontal ? undefined : xKey} 
-                type={isHorizontal ? 'number' : 'category'} 
+                dataKey={xKey} 
                 hide={data.showXAxis === false}
                 tick={{ fontSize: style.fontSize || 12, fill: style.xAxisColor || style.axisColor || '#4b5563' }}
                 stroke={style.xAxisColor || style.axisColor || '#e5e7eb'}
@@ -148,8 +144,6 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
                 )}
               </XAxis>
               <YAxis 
-                dataKey={isHorizontal ? xKey : undefined} 
-                type={isHorizontal ? 'category' : 'number'} 
                 hide={data.showYAxis === false}
                 tick={{ fontSize: style.fontSize || 12, fill: style.yAxisColor || style.axisColor || '#4b5563' }}
                 stroke={style.yAxisColor || style.axisColor || '#e5e7eb'}
@@ -171,28 +165,34 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
                 <Legend wrapperStyle={{ fontSize: style.fontSize || 12 }} />
               ) : null}
               {activeSeries.map((seriesItem, index) => (
-                <Bar
-                  key={seriesItem.fieldKey}
-                  dataKey={seriesItem.fieldKey}
-                  name={seriesItem.name}
-                  fill={palette[index % palette.length]}
-                  radius={isHorizontal ? [0, style.barRadius || 4, style.barRadius || 4, 0] : [style.barRadius || 4, style.barRadius || 4, 0, 0]}
-                  stackId={data.stacked ? 'stack' : undefined}
-                  onClick={(entry) => runAction(data.onBarClickAction, entry)}
-                >
-                  {style.showDataLabels ? (
-                    <LabelList 
-                      dataKey={seriesItem.fieldKey} 
-                      position={isHorizontal ? 'right' : 'top'} 
-                      style={{ fontSize: style.fontSize || 11, fill: style.textColor || '#4b5563' }}
-                    />
-                  ) : null}
-                  {chartData.map((_, cellIndex) => (
-                    <Cell key={cellIndex} fill={palette[cellIndex % palette.length]} />
-                  ))}
-                </Bar>
+                <Fragment key={seriesItem.fieldKey}>
+                  {data.fillArea ? <Area key={`${seriesItem.fieldKey}-area`} dataKey={seriesItem.fieldKey} fill={palette[index % palette.length]} stroke="none" fillOpacity={0.12} /> : null}
+                  <Line
+                    type={data.smooth !== false ? 'monotone' : 'linear'}
+                    dataKey={seriesItem.fieldKey}
+                    name={seriesItem.name}
+                    stroke={palette[index % palette.length]}
+                    strokeWidth={style.lineWidth || 2}
+                    dot={data.showDots !== false}
+                    activeDot={{
+                      r: 5,
+                      stroke: palette[index % palette.length],
+                      strokeWidth: 2,
+                      fill: '#ffffff',
+                      onClick: (event) => runAction(data.onPointClickAction, event),
+                    }}
+                  >
+                    {style.showDataLabels ? (
+                      <LabelList 
+                        dataKey={seriesItem.fieldKey} 
+                        position="top" 
+                        style={{ fontSize: style.fontSize || 11, fill: style.textColor || '#4b5563' }}
+                      />
+                    ) : null}
+                  </Line>
+                </Fragment>
               ))}
-            </RechartsBarChart>
+            </RechartsLineChart>
         ) : (
           <div style={{ height: '100%', minHeight: 120 }} />
         )}
@@ -201,4 +201,4 @@ const BarChart = React.memo(function BarChart({ config }: { config: ComponentCon
   );
 });
 
-export default BarChart;
+export default LineChart;

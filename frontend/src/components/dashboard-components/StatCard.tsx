@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { ComponentConfig } from '../../types/template';
-import type { QueryConfig } from '@btb/shared';
+import type { QueryConfig } from '../../shared';
 import { executeQuery } from '../../engine/queryEngine';
 import { parseQueryName } from '../../engine/runtimeUtils';
 import { useEditorStore } from '../../store/editorStore';
