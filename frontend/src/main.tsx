@@ -6,6 +6,7 @@ import './styles/base.css'
 import './index.css'
 import App from './App'
 
+
 window.addEventListener('error', (event) => {
   console.error('Uncaught error:', event.error);
 });

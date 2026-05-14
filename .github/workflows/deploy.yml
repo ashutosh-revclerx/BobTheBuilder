@@ -49,7 +49,7 @@ jobs:
           timeout: 180s
           script: |
             set -e
-            sudo chown -R Ubuntu:Ubuntu /home/Ubuntu/nexus-retool/frontend/dist || true
+            sudo chown -R Ubuntu:Ubuntu /home/Ubuntu/nexus-retool/frontend || true
             cd /home/Ubuntu/nexus-retool
             git fetch origin
             git reset --hard origin/deployment-digitalO
