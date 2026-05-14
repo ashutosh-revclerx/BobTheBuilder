@@ -6,6 +6,7 @@ module.exports = {
     env: {
       NODE_ENV: 'production',
       PORT: '5182',
+      VITE_BASE_PATH: '/ai-dashboard-builder/',
     },
   }],
 };
