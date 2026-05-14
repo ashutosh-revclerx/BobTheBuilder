@@ -29,7 +29,7 @@ function ProtectedRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={(import.meta.env.VITE_BASE_PATH || '/').replace(/\/$/, '') || '/'}>
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
