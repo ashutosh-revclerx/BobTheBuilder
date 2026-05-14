@@ -1,6 +1,6 @@
 import { preview } from 'vite';
 
-const port = parseInt(process.env.PORT || '5181');
+const port = parseInt(process.env.PORT || '5182');
 
 const server = await preview({
   preview: {

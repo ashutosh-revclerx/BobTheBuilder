@@ -18,7 +18,7 @@ export default defineConfig(({ command }) => ({
   },
   preview: {
     host: '0.0.0.0',
-    port: 5181,
+    port: 5182,
   },
   resolve: {
     alias: {

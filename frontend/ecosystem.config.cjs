@@ -5,7 +5,7 @@ module.exports = {
     script: './scripts/preview.mjs',
     env: {
       NODE_ENV: 'production',
-      PORT: '5181',
+      PORT: '5182',
     },
   }],
 };
