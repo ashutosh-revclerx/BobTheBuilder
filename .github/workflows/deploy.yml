@@ -1,0 +1,62 @@
+name: Deploy to Droplet
+
+on:
+  push:
+    branches: [deployment-digitalO]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+  workflow_dispatch:
+
+jobs:
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Deploy Backend via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          timeout: 120s
+          script: |
+            set -e
+            cd /home/Ubuntu/nexus-retool
+            git fetch origin
+            git reset --hard origin/deployment-digitalO
+            git clean -fd
+            cd backend
+            source venv/bin/activate
+            pip install -r requirements.txt --quiet
+            deactivate
+            sudo systemctl restart nexus-retool-backend
+            sudo systemctl is-active nexus-retool-backend
+            echo "Backend deploy done"
+
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Deploy Frontend via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          timeout: 180s
+          script: |
+            set -e
+            sudo chown -R Ubuntu:Ubuntu /home/Ubuntu/nexus-retool/frontend/dist || true
+            cd /home/Ubuntu/nexus-retool
+            git fetch origin
+            git reset --hard origin/deployment-digitalO
+            git clean -fd
+            cd frontend
+            npm ci --quiet
+            npm run build
+            pm2 restart ai-dashboard-builder-frontend || pm2 start ecosystem.config.cjs
+            pm2 list | grep ai-dashboard-builder-frontend
+            echo "Frontend deploy done"
