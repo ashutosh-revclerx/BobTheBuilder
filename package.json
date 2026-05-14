@@ -1,17 +1,10 @@
 {
   "name": "bob-the-builder",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
     "dev": "node scripts/run-workspaces.mjs dev",
     "preview": "node scripts/run-workspaces.mjs preview",
-    "build": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
-  },
-  "devDependencies": {
-    "concurrently": "^9.1.2"
+    "build": "npm run build --prefix frontend",
+    "lint": "npm run lint --prefix frontend"
   }
 }

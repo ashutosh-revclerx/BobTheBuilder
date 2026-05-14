@@ -42,16 +42,16 @@ coverage/
 .vite/
 *.tsbuildinfo
 
-# Python (LLM service)
-apps/backend/services/llm/.venv/
-apps/backend/services/llm/.env
-apps/backend/services/llm/.env.*
-!apps/backend/services/llm/.env.example
+# Python
 __pycache__/
 *.pyc
+.venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Docs (local notes, not tracked)
+docs/
 
 # Dashboard Exports
 *-export.zip

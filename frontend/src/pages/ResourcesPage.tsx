@@ -1,0 +1,770 @@
+import { useEffect, useMemo, useState } from 'react';
+import MethodBadge from '../components/ui/MethodBadge';
+import TopNav from '../components/ui/TopNav';
+import type { ImportedEndpoint } from '../components/ui/EndpointPicker';
+
+import { API_BASE_URL, apiFetch } from '../config/api';
+
+type AuthType = 'none' | 'bearer' | 'api_key' | 'basic';
+type ResourceType = 'REST' | 'agent' | 'postgresql';
+
+interface Resource {
+  id:                 string;
+  name:               string;
+  type:               string;
+  base_url:           string | null;
+  auth_type:          string | null;
+  poll_url_template:  string | null;
+  has_secret:         boolean;
+  created_at:         string;
+}
+
+interface ImportResponse {
+  success:           true;
+  resource:          { id: string; name: string };
+  endpointsImported: number;
+}
+
+interface Banner {
+  kind: 'success' | 'error';
+  text: string;
+}
+
+export default function ResourcesPage() {
+  // ── Import form state ──────────────────────────────────────────────────────
+  const [swaggerUrl, setSwaggerUrl]     = useState('');
+  const [resourceName, setResourceName] = useState('');
+  const [baseUrl, setBaseUrl]           = useState('');
+  const [authType, setAuthType]         = useState<AuthType>('none');
+  const [secretRef, setSecretRef]       = useState('');
+  const [importType, setImportType]                 = useState<'REST' | 'agent'>('REST');
+  const [importPollUrlTemplate, setImportPollUrlTemplate] = useState('');
+  const [importing, setImporting]       = useState(false);
+  const [banner, setBanner]             = useState<Banner | null>(null);
+
+  // ── Imported endpoints (just-imported resource) ────────────────────────────
+  const [importedResource, setImportedResource]  = useState<{ id: string; name: string } | null>(null);
+  const [importedEndpoints, setImportedEndpoints] = useState<ImportedEndpoint[]>([]);
+  const [endpointSearch, setEndpointSearch]      = useState('');
+
+  // ── Manual "Add resource" form state ───────────────────────────────────────
+  const [manualOpen, setManualOpen]               = useState(false);
+  const [manualName, setManualName]               = useState('');
+  const [manualType, setManualType]               = useState<ResourceType>('REST');
+  const [manualBaseUrl, setManualBaseUrl]         = useState('');
+  const [manualAuthType, setManualAuthType]       = useState<AuthType>('none');
+  const [manualSecretRef, setManualSecretRef]     = useState('');
+  const [manualPollUrlTemplate, setManualPollUrlTemplate] = useState('');
+  const [manualSubmitting, setManualSubmitting]   = useState(false);
+
+  // ── Existing resources list ────────────────────────────────────────────────
+  const [resources, setResources]   = useState<Resource[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedEndpoints, setExpandedEndpoints] = useState<ImportedEndpoint[]>([]);
+  const [confirmDeleteId, setConfirmDeleteId]     = useState<string | null>(null);
+
+  // ── Inline edit state ──────────────────────────────────────────────────────
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editBaseUrl, setEditBaseUrl] = useState('');
+  const [editAuthType, setEditAuthType] = useState<AuthType>('none');
+  const [editSecretRef, setEditSecretRef] = useState('');
+  const [editPollUrlTemplate, setEditPollUrlTemplate] = useState('');
+  const [editType, setEditType] = useState<ResourceType>('REST');
+  const [editSaving, setEditSaving] = useState(false);
+
+  const openEdit = (resource: Resource) => {
+    setEditingId(resource.id);
+    setEditBaseUrl(resource.base_url ?? '');
+    setEditAuthType((resource.auth_type as AuthType) || 'none');
+    setEditSecretRef(''); // never returned by API; user types to overwrite, blank = keep current
+    setEditPollUrlTemplate(resource.poll_url_template ?? '');
+    setEditType((resource.type as ResourceType) || 'REST');
+  };
+
+  const saveEdit = async (resourceId: string) => {
+    setEditSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        type: editType,
+        base_url: editBaseUrl.trim() || null,
+        auth_type: editAuthType,
+        poll_url_template: editPollUrlTemplate.trim() || null,
+      };
+      // Only send secret_ref if the user typed something — empty string means "keep current"
+      if (editSecretRef.trim()) {
+        body.secret_ref = editSecretRef.trim();
+      }
+      const response = await apiFetch(`${API_BASE_URL}/resources/${resourceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setBanner({ kind: 'error', text: json.error || json.detail || 'Could not update resource.' });
+        return;
+      }
+      setBanner({ kind: 'success', text: 'Resource updated.' });
+      setEditingId(null);
+      refreshResources();
+    } catch {
+      setBanner({ kind: 'error', text: 'Network error while updating.' });
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const refreshResources = () => {
+    apiFetch(`${API_BASE_URL}/resources`)
+      .then((r) => r.json())
+      .then((data: Resource[]) => setResources(Array.isArray(data) ? data : []))
+      .catch(() => setResources([]));
+  };
+
+  useEffect(refreshResources, []);
+
+  useEffect(() => {
+    if (!banner) return;
+    const t = window.setTimeout(() => setBanner(null), 3500);
+    return () => window.clearTimeout(t);
+  }, [banner]);
+
+  const handleImport = async () => {
+    if (!swaggerUrl.trim() || !resourceName.trim() || !baseUrl.trim()) {
+      setBanner({ kind: 'error', text: 'Swagger URL, resource name, and base URL are all required.' });
+      return;
+    }
+    if (authType !== 'none' && !secretRef.trim()) {
+      setBanner({ kind: 'error', text: 'Secret reference is required for the chosen auth type.' });
+      return;
+    }
+
+    setImporting(true);
+    setBanner(null);
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/resources/import-swagger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          swaggerUrl,
+          resourceName,
+          baseUrl,
+          authType,
+          secretRef: authType !== 'none' ? secretRef : undefined,
+          resourceType: importType,
+          pollUrlTemplate: importType === 'agent' && importPollUrlTemplate.trim()
+            ? importPollUrlTemplate.trim()
+            : undefined,
+        }),
+      });
+      const json = await response.json();
+
+      if (!response.ok || !json.success) {
+        setBanner({ kind: 'error', text: json.error || json.detail || 'Import failed' });
+        return;
+      }
+
+      const payload = json as ImportResponse;
+      setBanner({ kind: 'success', text: `Imported ${payload.endpointsImported} endpoints from ${payload.resource.name}` });
+      setImportedResource(payload.resource);
+
+      // Fetch the freshly-imported endpoint list
+      const endpointsRes = await apiFetch(`${API_BASE_URL}/resources/${payload.resource.id}/endpoints`);
+      setImportedEndpoints(endpointsRes.ok ? await endpointsRes.json() : []);
+
+      refreshResources();
+    } catch {
+      setBanner({ kind: 'error', text: 'Network error — could not reach backend.' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const filteredImportedEndpoints = useMemo(() => {
+    const q = endpointSearch.trim().toLowerCase();
+    if (!q) return importedEndpoints;
+    return importedEndpoints.filter(
+      (e) =>
+        e.path.toLowerCase().includes(q) ||
+        e.method.toLowerCase().includes(q) ||
+        (e.summary ?? '').toLowerCase().includes(q),
+    );
+  }, [importedEndpoints, endpointSearch]);
+
+  const handleManualSubmit = async () => {
+    if (!manualName.trim()) {
+      setBanner({ kind: 'error', text: 'Resource name is required.' });
+      return;
+    }
+    const needsBaseUrl = manualType === 'REST' || manualType === 'agent';
+    if (needsBaseUrl && !manualBaseUrl.trim()) {
+      setBanner({ kind: 'error', text: 'Base URL is required for REST and agent types.' });
+      return;
+    }
+    if (manualAuthType !== 'none' && !manualSecretRef.trim()) {
+      setBanner({ kind: 'error', text: 'Secret reference is required for the chosen auth type.' });
+      return;
+    }
+
+    setManualSubmitting(true);
+    try {
+      const body: Record<string, unknown> = {
+        name:      manualName.trim(),
+        type:      manualType,
+        auth_type: manualAuthType,
+      };
+      if (needsBaseUrl) body.base_url = manualBaseUrl.trim();
+      if (manualAuthType !== 'none') body.secret_ref = manualSecretRef.trim();
+      // For postgresql, secret_ref carries the connection string — accept it on any auth type
+      if (manualType === 'postgresql' && manualSecretRef.trim()) body.secret_ref = manualSecretRef.trim();
+      // Agent resources may carry a poll URL template (used when the kickoff
+      // response doesn't include one).
+      if (manualType === 'agent' && manualPollUrlTemplate.trim()) {
+        body.poll_url_template = manualPollUrlTemplate.trim();
+      }
+
+      const response = await apiFetch(`${API_BASE_URL}/resources`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await response.json();
+
+      if (!response.ok) {
+        setBanner({ kind: 'error', text: json.error || 'Could not create resource.' });
+        return;
+      }
+
+      setBanner({ kind: 'success', text: `Resource "${manualName}" created.` });
+      // Reset form
+      setManualName('');
+      setManualBaseUrl('');
+      setManualSecretRef('');
+      setManualPollUrlTemplate('');
+      setManualAuthType('none');
+      setManualType('REST');
+      setManualOpen(false);
+      refreshResources();
+    } catch {
+      setBanner({ kind: 'error', text: 'Network error — could not reach backend.' });
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
+
+  const handleToggleExpand = async (resource: Resource) => {
+    if (expandedId === resource.id) {
+      setExpandedId(null);
+      setExpandedEndpoints([]);
+      return;
+    }
+    setExpandedId(resource.id);
+    setExpandedEndpoints([]);
+    try {
+      const r = await apiFetch(`${API_BASE_URL}/resources/${resource.id}/endpoints`);
+      setExpandedEndpoints(r.ok ? await r.json() : []);
+    } catch {
+      setExpandedEndpoints([]);
+    }
+  };
+
+  const handleDeleteResource = async (id: string) => {
+    try {
+      const r = await apiFetch(`${API_BASE_URL}/resources/${id}`, { method: 'DELETE' });
+      if (!r.ok) {
+        setBanner({ kind: 'error', text: 'Could not delete resource.' });
+        return;
+      }
+      setBanner({ kind: 'success', text: 'Resource deleted.' });
+      setConfirmDeleteId(null);
+      if (expandedId === id) {
+        setExpandedId(null);
+        setExpandedEndpoints([]);
+      }
+      refreshResources();
+    } catch {
+      setBanner({ kind: 'error', text: 'Network error while deleting.' });
+    }
+  };
+
+  return (
+    <div className="resources-page">
+      <TopNav />
+
+      <main className="resources-content">
+        {banner && (
+          <div className={`resources-banner resources-banner-${banner.kind}`}>{banner.text}</div>
+        )}
+
+        {/* SECTION A — Import */}
+        <section className="resources-card">
+          <div className="resources-card-head">
+            <h2>Import from Swagger / OpenAPI</h2>
+            <p>Point us at a docs URL and we'll register the resource and all its endpoints.</p>
+          </div>
+
+          <div className="resources-form">
+            <label className="form-group">
+              <span className="form-label">Swagger / OpenAPI docs URL</span>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="https://api.example.com/docs/swagger.json"
+                value={swaggerUrl}
+                onChange={(e) => setSwaggerUrl(e.target.value)}
+              />
+              <span className="form-help">Link to the raw JSON spec, not the Swagger UI HTML page. (Tip: in Swagger UI, DevTools → Network shows the real spec URL.)</span>
+            </label>
+
+            <label className="form-group">
+              <span className="form-label">Resource name</span>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="nexus-scrape"
+                value={resourceName}
+                onChange={(e) => setResourceName(e.target.value)}
+              />
+              <span className="form-help">Short identifier you'll reference in dashboard queries.</span>
+            </label>
+
+            <label className="form-group">
+              <span className="form-label">Base URL</span>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="https://api.example.com"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+              />
+              <span className="form-help">Where your API lives. No trailing slash.</span>
+            </label>
+
+            <label className="form-group">
+              <span className="form-label">Resource type</span>
+              <select
+                className="form-select"
+                value={importType}
+                onChange={(e) => setImportType(e.target.value as 'REST' | 'agent')}
+              >
+                <option value="REST">REST — synchronous API</option>
+                <option value="agent">Agent — async job (kickoff + poll)</option>
+              </select>
+              <span className="form-help">
+                {importType === 'REST'
+                  ? 'Standard request/response — the upstream returns the result immediately.'
+                  : 'Kickoff + polling — POST returns a jobId, we poll until status is done/complete/success (60s cap).'}
+              </span>
+            </label>
+
+            {importType === 'agent' && (
+              <label className="form-group">
+                <span className="form-label">Poll URL template (optional)</span>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="/public/result/{{jobId}}"
+                  value={importPollUrlTemplate}
+                  onChange={(e) => setImportPollUrlTemplate(e.target.value)}
+                />
+                <span className="form-help">
+                  Use <code>{`{{jobId}}`}</code> as the placeholder. Only needed if the kickoff response
+                  doesn't include a <code>poll_url</code> / <code>pollUrl</code> field.
+                </span>
+              </label>
+            )}
+
+            <label className="form-group">
+              <span className="form-label">Auth type</span>
+              <select
+                className="form-select"
+                value={authType}
+                onChange={(e) => setAuthType(e.target.value as AuthType)}
+              >
+                <option value="none">None</option>
+                <option value="bearer">Bearer Token (Authorization: Bearer …)</option>
+                <option value="api_key">API Key (X-API-Key header)</option>
+                <option value="basic">Basic (Authorization: Basic …)</option>
+              </select>
+              <span className="form-help">How we authenticate every outgoing request to this backend.</span>
+            </label>
+
+            {authType !== 'none' && (
+              <label className="form-group">
+                <span className="form-label">Secret value</span>
+                <input
+                  type="password"
+                  className="form-input"
+                  placeholder="Paste the raw API key, token, or credentials"
+                  value={secretRef}
+                  onChange={(e) => setSecretRef(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <span className="form-help">
+                  Stored in Postgres and never returned via the API (responses show <code>has_secret: true</code> only).
+                  Advanced: you can also use <code>{`{{env.VAR_NAME}}`}</code> to reference a backend env var instead of the raw value.
+                </span>
+              </label>
+            )}
+
+            <button
+              type="button"
+              className="btn-topbar primary resources-import-button"
+              disabled={importing}
+              onClick={() => void handleImport()}
+            >
+              {importing ? <span className="spinner dashboard-list-button-spinner" /> : null}
+              <span>{importing ? 'Importing…' : 'Import Endpoints'}</span>
+            </button>
+          </div>
+        </section>
+
+        {/* SECTION B — Imported endpoints from latest import */}
+        {importedResource && importedEndpoints.length > 0 && (
+          <section className="resources-card">
+            <div className="resources-card-head">
+              <h2>{importedResource.name} — {importedEndpoints.length} endpoints imported</h2>
+              <input
+                type="text"
+                className="form-input resources-search"
+                placeholder="Search endpoints…"
+                value={endpointSearch}
+                onChange={(e) => setEndpointSearch(e.target.value)}
+              />
+            </div>
+            <ul className="resources-endpoint-list">
+              {filteredImportedEndpoints.map((ep) => (
+                <li key={ep.id} className="resources-endpoint-row">
+                  <MethodBadge method={ep.method} />
+                  <span className="resources-endpoint-path">{ep.path}</span>
+                  <span className="resources-endpoint-summary">{ep.summary ?? ''}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* SECTION C — Existing resources */}
+        <section className="resources-card">
+          <div className="resources-card-head">
+            <h2>All resources</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <p>{resources.length} registered</p>
+              <button
+                className="btn-topbar primary"
+                onClick={() => setManualOpen((v) => !v)}
+              >
+                {manualOpen ? 'Cancel' : '+ Add resource'}
+              </button>
+            </div>
+          </div>
+
+          {manualOpen && (
+            <div className="resources-form" style={{ marginBottom: 18 }}>
+              <label className="form-group">
+                <span className="form-label">Resource name</span>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="my-internal-api"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                />
+                <span className="form-help">A short identifier you'll use to reference this backend in dashboard queries (e.g. <code>nexus-scrape</code>).</span>
+              </label>
+
+              <label className="form-group">
+                <span className="form-label">Type</span>
+                <select
+                  className="form-select"
+                  value={manualType}
+                  onChange={(e) => setManualType(e.target.value as ResourceType)}
+                >
+                  <option value="REST">REST — synchronous API</option>
+                  <option value="agent">Agent — async job (kickoff + poll)</option>
+                  <option value="postgresql">PostgreSQL — read-only DB</option>
+                </select>
+                <span className="form-help">
+                  {manualType === 'REST' && (
+                    <>Pick this if the API returns the result directly. Example: <code>POST /api/users</code> → returns <code>[{`{ id, name }`}]</code> in the same response.</>
+                  )}
+                  {manualType === 'agent' && (
+                    <>Pick this if the API kicks off a background job. Example: <code>POST /scrape</code> → returns <code>{`{ job_id }`}</code>, then we poll for the result. Per-query you can set a custom <code>pollUrlTemplate</code> in the dashboard builder if your API doesn't return a <code>poll_url</code> field.</>
+                  )}
+                  {manualType === 'postgresql' && (
+                    <>Pick this for direct DB queries. The query text IS the SQL — keep this user read-only at the DB level.</>
+                  )}
+                </span>
+              </label>
+
+              {(manualType === 'REST' || manualType === 'agent') && (
+                <label className="form-group">
+                  <span className="form-label">Base URL</span>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="https://api.example.com"
+                    value={manualBaseUrl}
+                    onChange={(e) => setManualBaseUrl(e.target.value)}
+                  />
+                  <span className="form-help">Where your API lives. No trailing slash. Endpoint paths are appended per-query.</span>
+                </label>
+              )}
+
+              {manualType !== 'postgresql' && (
+                <label className="form-group">
+                  <span className="form-label">Auth type</span>
+                  <select
+                    className="form-select"
+                    value={manualAuthType}
+                    onChange={(e) => setManualAuthType(e.target.value as AuthType)}
+                  >
+                    <option value="none">None</option>
+                    <option value="bearer">Bearer Token (Authorization: Bearer …)</option>
+                    <option value="api_key">API Key (X-API-Key header)</option>
+                    <option value="basic">Basic (Authorization: Basic …)</option>
+                  </select>
+                  <span className="form-help">How we authenticate every outgoing request to this backend.</span>
+                </label>
+              )}
+
+              {(manualAuthType !== 'none' || manualType === 'postgresql') && (
+                <label className="form-group">
+                  <span className="form-label">
+                    {manualType === 'postgresql' ? 'Connection string' : 'Secret value'}
+                  </span>
+                  <input
+                    type="password"
+                    className="form-input"
+                    placeholder={
+                      manualType === 'postgresql'
+                        ? 'postgresql://user:pass@host:5432/db'
+                        : 'Paste the raw API key, token, or credentials'
+                    }
+                    value={manualSecretRef}
+                    onChange={(e) => setManualSecretRef(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                  <span className="form-help">
+                    Stored in Postgres and never returned via the API (responses show <code>has_secret: true</code> only).
+                    Advanced: use <code>{`{{env.VAR_NAME}}`}</code> to reference a backend env var instead.
+                  </span>
+                </label>
+              )}
+
+              {manualType === 'agent' && (
+                <label className="form-group">
+                  <span className="form-label">Poll URL template (optional)</span>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="/public/result/{{jobId}}"
+                    value={manualPollUrlTemplate}
+                    onChange={(e) => setManualPollUrlTemplate(e.target.value)}
+                  />
+                  <span className="form-help">
+                    Use <code>{`{{jobId}}`}</code> as the placeholder. Only needed if the kickoff response
+                    doesn't include a <code>poll_url</code> / <code>pollUrl</code> field.
+                  </span>
+                </label>
+              )}
+
+              {manualType === 'agent' && (
+                <div
+                  className="form-group"
+                  style={{
+                    background: 'var(--surface-muted, #f8f9fb)',
+                    border: '1px solid var(--border, #e3e6ec)',
+                    borderRadius: 8,
+                    padding: '10px 12px',
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    color: 'var(--text-muted, #5c6370)',
+                  }}
+                >
+                  <strong style={{ color: 'var(--text-primary, #0f1117)' }}>How polling works for agent resources</strong>
+                  <ol style={{ margin: '6px 0 0 16px', padding: 0 }}>
+                    <li>We POST to your endpoint to kick off the job.</li>
+                    <li>We read <code>job_id</code> (or <code>jobId</code>) from the response.</li>
+                    <li>If the response has <code>poll_url</code> / <code>pollUrl</code>, we poll there. Otherwise we use <code>pollUrlTemplate</code> from the query, or fall back to <code>{`{baseUrl}/public/result/{jobId}`}</code>.</li>
+                    <li>We poll every 2s until <code>status</code> is <code>done</code> / <code>complete</code> / <code>success</code>, or 60s elapses.</li>
+                  </ol>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="btn-topbar primary resources-import-button"
+                disabled={manualSubmitting}
+                onClick={() => void handleManualSubmit()}
+              >
+                {manualSubmitting ? <span className="spinner dashboard-list-button-spinner" /> : null}
+                <span>{manualSubmitting ? 'Creating…' : 'Create resource'}</span>
+              </button>
+            </div>
+          )}
+
+          {resources.length === 0 ? (
+            <div className="resources-empty">No resources yet. Import one above to get started.</div>
+          ) : (
+            <ul className="resources-list">
+              {resources.map((resource) => {
+                const isExpanded = expandedId === resource.id;
+                const isConfirming = confirmDeleteId === resource.id;
+                const isEditing = editingId === resource.id;
+                return (
+                  <li key={resource.id} className="resources-list-item">
+                    <div className="resources-list-row">
+                      <div className="resources-list-info">
+                        <div className="resources-list-name">
+                          <strong>{resource.name}</strong>
+                          <span className={`resources-type-badge type-${resource.type.toLowerCase()}`}>{resource.type}</span>
+                        </div>
+                        <div className="resources-list-meta">{resource.base_url ?? '—'}</div>
+                      </div>
+
+                      <div className="resources-list-actions">
+                        <button className="btn-topbar" onClick={() => void handleToggleExpand(resource)}>
+                          {isExpanded ? 'Hide' : 'View Endpoints'}
+                        </button>
+                        <button
+                          className="btn-topbar"
+                          onClick={() => (isEditing ? setEditingId(null) : openEdit(resource))}
+                        >
+                          {isEditing ? 'Cancel' : 'Edit'}
+                        </button>
+                        {isConfirming ? (
+                          <div className="dashboard-card-delete-confirm">
+                            <span>Delete?</span>
+                            <button className="btn-topbar" onClick={() => void handleDeleteResource(resource.id)}>Yes</button>
+                            <button className="btn-topbar" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                          </div>
+                        ) : (
+                          <button className="btn-topbar danger-text" onClick={() => setConfirmDeleteId(resource.id)}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {isEditing && (
+                      <div className="resources-list-expanded">
+                        <div className="resources-form" style={{ marginBottom: 0 }}>
+                          <label className="form-group">
+                            <span className="form-label">Type</span>
+                            <select
+                              className="form-select"
+                              value={editType}
+                              onChange={(e) => setEditType(e.target.value as ResourceType)}
+                            >
+                              <option value="REST">REST</option>
+                              <option value="agent">agent</option>
+                              <option value="postgresql">postgresql</option>
+                            </select>
+                          </label>
+
+                          {(editType === 'REST' || editType === 'agent') && (
+                            <label className="form-group">
+                              <span className="form-label">Base URL</span>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={editBaseUrl}
+                                onChange={(e) => setEditBaseUrl(e.target.value)}
+                                placeholder="https://api.example.com"
+                              />
+                            </label>
+                          )}
+
+                          {editType !== 'postgresql' && (
+                            <label className="form-group">
+                              <span className="form-label">Auth type</span>
+                              <select
+                                className="form-select"
+                                value={editAuthType}
+                                onChange={(e) => setEditAuthType(e.target.value as AuthType)}
+                              >
+                                <option value="none">None</option>
+                                <option value="bearer">Bearer</option>
+                                <option value="api_key">API Key</option>
+                                <option value="basic">Basic</option>
+                              </select>
+                            </label>
+                          )}
+
+                          <label className="form-group">
+                            <span className="form-label">
+                              {editType === 'postgresql' ? 'Connection string' : 'Secret value'}
+                            </span>
+                            <input
+                              type="password"
+                              className="form-input"
+                              value={editSecretRef}
+                              onChange={(e) => setEditSecretRef(e.target.value)}
+                              placeholder={
+                                resource.has_secret
+                                  ? '••••••• (leave blank to keep current)'
+                                  : 'Paste the secret value here'
+                              }
+                              autoComplete="new-password"
+                            />
+                            <span className="form-help">
+                              Leave blank to keep the existing secret unchanged. Typing here overwrites it.
+                            </span>
+                          </label>
+
+                          {editType === 'agent' && (
+                            <label className="form-group">
+                              <span className="form-label">Poll URL template</span>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={editPollUrlTemplate}
+                                onChange={(e) => setEditPollUrlTemplate(e.target.value)}
+                                placeholder="/v1/person-lookup/{{jobId}}"
+                              />
+                              <span className="form-help">
+                                Use <code>{`{{jobId}}`}</code>. Only needed if the kickoff response doesn't return a <code>poll_url</code>.
+                              </span>
+                            </label>
+                          )}
+
+                          <button
+                            type="button"
+                            className="btn-topbar primary"
+                            disabled={editSaving}
+                            onClick={() => void saveEdit(resource.id)}
+                          >
+                            {editSaving ? 'Saving…' : 'Save changes'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {isExpanded && (
+                      <div className="resources-list-expanded">
+                        {expandedEndpoints.length === 0 ? (
+                          <div className="resources-empty">No endpoints imported for this resource.</div>
+                        ) : (
+                          <ul className="resources-endpoint-list">
+                            {expandedEndpoints.map((ep) => (
+                              <li key={ep.id} className="resources-endpoint-row">
+                                <MethodBadge method={ep.method} />
+                                <span className="resources-endpoint-path">{ep.path}</span>
+                                <span className="resources-endpoint-summary">{ep.summary ?? ''}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}
