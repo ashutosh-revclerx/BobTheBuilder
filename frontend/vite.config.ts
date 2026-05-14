@@ -3,9 +3,9 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig(() => ({
   plugins: [react(), tailwindcss()],
-  base: command === 'build' ? '/ai-dashboard-builder/' : '/',
+  base: process.env.VITE_BASE_PATH || '/',
   server: {
     host: '0.0.0.0',
     port: 5143,
