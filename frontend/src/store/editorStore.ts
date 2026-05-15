@@ -387,11 +387,15 @@ const createDefaultConfig = (
             { label: 'Mobile', value: 28 },
             { label: 'Tablet', value: 10 },
           ],
+          categoryKey: 'label',
           nameField: 'label',
           valueField: 'value',
+          variant: 'donut',
           donut: true,
           showLegend: true,
           showLabels: false,
+          hoverExpand: true,
+          colors: ['#2563eb', '#3b82f6', '#60a5fa'],
           colorScheme: 'Blue',
           onSliceClickAction: '',
         },
@@ -1448,6 +1452,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           };
         } else if (ctype === 'BarChart' || ctype === 'LineChart' || ctype === 'PieChart' || ctype === 'HeatMap') {
           style.backgroundColor = palette.chart_tint;
+          if (ctype === 'PieChart') {
+            style.colors = [palette.primary, palette.success, palette.warning, palette.error].filter(Boolean);
+          }
           style.xAxisColor = isDark ? '#94a3b8' : '#4b5563';
           style.yAxisColor = style.xAxisColor;
           style.gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';

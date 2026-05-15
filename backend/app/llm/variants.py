@@ -229,6 +229,8 @@ def _repaint_component(component: dict[str, Any], palette: dict[str, Any]) -> di
         style["borderColor"] = palette["border_subtle"]
         if ctype != "HeatMap":
             style["seriesColors"] = palette.get("chart_colors", [palette["primary"]])
+            if ctype == "PieChart":
+                component.setdefault("data", {})["colors"] = palette.get("chart_colors", [palette["primary"]])
             style["gridColor"] = palette["border_subtle"]
             style["axisColor"] = palette["text_faint"]
         else:

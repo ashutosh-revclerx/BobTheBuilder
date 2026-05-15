@@ -18,7 +18,7 @@ Every dashboard component receives a `ComponentConfig`:
   data: {
     dbBinding: "{{queries.sales.data}}",
     mockValue: [{ label: "A", value: 30 }],
-    nameField: "label",
+    categoryKey: "label",
     valueField: "value"
   }
 }
@@ -86,6 +86,7 @@ Add any style keys to `ComponentStyle`:
 ```ts
 export interface ComponentStyle {
   seriesColors?: string[];
+  colors?: string[];
   innerRadius?: number;
   cellGap?: number;
   minCellColor?: string;
@@ -99,9 +100,13 @@ Add any data keys to `ComponentData`:
 ```ts
 export interface ComponentData {
   nameField?: string;
+  categoryKey?: string;
   valueField?: string;
   donut?: boolean;
+  variant?: "default" | "donut" | "minimal";
+  colors?: string[];
   showLabels?: boolean;
+  hoverExpand?: boolean;
   onSliceClickAction?: string;
   xField?: string;
   yField?: string;
@@ -255,9 +260,13 @@ case "PieChart":
         { label: "Mobile", value: 28 },
       ],
       nameField: "label",
+      categoryKey: "label",
       valueField: "value",
+      variant: "donut",
       donut: true,
       showLegend: true,
+      colors: ["#2563eb", "#60a5fa", "#93c5fd"],
+      hoverExpand: true,
     },
     layout: { ...COMPONENT_LAYOUTS[type] },
   };
@@ -315,7 +324,7 @@ Add component-specific data controls:
 ```tsx
 {type === "PieChart" && (
   <>
-    <TextField label="Name Field" value={data.nameField ?? ""} onChange={(value) => handleDataField("nameField", value)} />
+    <TextField label="Category Key" value={data.categoryKey ?? data.nameField ?? ""} onChange={(value) => handleDataField("categoryKey", value)} />
     <TextField label="Value Field" value={data.valueField ?? ""} onChange={(value) => handleDataField("valueField", value)} />
     <BooleanField label="Donut" value={data.donut === true} onChange={(value) => handleDataField("donut", value)} />
     <BooleanField label="Show labels" value={data.showLabels === true} onChange={(value) => handleDataField("showLabels", value)} />
@@ -390,16 +399,19 @@ Add a conservative entry with only fields the React component actually reads:
         "seriesColors",
     ],
     "data": COMMON_VISIBILITY_DATA + [
-        "nameField",
+        "categoryKey",
         "valueField",
         "showLegend",
         "showLabels",
+        "variant",
+        "colors",
+        "hoverExpand",
         "donut",
         "onSliceClickAction",
     ],
     "required": {
         "style": ["seriesColors"],
-        "data": ["nameField", "valueField", "dbBinding"],
+        "data": ["categoryKey", "valueField", "dbBinding"],
     },
 }
 ```
@@ -409,7 +421,7 @@ Edit `backend/app/llm/prompts.py`.
 Add the type to the allowed component list and include binding guidance:
 
 ```text
-PieChart expects array rows with nameField and valueField.
+PieChart expects array rows with categoryKey and valueField.
 HeatMap expects array rows with xField, yField, and valueField.
 ```
 
@@ -477,12 +489,17 @@ Adding React behavior but not TypeScript types: future code will drift and gener
 `PieChart` reads:
 
 ```ts
+data.categoryKey
 data.nameField
 data.valueField
 data.donut
+data.variant
+data.colors
 data.showLegend
 data.showLabels
+data.hoverExpand
 data.onSliceClickAction
+style.colors
 style.seriesColors
 style.innerRadius
 ```

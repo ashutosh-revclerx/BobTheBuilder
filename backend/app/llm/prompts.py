@@ -138,8 +138,11 @@ TextInput:    data.placeholder  = "..."
               data.type         = "Text" | "URL" | "Email"
 
 PieChart:     data.dbBinding  = "{{queries.X.data}}"  (expects array rows)
-              data.nameField  = "category"
+              data.categoryKey = "category"
               data.valueField = "value"
+              data.variant    = "default" | "donut" | "minimal"
+              data.colors     = ["#2563eb", "#3b82f6"]
+              data.hoverExpand = true
 
 HeatMap:      data.dbBinding  = "{{queries.X.data}}"  (expects array rows)
               data.xField     = "hour"
@@ -528,7 +531,7 @@ def build_system_prompt() -> str:
         "  Always include trend and trendType when the metric has a direction.\n"
         "- Bar/Line charts MUST use: seriesColors, gridColor, axisColor, showGrid, showLegend,\n"
         "  xField, series. Set smooth:true on LineCharts.\n"
-        "- Pie charts should define nameField and valueField, and may use donut mode.\n"
+        "- Pie charts should define categoryKey and valueField, plus variant, colors, and hoverExpand when useful.\n"
         "- Heat maps should define xField, yField, valueField with min/max cell colors.\n"
         "- Tables MUST use: headerBackgroundColor, stripeRows:true, rowHoverColor,\n"
         "  searchable:true, pagination:true, and explicit columns array.\n"

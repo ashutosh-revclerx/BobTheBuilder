@@ -47,6 +47,7 @@ export interface ComponentStyle {
   };
   // Chart-specific
   seriesColors?: string[];
+  colors?: string[];
   gridColor?: string;
   axisColor?: string;
   xAxisColor?: string;
@@ -176,8 +177,12 @@ export interface ComponentData {
   fillArea?: boolean;
   onPointClickAction?: string;
   nameField?: string;
+  categoryKey?: string;
   donut?: boolean;
+  variant?: 'default' | 'donut' | 'minimal';
+  colors?: string[];
   showLabels?: boolean;
+  hoverExpand?: boolean;
   onSliceClickAction?: string;
   minValue?: number;
   maxValue?: number;

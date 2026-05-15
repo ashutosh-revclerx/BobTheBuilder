@@ -1474,10 +1474,31 @@ export default function DataTab() {
 
       {type === 'PieChart' && (
         <>
-          <TextField label="Name Field" value={data.nameField ?? ''} onChange={(value) => handleDataField('nameField', value)} />
+          <TextField label="Category Key" value={data.categoryKey ?? data.nameField ?? ''} onChange={(value) => handleDataField('categoryKey', value)} />
           <TextField label="Value Field" value={data.valueField ?? ''} onChange={(value) => handleDataField('valueField', value)} />
-          <BooleanField label="Donut" value={data.donut === true} onChange={(value) => handleDataField('donut', value)} />
+          <SelectField
+            label="Variant"
+            value={data.variant || (data.donut ? 'donut' : 'default')}
+            onChange={(value) => handleDataField('variant', value)}
+            options={['default', 'donut', 'minimal']}
+          />
+          <FormField label="Colors">
+            <textarea
+              className="form-textarea"
+              value={JSON.stringify(data.colors ?? [], null, 2)}
+              onChange={(e) => {
+                try {
+                  handleDataField('colors', JSON.parse(e.target.value));
+                } catch {
+                  // Ignore invalid JSON while typing.
+                }
+              }}
+              placeholder='["#2563eb", "#3b82f6"]'
+              rows={3}
+            />
+          </FormField>
           <BooleanField label="Show labels" value={data.showLabels === true} onChange={(value) => handleDataField('showLabels', value)} />
+          <BooleanField label="Hover expand" value={data.hoverExpand === true} onChange={(value) => handleDataField('hoverExpand', value)} />
           <TextField
             label="On slice click -> set variable"
             value={data.onSliceClickAction ?? ''}

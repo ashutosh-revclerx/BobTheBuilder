@@ -184,9 +184,12 @@ def _enrich_component(component: dict[str, Any]) -> None:
             style.setdefault("emptyCellColor", "#f3f4f6")
             style.setdefault("cellGap", 4)
         if ctype == "PieChart":
-            data.setdefault("nameField", "label")
+            data.setdefault("categoryKey", data.get("nameField", "label"))
             data.setdefault("valueField", "value")
-            data.setdefault("donut", True)
+            data.setdefault("variant", "donut")
+            data.setdefault("hoverExpand", True)
+            data.setdefault("colors", style.get("seriesColors", ["#2563eb", "#3b82f6", "#60a5fa"]))
+            data.setdefault("donut", data.get("variant") == "donut")
         style.setdefault("borderRadius", 12)
         style.setdefault("padding", 18)
 

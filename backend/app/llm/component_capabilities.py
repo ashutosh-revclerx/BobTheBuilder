@@ -170,19 +170,24 @@ COMPONENT_CAPABILITIES: dict[str, dict] = {
         "visual_role": "Shows composition share by category.",
         "style": CHART_STYLE + [
             "innerRadius",
+            "colors",
         ],
         "data": COMMON_VISIBILITY_DATA + [
+            "categoryKey",
             "nameField",
             "valueField",
             "showLegend",
             "showLabels",
+            "variant",
             "donut",
+            "colors",
+            "hoverExpand",
             "colorScheme",
             "onSliceClickAction",
         ],
         "required": {
-            "style": ["seriesColors"],
-            "data": ["nameField", "valueField", "dbBinding"],
+            "style": ["colors"],
+            "data": ["categoryKey", "valueField", "dbBinding"],
         },
     },
     "HeatMap": {

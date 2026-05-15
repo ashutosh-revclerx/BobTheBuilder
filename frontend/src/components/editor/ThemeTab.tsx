@@ -355,7 +355,7 @@ export default function ThemeTab() {
     Math.max(data?.series?.length ?? 2, 1),
     MAX_SERIES_COLORS,
   );
-  const currentSeriesColors = style?.seriesColors ?? Array.from({ length: seriesCount }, (_, i) =>
+  const currentSeriesColors = (ctype === 'PieChart' ? style?.colors : style?.seriesColors) ?? Array.from({ length: seriesCount }, (_, i) =>
     ['#2563eb', '#7c3aed', '#0891b2', '#059669', '#d97706'][i] ?? '#2563eb',
   );
 
@@ -612,6 +612,7 @@ export default function ThemeTab() {
                             const next = [...currentSeriesColors];
                             next[i] = c;
                             setDebounced('seriesColors', next);
+                            if (ctype === 'PieChart') setDebounced('colors', next);
                           }}
                         />
                       </div>
