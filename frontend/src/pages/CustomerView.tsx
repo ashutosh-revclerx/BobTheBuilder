@@ -9,6 +9,8 @@ import StatCard from '../components/dashboard-components/StatCard';
 import Table from '../components/dashboard-components/Table';
 import BarChartComponent from '../components/dashboard-components/BarChart';
 import LineChartComponent from '../components/dashboard-components/LineChart';
+import PieChartComponent from '../components/dashboard-components/PieChart';
+import HeatMapComponent from '../components/dashboard-components/HeatMap';
 import StatusBadge from '../components/dashboard-components/StatusBadge';
 import Button from '../components/dashboard-components/Button';
 import LogsViewer from '../components/dashboard-components/LogsViewer';
@@ -32,6 +34,8 @@ const ComponentMap: Record<ComponentType, React.ComponentType<any>> = {
   Table,
   BarChart: BarChartComponent,
   LineChart: LineChartComponent,
+  PieChart: PieChartComponent,
+  HeatMap: HeatMapComponent,
   StatusBadge,
   Button,
   LogsViewer,

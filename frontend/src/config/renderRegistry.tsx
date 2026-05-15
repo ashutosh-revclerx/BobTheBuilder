@@ -26,6 +26,8 @@ import type { ComponentType } from '../types/template';
 // Lazy load heavy components with Suspense
 const BarChartComponent = lazy(() => import('../components/dashboard-components/BarChart'));
 const LineChartComponent = lazy(() => import('../components/dashboard-components/LineChart'));
+const PieChartComponent = lazy(() => import('../components/dashboard-components/PieChart'));
+const HeatMapComponent = lazy(() => import('../components/dashboard-components/HeatMap'));
 const LogsViewer = lazy(() => import('../components/dashboard-components/LogsViewer'));
 const NodeGraph = lazy(() => import('../components/dashboard-components/NodeGraph'));
 
@@ -41,6 +43,8 @@ export const RenderRegistry: Record<ComponentType, React.ComponentType<any>> = {
   Table,
   BarChart: BarChartComponent,
   LineChart: LineChartComponent,
+  PieChart: PieChartComponent,
+  HeatMap: HeatMapComponent,
   StatusBadge,
   Button,
   LogsViewer,

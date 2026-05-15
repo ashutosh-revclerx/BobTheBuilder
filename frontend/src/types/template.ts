@@ -34,6 +34,11 @@ export interface ComponentStyle {
   barRadius?: number;
   showDataLabels?: boolean;
   lineWidth?: number;
+  innerRadius?: number;
+  cellGap?: number;
+  minCellColor?: string;
+  maxCellColor?: string;
+  emptyCellColor?: string;
   levelColors?: Record<'INFO' | 'WARN' | 'ERROR' | 'DEBUG', string>;
   backgroundGradient?: {
     enabled: boolean;
@@ -42,6 +47,7 @@ export interface ComponentStyle {
   };
   // Chart-specific
   seriesColors?: string[];
+  colors?: string[];
   gridColor?: string;
   axisColor?: string;
   xAxisColor?: string;
@@ -170,6 +176,18 @@ export interface ComponentData {
   showDots?: boolean;
   fillArea?: boolean;
   onPointClickAction?: string;
+  nameField?: string;
+  categoryKey?: string;
+  donut?: boolean;
+  variant?: 'default' | 'donut' | 'minimal';
+  colors?: string[];
+  showLabels?: boolean;
+  hoverExpand?: boolean;
+  onSliceClickAction?: string;
+  minValue?: number;
+  maxValue?: number;
+  showCellLabels?: boolean;
+  onCellClickAction?: string;
 
   placeholder?: string;
   type?: 'Text' | 'Email' | 'Password' | 'URL' | 'Search';
@@ -227,6 +245,8 @@ export type ComponentType =
   | 'Table'
   | 'BarChart'
   | 'LineChart'
+  | 'PieChart'
+  | 'HeatMap'
   | 'StatusBadge'
   | 'Button'
   | 'LogsViewer'
@@ -244,6 +264,7 @@ export type ComponentType =
 
 export interface ComponentConfig {
   id: string;
+  componentKey?: string;
   type: ComponentType;
   label: string;
   visible?: string | boolean;

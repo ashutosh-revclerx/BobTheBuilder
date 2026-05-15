@@ -36,7 +36,7 @@ PROPERTY_HINTS: dict[str, str] = {
     "textAlign": "one of: 'Left' | 'Center' | 'Right' | 'Justify'",
     "overflow": "one of: 'Wrap' | 'Truncate' | 'Scroll'",
     "shape": "one of: 'Rounded' | 'Pill' | 'Square'",
-    "variant": "component variant string, e.g. 'Primary' | 'Secondary' | 'Danger' | 'Ghost' | 'Clean' | 'Zebra' | 'Bordered'",
+    "variant": "component variant string, e.g. Button 'Primary', Table 'Bordered', PieChart 'default' | 'donut' | 'minimal'",
     "iconLeft": "icon name string or empty string",
     "fullWidth": "boolean",
     "hoverBackgroundColor": "hex color string",
@@ -45,6 +45,7 @@ PROPERTY_HINTS: dict[str, str] = {
 
     # Gradient
     "seriesColors": "array of hex colors, e.g. ['#2563eb', '#10b981']",
+    "colors": "array of hex colors, e.g. ['#2563eb', '#10b981']; used by PieChart",
     "gridColor": "hex color string or rgba string",
     "axisColor": "hex color string",
     "xAxisColor": "hex color string",
@@ -99,6 +100,8 @@ PROPERTY_HINTS: dict[str, str] = {
     "fillArea": "boolean",
     "onBarClickAction": "action name string",
     "onPointClickAction": "action name string",
+    "categoryKey": "PieChart category/name field key in each data row",
+    "hoverExpand": "boolean; expands PieChart slices on hover",
 
     # StatCard / StatusBadge
     "metricFontSize": "number in px",

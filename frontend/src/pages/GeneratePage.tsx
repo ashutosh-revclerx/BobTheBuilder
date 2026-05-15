@@ -143,7 +143,7 @@ export default function GeneratePage() {
             </span>
             {resources.length === 0 ? (
               <div className="resources-empty">
-                No resources registered yet. <a href="/resources">Add one</a> first if you want live data.
+                No resources registered yet. <a href={`${import.meta.env.BASE_URL}resources`}>Add one</a> first if you want live data.
               </div>
             ) : (
               <div className="generate-resource-grid">

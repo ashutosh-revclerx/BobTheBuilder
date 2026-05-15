@@ -351,13 +351,15 @@ export default function ThemeTab() {
   const toggle = (section: 'component' | 'dashboard' | 'presets') =>
     setExpandedSection((s) => (s === section ? '' : section));
 
+  const pieRows = Array.isArray(data?.mockValue) ? data.mockValue : [];
   const seriesCount = Math.min(
-    Math.max(data?.series?.length ?? 2, 1),
+    Math.max(ctype === 'PieChart' ? (style?.colors?.length ?? data?.colors?.length ?? pieRows.length ?? 3) : (data?.series?.length ?? 2), 1),
     MAX_SERIES_COLORS,
   );
-  const currentSeriesColors = style?.seriesColors ?? Array.from({ length: seriesCount }, (_, i) =>
+  const currentSeriesColors = (ctype === 'PieChart' ? (style?.colors ?? data?.colors) : style?.seriesColors) ?? Array.from({ length: seriesCount }, (_, i) =>
     ['#2563eb', '#7c3aed', '#0891b2', '#059669', '#d97706'][i] ?? '#2563eb',
   );
+  const pieCategoryKey = data?.categoryKey || data?.nameField || data?.xField || 'label';
 
   return (
     <div className="theme-tab">
@@ -597,25 +599,28 @@ export default function ThemeTab() {
             )}
 
             {/* ── Charts ── */}
-            {(ctype === 'BarChart' || ctype === 'LineChart') && (
+            {(ctype === 'BarChart' || ctype === 'LineChart' || ctype === 'PieChart' || ctype === 'HeatMap') && (
               <>
-                <div className="form-group">
-                  <label className="form-label">Series Colors</label>
-                  {Array.from({ length: seriesCount }).map((_, i) => (
-                    <div key={i} className="color-picker-group" style={{ marginBottom: '4px' }}>
-                      <LocalSeriesColorInput 
-                        value={currentSeriesColors[i] ?? '#2563eb'}
-                        componentId={lastSelectedComponentId}
-                        label={data.series?.[i]?.name ?? `Series ${i + 1}`}
-                        onChange={(c) => {
-                          const next = [...currentSeriesColors];
-                          next[i] = c;
-                          setDebounced('seriesColors', next);
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
+                {ctype !== 'HeatMap' && (
+                  <div className="form-group">
+                    <label className="form-label">Series Colors</label>
+                    {Array.from({ length: seriesCount }).map((_, i) => (
+                      <div key={i} className="color-picker-group" style={{ marginBottom: '4px' }}>
+                        <LocalSeriesColorInput 
+                          value={currentSeriesColors[i] ?? '#2563eb'}
+                          componentId={lastSelectedComponentId}
+                          label={ctype === 'PieChart' ? String(pieRows[i]?.[pieCategoryKey] ?? `Slice ${i + 1}`) : (data.series?.[i]?.name ?? `Series ${i + 1}`)}
+                          onChange={(c) => {
+                            const next = [...currentSeriesColors];
+                            next[i] = c;
+                            setDebounced('seriesColors', next);
+                            if (ctype === 'PieChart') setDebounced('colors', next);
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <LocalColorField
                   label="Grid Line Color"
                   componentId={lastSelectedComponentId}
@@ -671,6 +676,27 @@ export default function ThemeTab() {
                     />
                     <span className="slider-value">{style.lineWidth ?? 2}px</span>
                   </FormField>
+                )}
+                {ctype === 'PieChart' && (
+                  <FormField label="Inner Radius (px)">
+                    <input
+                      type="range"
+                      className="slider-input"
+                      min={0}
+                      max={90}
+                      step={1}
+                      value={style.innerRadius ?? 50}
+                      onChange={(e) => set('innerRadius', Number(e.target.value))}
+                    />
+                    <span className="slider-value">{style.innerRadius ?? 50}px</span>
+                  </FormField>
+                )}
+                {ctype === 'HeatMap' && (
+                  <>
+                    <LocalColorField label="Min Cell Color" componentId={lastSelectedComponentId} value={style.minCellColor ?? '#dbeafe'} onChange={(v) => setDebounced('minCellColor', v)} />
+                    <LocalColorField label="Max Cell Color" componentId={lastSelectedComponentId} value={style.maxCellColor ?? '#1d4ed8'} onChange={(v) => setDebounced('maxCellColor', v)} />
+                    <LocalColorField label="Empty Cell Color" componentId={lastSelectedComponentId} value={style.emptyCellColor ?? '#f3f4f6'} onChange={(v) => setDebounced('emptyCellColor', v)} />
+                  </>
                 )}
                 <FormField label="Show Data Labels">
                   <div className="option-group">

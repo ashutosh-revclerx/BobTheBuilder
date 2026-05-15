@@ -118,10 +118,10 @@ function DashboardCard({
           {dashboard.status}
         </span>
         {dashboard.status === 'live' && customer && (
-          <a 
-            href={`/c/${customer.slug}`} 
-            target="_blank" 
-            rel="noopener noreferrer" 
+          <a
+            href={`${import.meta.env.BASE_URL}c/${customer.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="dl-card__view-link"
             title="View Live Dashboard"
           >
@@ -149,12 +149,12 @@ function DashboardCard({
       {customer && dashboard.status === 'live' && (
         <a
           className="dl-card__live-link"
-          href={`/c/${customer.slug}`}
+          href={`${import.meta.env.BASE_URL}c/${customer.slug}`}
           target="_blank"
           rel="noopener noreferrer"
           title={`Open ${customer.name}'s dashboard in a new tab`}
         >
-          <span className="dl-card__live-link-url">/c/{customer.slug}</span>
+          <span className="dl-card__live-link-url">{import.meta.env.BASE_URL}c/{customer.slug}</span>
           <span className="dl-card__live-link-icon" aria-hidden="true">↗</span>
         </a>
       )}
