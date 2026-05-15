@@ -542,6 +542,45 @@ const ensureColumnVisibility = (columns: TableColumn[] = [], current?: Record<st
 const normalizeVisibleForRoles = (roles?: string[]) =>
   Array.isArray(roles) ? roles.filter((role): role is string => VISIBILITY_ROLE_OPTIONS.includes(role as any)) : [];
 
+const COMPONENT_KEY_RE = /^[a-z][a-z0-9_]*$/;
+
+const typeToComponentKeyBase = (type: ComponentType): string =>
+  type
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .toLowerCase();
+
+const sanitizeComponentKey = (value: string): string => {
+  const lower = value.trim().toLowerCase();
+  const normalized = lower
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (!normalized) return 'component';
+  if (/^[a-z]/.test(normalized)) return normalized;
+  return `c_${normalized}`;
+};
+
+const buildScopedComponentKey = (
+  base: string,
+  components: ComponentConfig[],
+  excludeId?: string,
+): string => {
+  const used = new Set(
+    components
+      .filter((component) => component.id !== excludeId)
+      .map((component) => component.componentKey)
+      .filter((key): key is string => Boolean(key)),
+  );
+  let i = 1;
+  let candidate = `${base}_${i}`;
+  while (used.has(candidate)) {
+    i += 1;
+    candidate = `${base}_${i}`;
+  }
+  return candidate;
+};
+
 const normalizeComponent = (component: ComponentConfig): ComponentConfig => {
   const defaults = defaultConfigs[component.type];
   const data = {
@@ -597,6 +636,28 @@ const normalizeComponent = (component: ComponentConfig): ComponentConfig => {
 
 const normalizeComponents = (components: ComponentConfig[]) => components.map(normalizeComponent);
 
+const withScopedComponentKeys = (components: ComponentConfig[]): ComponentConfig[] => {
+  const next = components.map((component) => ({ ...component }));
+  const used = new Set<string>();
+  for (const component of next) {
+    const fallbackBase = typeToComponentKeyBase(component.type);
+    const raw = component.componentKey?.trim();
+    const sanitized = raw ? sanitizeComponentKey(raw) : '';
+    let resolved = sanitized && COMPONENT_KEY_RE.test(sanitized) && !used.has(sanitized) ? sanitized : '';
+    if (!resolved) {
+      let n = 1;
+      resolved = `${fallbackBase}_${n}`;
+      while (used.has(resolved)) {
+        n += 1;
+        resolved = `${fallbackBase}_${n}`;
+      }
+    }
+    component.componentKey = resolved;
+    used.add(resolved);
+  }
+  return next;
+};
+
 interface QueryState {
   data: unknown;
   status: 'idle' | 'loading' | 'success' | 'error';
@@ -649,6 +710,7 @@ interface EditorState {
   updateStyle: (componentId: string, style: Partial<ComponentStyle>) => void;
   updateData: (componentId: string, data: Partial<ComponentData>) => void;
   updateLabel: (componentId: string, label: string) => void;
+  updateComponentKey: (componentId: string, componentKey: string) => void;
   updateLayouts: (layouts: { id: string; x: number; y: number; w: number; h: number }[]) => void;
   addComponent: (
     type: ComponentType,
@@ -762,7 +824,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     })),
 
   loadTemplate: (templateId, name, components, queries = [], status = 'draft', publishedAt = null, canvasStyle, generationPrompt = null) => {
-    const normalizedComponents = normalizeComponents(clone(components));
+    const normalizedComponents = withScopedComponentKeys(normalizeComponents(clone(components)));
     set({
       activeTemplateId: templateId,
       originalTemplateId: templateId,
@@ -792,7 +854,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   loadSavedTemplate: (saved) => {
-    const normalizedComponents = normalizeComponents(clone(saved.components));
+    const normalizedComponents = withScopedComponentKeys(normalizeComponents(clone(saved.components)));
     set({
       activeTemplateId: saved.templateId,
       originalTemplateId: saved.originalTemplateId,
@@ -852,7 +914,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   updateData: (componentId, dataUpdates) => {
     set((state) => {
-      const components = state.components.map((component) => {
+      const components = withScopedComponentKeys(state.components.map((component) => {
         if (component.id !== componentId) {
           return component;
         }
@@ -872,7 +934,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             visibleForRoles: normalizeVisibleForRoles(nextRoles as string[]),
           },
         });
-      });
+      }));
 
       return {
         components,
@@ -890,11 +952,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   updateLabel: (componentId, label) => {
     set((state) => ({
-      components: state.components.map((c) => 
+      components: withScopedComponentKeys(state.components.map((c) => 
         c.id === componentId ? normalizeComponent({ ...c, label }) : c
-      ),
+      )),
       isDirty: true,
     }));
+  },
+
+  updateComponentKey: (componentId, componentKey) => {
+    set((state) => {
+      const target = state.components.find((component) => component.id === componentId);
+      if (!target) return state;
+      const base = typeToComponentKeyBase(target.type);
+      const sanitized = sanitizeComponentKey(componentKey);
+      const desired = COMPONENT_KEY_RE.test(sanitized)
+        ? sanitized
+        : buildScopedComponentKey(base, state.components, componentId);
+      const taken = state.components.some(
+        (component) => component.id !== componentId && component.componentKey === desired,
+      );
+      const resolved = taken
+        ? buildScopedComponentKey(base, state.components, componentId)
+        : desired;
+      return {
+        components: withScopedComponentKeys(
+          state.components.map((component) =>
+            component.id === componentId ? { ...component, componentKey: resolved } : component,
+          ),
+        ),
+        isDirty: true,
+      };
+    });
   },
 
   updateLayouts: (newLayouts) => {
@@ -968,6 +1056,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const newComponent = normalizeComponent({
         id,
         type,
+        componentKey: buildScopedComponentKey(typeToComponentKeyBase(type), state.components),
         label: `New ${type}`,
         visible: 'true',
         visibleForRoles: [],
@@ -979,7 +1068,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
 
       return {
-        components: [...state.components, newComponent],
+        components: withScopedComponentKeys([...state.components, newComponent]),
         selectedComponentId: id,
         lastSelectedComponentId: id,
         rightPanelOpen: true,
@@ -1067,6 +1156,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {
           ...clone(comp),
           id: newCid,
+          componentKey: buildScopedComponentKey(
+            typeToComponentKeyBase(comp.type),
+            [...state.components, ...componentsToDuplicate],
+            comp.id,
+          ),
           parentId: newParentId,
           layout,
           label: `${comp.label} (Copy)`,
@@ -1074,7 +1168,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
 
       return {
-        components: [...state.components, ...duplicated],
+        components: withScopedComponentKeys([...state.components, ...duplicated]),
         selectedComponentId: newIdMap[targetId],
         lastSelectedComponentId: newIdMap[targetId],
         isDirty: true,
@@ -1125,7 +1219,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           templateId,
           {
             ...saved,
-            components: normalizeComponents(clone(saved.components)),
+            components: withScopedComponentKeys(normalizeComponents(clone(saved.components))),
           },
         ]),
       );
@@ -1144,7 +1238,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
     
-    const normalizedComponents = normalizeComponents(clone(components));
+    const normalizedComponents = withScopedComponentKeys(normalizeComponents(clone(components)));
     set({
       savedTemplates: existing,
       activeTemplateId: templateId,
@@ -1339,7 +1433,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   
   importDashboard: (data) => {
     const { metadata, config, queries, state, componentState: importedComponentState } = data;
-    const normalizedComponents = normalizeComponents(clone(config.components || []));
+    const normalizedComponents = withScopedComponentKeys(normalizeComponents(clone(config.components || [])));
 
     set({
       dashboardName: metadata.name || config.name,
@@ -1421,7 +1515,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           data: { ...clone(defaults.data), ...((c as any).data ?? {}) },
           ...(((c as any).parentId !== undefined) ? { parentId: (c as any).parentId } : {}),
         } as ComponentConfig;
-        nextComponents = normalizeComponents([...state.components, newComp]);
+        nextComponents = withScopedComponentKeys(normalizeComponents([...state.components, newComp]));
         break;
       }
       case 'updateComponent': {

@@ -63,6 +63,7 @@ export default function RightPanel() {
           {component ? (
             <>
               {component.label}
+              {component.componentKey ? <span className="right-panel-type-badge">{component.componentKey}</span> : null}
               <span className="right-panel-type-badge">{component.type}</span>
             </>
           ) : (

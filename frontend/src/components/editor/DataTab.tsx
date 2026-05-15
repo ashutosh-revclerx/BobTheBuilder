@@ -476,7 +476,7 @@ function BindingPicker({
         const fields = STATE_FIELDS_BY_TYPE[comp.type] ?? COMMON_STATE_FIELDS;
         fields.forEach((field) => {
           candidates.push({
-            label: `${comp.label || comp.id} → ${field}`,
+            label: `${comp.componentKey || comp.label || comp.id} → ${field}`,
             group: 'Component State',
             value: bindingExpression(`componentState.${comp.id}.${field}`),
             componentId: comp.id,
@@ -713,7 +713,7 @@ function BindingPicker({
                   return (
                     <div key={component.id} style={{ marginBottom: '8px' }}>
                       <div style={{ fontSize: '12px', color: '#111827', paddingBottom: '6px', borderBottom: '1px solid #e5e7eb' }}>
-                        {component.label || component.id}
+                        {component.componentKey || component.label || component.id}
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
                         {fields.map((field) => (
@@ -721,7 +721,7 @@ function BindingPicker({
                             key={field}
                             onClick={() =>
                               handleAutocompletePick({
-                                label: `${component.label || component.id} → ${field}`,
+                                label: `${component.componentKey || component.label || component.id} → ${field}`,
                                 group: 'Component State',
                                 value: bindingExpression(`componentState.${component.id}.${field}`),
                                 componentId: component.id,
@@ -908,8 +908,16 @@ export default function DataTab() {
   const lastSelectedComponentId = useEditorStore((s) => s.lastSelectedComponentId);
   const components = useEditorStore((s) => s.components);
   const updateData = useEditorStore((s) => s.updateData);
+  const updateComponentKey = useEditorStore((s) => s.updateComponentKey);
+  const [componentKeyDraft, setComponentKeyDraft] = useState('');
+  const [componentKeyError, setComponentKeyError] = useState<string | null>(null);
 
   const selectedComponent = components.find((component) => component.id === lastSelectedComponentId);
+  useEffect(() => {
+    if (!selectedComponent) return;
+    setComponentKeyDraft(selectedComponent.componentKey ?? '');
+    setComponentKeyError(null);
+  }, [selectedComponent?.id, selectedComponent?.componentKey]);
   if (!selectedComponent) {
     return null;
   }
@@ -938,6 +946,28 @@ export default function DataTab() {
       return;
     }
     updateData(lastSelectedComponentId, { [key]: value } as Partial<ComponentData>);
+  };
+
+  const handleComponentKeyChange = (value: string) => {
+    setComponentKeyDraft(value);
+    const candidate = value.trim().toLowerCase();
+    if (!candidate) {
+      setComponentKeyError('Component key is required.');
+      return;
+    }
+    if (!/^[a-z][a-z0-9_]*$/.test(candidate)) {
+      setComponentKeyError('Use lowercase letters, numbers, and underscore. Must start with a letter.');
+      return;
+    }
+    const duplicate = components.some(
+      (component) => component.id !== selectedComponent.id && component.componentKey === candidate,
+    );
+    if (duplicate) {
+      setComponentKeyError('This key already exists in the current dashboard.');
+      return;
+    }
+    setComponentKeyError(null);
+    updateComponentKey(selectedComponent.id, candidate);
   };
 
   const handleMockValueChange = (rawValue: string) => {
@@ -1036,6 +1066,17 @@ export default function DataTab() {
         onChange={(value) => handleDataField('label', value)}
         placeholder="Component label"
       />
+      <TextField
+        label="Component Key"
+        value={componentKeyDraft}
+        onChange={handleComponentKeyChange}
+        placeholder="table_1"
+      />
+      {componentKeyError && (
+        <p className="endpoint-picker-hint" style={{ color: '#b91c1c', marginTop: '-6px' }}>
+          {componentKeyError}
+        </p>
+      )}
 
       <TextField
         label="Visible"

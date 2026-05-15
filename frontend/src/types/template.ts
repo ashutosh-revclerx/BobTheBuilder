@@ -244,6 +244,7 @@ export type ComponentType =
 
 export interface ComponentConfig {
   id: string;
+  componentKey?: string;
   type: ComponentType;
   label: string;
   visible?: string | boolean;
