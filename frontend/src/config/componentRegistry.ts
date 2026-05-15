@@ -10,6 +10,8 @@ import {
   CheckSquare,
   Hash,
   LineChart as LineIcon,
+  PieChart as PieIcon,
+  Grid3X3,
   Terminal,
   Image as ImageIcon,
   Play as PlayIcon,
@@ -62,6 +64,8 @@ export const COMPONENT_REGISTRY: ComponentCategory[] = [
     options: [
       { type: 'BarChart', icon: BarChart3, label: 'Bar Chart', description: 'Visualize data with bars' },
       { type: 'LineChart', icon: LineIcon, label: 'Line Chart', description: 'Visualize trends over time' },
+      { type: 'PieChart', icon: PieIcon, label: 'Pie Chart', description: 'Part-to-whole distribution' },
+      { type: 'HeatMap', icon: Grid3X3, label: 'Heat Map', description: 'Density across two dimensions' },
     ],
   },
   {

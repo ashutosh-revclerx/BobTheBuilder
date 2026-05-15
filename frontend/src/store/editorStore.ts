@@ -31,6 +31,8 @@ const COMPONENT_LAYOUTS: Record<ComponentType, LayoutConfig> = {
   NumberInput: { x: 0, y: 0, w: 3, h: 6, minW: 2, minH: 3 },
   BarChart: { x: 0, y: 0, w: 6, h: 12, minW: 3, minH: 6 },
   LineChart: { x: 0, y: 0, w: 6, h: 12, minW: 3, minH: 6 },
+  PieChart: { x: 0, y: 0, w: 5, h: 12, minW: 3, minH: 6 },
+  HeatMap: { x: 0, y: 0, w: 6, h: 12, minW: 4, minH: 6 },
   LogsViewer: { x: 0, y: 0, w: 4, h: 12, minW: 4, minH: 4 },
   Image: { x: 0, y: 0, w: 4, h: 8, minW: 2, minH: 3 },
   Embed: { x: 0, y: 0, w: 6, h: 10, minW: 3, minH: 4 },
@@ -369,6 +371,61 @@ const createDefaultConfig = (
         },
         layout: { ...COMPONENT_LAYOUTS[type] },
       };
+    case 'PieChart':
+      return {
+        style: {
+          ...createBaseStyle(),
+          borderRadius: 10,
+          padding: 20,
+          innerRadius: 50,
+          showDataLabels: false,
+        },
+        data: {
+          ...createBaseData(),
+          mockValue: [
+            { label: 'Desktop', value: 62 },
+            { label: 'Mobile', value: 28 },
+            { label: 'Tablet', value: 10 },
+          ],
+          nameField: 'label',
+          valueField: 'value',
+          donut: true,
+          showLegend: true,
+          showLabels: false,
+          colorScheme: 'Blue',
+          onSliceClickAction: '',
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
+    case 'HeatMap':
+      return {
+        style: {
+          ...createBaseStyle(),
+          borderRadius: 10,
+          padding: 20,
+          cellGap: 4,
+          minCellColor: '#dbeafe',
+          maxCellColor: '#1d4ed8',
+          emptyCellColor: '#f3f4f6',
+        },
+        data: {
+          ...createBaseData(),
+          mockValue: [
+            { day: 'Mon', hour: '09:00', value: 12 },
+            { day: 'Mon', hour: '10:00', value: 24 },
+            { day: 'Tue', hour: '09:00', value: 18 },
+          ],
+          xField: 'hour',
+          yField: 'day',
+          valueField: 'value',
+          showCellLabels: false,
+          showLegend: false,
+          minValue: 0,
+          maxValue: 30,
+          onCellClickAction: '',
+        },
+        layout: { ...COMPONENT_LAYOUTS[type] },
+      };
     case 'LogsViewer':
       return {
         style: {
@@ -514,6 +571,8 @@ const defaultConfigs: Record<ComponentType, { style: ComponentStyle; data: Compo
   Table: createDefaultConfig('Table'),
   BarChart: createDefaultConfig('BarChart'),
   LineChart: createDefaultConfig('LineChart'),
+  PieChart: createDefaultConfig('PieChart'),
+  HeatMap: createDefaultConfig('HeatMap'),
   StatusBadge: createDefaultConfig('StatusBadge'),
   Button: createDefaultConfig('Button'),
   LogsViewer: createDefaultConfig('LogsViewer'),
@@ -1387,13 +1446,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             Pending: palette.warning,
             Error: palette.error,
           };
-        } else if (ctype === 'BarChart' || ctype === 'LineChart') {
+        } else if (ctype === 'BarChart' || ctype === 'LineChart' || ctype === 'PieChart' || ctype === 'HeatMap') {
           style.backgroundColor = palette.chart_tint;
           style.xAxisColor = isDark ? '#94a3b8' : '#4b5563';
           style.yAxisColor = style.xAxisColor;
           style.gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
           style.axisColor = style.xAxisColor;
           style.textColor = palette.text;
+          if (ctype === 'HeatMap') {
+            style.minCellColor = isDark ? '#1e3a8a' : '#dbeafe';
+            style.maxCellColor = palette.primary;
+            style.emptyCellColor = isDark ? '#0f172a' : '#f1f5f9';
+          }
         } else if (ctype === 'Table') {
           style.backgroundColor = palette.table_tint;
           style.headerBackgroundColor = palette.surface;

@@ -9,6 +9,8 @@ const DEFAULT_SIZES: Record<string, {w:number, h:number}> = {
   StatCard:        { w: 4, h: 6 },
   BarChart:        { w: 6, h: 12 },
   LineChart:       { w: 6, h: 12 },
+  PieChart:        { w: 5, h: 12 },
+  HeatMap:         { w: 6, h: 12 },
   Table:           { w: 6, h: 12 },
   Button:          { w: 2, h: 4 },
   StatusBadge:     { w: 2, h: 4 },

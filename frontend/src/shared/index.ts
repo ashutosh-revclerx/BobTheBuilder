@@ -13,7 +13,7 @@ export const ComponentStyleSchema = z.object({
 
 export const ComponentConfigSchema = z.object({
   id: z.string(),
-  type: z.enum(['StatCard', 'Table', 'BarChart', 'LineChart', 'StatusBadge', 'Button', 'LogsViewer',
+  type: z.enum(['StatCard', 'Table', 'BarChart', 'LineChart', 'PieChart', 'HeatMap', 'StatusBadge', 'Button', 'LogsViewer',
     'Container', 'TabbedContainer', 'Text', 'TextInput', 'NumberInput', 'Select',
     'Image', 'Embed', 'NodeGraph', 'FileUpload', 'ChatBox']),
   label: z.string().default(''),

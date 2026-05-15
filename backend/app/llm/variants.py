@@ -224,12 +224,18 @@ def _repaint_component(component: dict[str, Any], palette: dict[str, Any]) -> di
         style.setdefault("padding", 22)
         style.setdefault("borderRadius", 14)
 
-    elif ctype in {"LineChart", "BarChart"}:
+    elif ctype in {"LineChart", "BarChart", "PieChart", "HeatMap"}:
         style["backgroundColor"] = palette["chart_tint"]
         style["borderColor"] = palette["border_subtle"]
-        style["seriesColors"] = palette.get("chart_colors", [palette["primary"]])
-        style["gridColor"] = palette["border_subtle"]
-        style["axisColor"] = palette["text_faint"]
+        if ctype != "HeatMap":
+            style["seriesColors"] = palette.get("chart_colors", [palette["primary"]])
+            style["gridColor"] = palette["border_subtle"]
+            style["axisColor"] = palette["text_faint"]
+        else:
+            chart_colors = palette.get("chart_colors", [palette["primary"]])
+            style["minCellColor"] = chart_colors[0]
+            style["maxCellColor"] = palette["primary"]
+            style["emptyCellColor"] = palette["border_subtle"]
 
     elif ctype == "Table":
         style["backgroundColor"] = palette["table_tint"]
@@ -334,7 +340,7 @@ def _score_component(component: dict[str, Any]) -> int:
     ctype = component.get("type")
     if ctype == "StatCard":
         return 100
-    if ctype in {"LineChart", "BarChart"}:
+    if ctype in {"LineChart", "BarChart", "PieChart", "HeatMap"}:
         return 90
     if ctype in {"Table", "LogsViewer"}:
         return 80
@@ -391,7 +397,7 @@ def _overview_transform(components: list[dict[str, Any]]) -> list[dict[str, Any]
         if ctype == "StatCard":
             clone["layout"]["w"] = 3
             clone["layout"]["h"] = 7
-        elif ctype in {"LineChart", "BarChart"}:
+        elif ctype in {"LineChart", "BarChart", "PieChart", "HeatMap"}:
             clone["layout"]["w"] = 6
             clone["layout"]["h"] = 13
         elif ctype in {"Table", "LogsViewer"}:
@@ -410,7 +416,7 @@ def _detailed_transform(components: list[dict[str, Any]]) -> list[dict[str, Any]
         if ctype in {"Table", "LogsViewer"}:
             clone["layout"]["w"] = 12
             clone["layout"]["h"] = 16
-        elif ctype in {"LineChart", "BarChart"}:
+        elif ctype in {"LineChart", "BarChart", "PieChart", "HeatMap"}:
             clone["layout"]["w"] = 8
             clone["layout"]["h"] = 13
         elif ctype == "StatCard":
@@ -426,7 +432,7 @@ def _visual_transform(components: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for c in ordered:
         clone = copy.deepcopy(c)
         ctype = clone.get("type")
-        if ctype in {"LineChart", "BarChart"}:
+        if ctype in {"LineChart", "BarChart", "PieChart", "HeatMap"}:
             clone["layout"]["w"] = 12
             clone["layout"]["h"] = 14
         elif ctype == "StatCard":
@@ -459,21 +465,21 @@ def _apply_archetype_adjustments(
             elif ctype == "Button":
                 layout["w"] = min(4, int(layout.get("w", 4)))
                 layout["h"] = max(3, int(layout.get("h", 3)))
-            elif ctype in {"Text", "Table", "LogsViewer", "LineChart", "BarChart"}:
+            elif ctype in {"Text", "Table", "LogsViewer", "LineChart", "BarChart", "PieChart", "HeatMap"}:
                 layout["w"] = max(8, int(layout.get("w", 8)))
 
         elif dashboard_type == "logs":
             if ctype == "LogsViewer":
                 layout["w"] = 12
                 layout["h"] = 14 if profile == "Detailed" else 12
-            elif ctype in {"Table", "LineChart", "BarChart"}:
+            elif ctype in {"Table", "LineChart", "BarChart", "PieChart", "HeatMap"}:
                 layout["w"] = max(8, int(layout.get("w", 8)))
 
         elif dashboard_type == "monitoring":
             if ctype in {"StatusBadge", "StatCard"}:
                 layout["w"] = 3 if ctype == "StatCard" else min(4, int(layout.get("w", 4)))
                 layout["h"] = max(4, int(layout.get("h", 4)))
-            elif ctype in {"LineChart", "BarChart"}:
+            elif ctype in {"LineChart", "BarChart", "PieChart", "HeatMap"}:
                 layout["w"] = 6 if profile != "Visual" else 12
                 layout["h"] = max(10, int(layout.get("h", 10)))
             elif ctype == "LogsViewer":
@@ -489,7 +495,7 @@ def _apply_archetype_adjustments(
         elif dashboard_type == "analytics":
             if ctype == "StatCard":
                 layout["w"] = 3
-            elif ctype in {"LineChart", "BarChart"}:
+            elif ctype in {"LineChart", "BarChart", "PieChart", "HeatMap"}:
                 layout["w"] = 12 if profile == "Visual" else 6
                 layout["h"] = max(10, int(layout.get("h", 10)))
             elif ctype == "Table":
@@ -556,7 +562,7 @@ def _ensure_required_fields(component: dict[str, Any]) -> dict[str, Any]:
         style.setdefault("metricFontSize", 32)
         style.setdefault("labelFontSize", 13)
         style.setdefault("borderLeftWidth", 4)
-    elif ctype in {"LineChart", "BarChart"}:
+    elif ctype in {"LineChart", "BarChart", "PieChart", "HeatMap"}:
         style.setdefault("showGrid", True)
         style.setdefault("showLegend", True)
     elif ctype == "Table":

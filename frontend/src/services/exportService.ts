@@ -16,6 +16,8 @@ import statCardSource from '../components/dashboard-components/StatCard.tsx?raw'
 import tableSource from '../components/dashboard-components/Table.tsx?raw';
 import barChartSource from '../components/dashboard-components/BarChart.tsx?raw';
 import lineChartSource from '../components/dashboard-components/LineChart.tsx?raw';
+import pieChartSource from '../components/dashboard-components/PieChart.tsx?raw';
+import heatMapSource from '../components/dashboard-components/HeatMap.tsx?raw';
 import statusBadgeSource from '../components/dashboard-components/StatusBadge.tsx?raw';
 import buttonSource from '../components/dashboard-components/Button.tsx?raw';
 import logsViewerSource from '../components/dashboard-components/LogsViewer.tsx?raw';
@@ -116,6 +118,8 @@ const sourceRuntimeFiles: Record<string, string> = {
   'src/components/dashboard-components/Table.tsx': tableSource,
   'src/components/dashboard-components/BarChart.tsx': barChartSource,
   'src/components/dashboard-components/LineChart.tsx': lineChartSource,
+  'src/components/dashboard-components/PieChart.tsx': pieChartSource,
+  'src/components/dashboard-components/HeatMap.tsx': heatMapSource,
   'src/components/dashboard-components/StatusBadge.tsx': statusBadgeSource,
   'src/components/dashboard-components/Button.tsx': buttonSource,
   'src/components/dashboard-components/LogsViewer.tsx': logsViewerSource,

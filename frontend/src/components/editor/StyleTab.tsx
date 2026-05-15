@@ -425,6 +425,22 @@ export default function StyleTab() {
         </>
       )}
 
+      {component.type === 'PieChart' && (
+        <>
+          <SliderField label="Inner Radius" value={style.innerRadius || 50} min={0} max={90} onChange={(value) => handleChange('innerRadius', value)} />
+          <BooleanField label="Show Data Labels" value={style.showDataLabels === true} onChange={(value) => handleChange('showDataLabels', value)} />
+        </>
+      )}
+
+      {component.type === 'HeatMap' && (
+        <>
+          <SliderField label="Cell Gap" value={style.cellGap || 4} min={0} max={12} onChange={(value) => handleChange('cellGap', value)} />
+          <ColorField label="Min Cell Color" value={style.minCellColor || '#dbeafe'} onChange={(v) => handleChange('minCellColor', v)} />
+          <ColorField label="Max Cell Color" value={style.maxCellColor || '#1d4ed8'} onChange={(v) => handleChange('maxCellColor', v)} />
+          <ColorField label="Empty Cell Color" value={style.emptyCellColor || '#f3f4f6'} onChange={(v) => handleChange('emptyCellColor', v)} />
+        </>
+      )}
+
       {component.type === 'LogsViewer' && (
         <>
         </>

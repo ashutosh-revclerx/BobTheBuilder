@@ -165,6 +165,49 @@ COMPONENT_CAPABILITIES: dict[str, dict] = {
             "data": ["xField", "series", "dbBinding"],
         },
     },
+    "PieChart": {
+        "description": "Part-to-whole distribution chart with optional donut mode and slice click actions.",
+        "visual_role": "Shows composition share by category.",
+        "style": CHART_STYLE + [
+            "innerRadius",
+        ],
+        "data": COMMON_VISIBILITY_DATA + [
+            "nameField",
+            "valueField",
+            "showLegend",
+            "showLabels",
+            "donut",
+            "colorScheme",
+            "onSliceClickAction",
+        ],
+        "required": {
+            "style": ["seriesColors"],
+            "data": ["nameField", "valueField", "dbBinding"],
+        },
+    },
+    "HeatMap": {
+        "description": "Two-dimensional density grid mapping x/y buckets to a color-scaled value.",
+        "visual_role": "Highlights concentration and intensity patterns across two categorical axes.",
+        "style": COMMON_CARD_STYLE + [
+            "cellGap",
+            "minCellColor",
+            "maxCellColor",
+            "emptyCellColor",
+        ],
+        "data": COMMON_VISIBILITY_DATA + [
+            "xField",
+            "yField",
+            "valueField",
+            "minValue",
+            "maxValue",
+            "showCellLabels",
+            "onCellClickAction",
+        ],
+        "required": {
+            "style": ["minCellColor", "maxCellColor"],
+            "data": ["xField", "yField", "valueField", "dbBinding"],
+        },
+    },
     "LogsViewer": {
         "description": "Scrollable log stream with level colors, search, filtering, and auto-scroll.",
         "visual_role": "Terminal-like event/log inspection surface.",

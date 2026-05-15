@@ -927,7 +927,8 @@ export default function DataTab() {
   const columns = (data.columns ?? []) as TableColumn[];
   const visibleRoles = selectedComponent.visibleForRoles ?? data.visibleForRoles ?? [];
   const isTable = type === 'Table';
-  const isChart = type === 'BarChart' || type === 'LineChart';
+  const isChart = type === 'BarChart' || type === 'LineChart' || type === 'PieChart' || type === 'HeatMap';
+  const isCartesianChart = type === 'BarChart' || type === 'LineChart';
   const tabs = data.tabs ?? [];
   const optionsList = data.optionsList ?? [];
 
@@ -1380,7 +1381,7 @@ export default function DataTab() {
         </>
       )}
 
-      {isChart && (
+      {isCartesianChart && (
         <>
           <TextField label="X Field" value={data.xField ?? ''} onChange={(value) => handleDataField('xField', value)} />
           <TextField label="Y Field" value={data.yField ?? ''} onChange={(value) => handleDataField('yField', value)} />
@@ -1467,6 +1468,36 @@ export default function DataTab() {
             label="On point click -> set variable"
             value={data.onPointClickAction ?? ''}
             onChange={(value) => handleDataField('onPointClickAction', value)}
+          />
+        </>
+      )}
+
+      {type === 'PieChart' && (
+        <>
+          <TextField label="Name Field" value={data.nameField ?? ''} onChange={(value) => handleDataField('nameField', value)} />
+          <TextField label="Value Field" value={data.valueField ?? ''} onChange={(value) => handleDataField('valueField', value)} />
+          <BooleanField label="Donut" value={data.donut === true} onChange={(value) => handleDataField('donut', value)} />
+          <BooleanField label="Show labels" value={data.showLabels === true} onChange={(value) => handleDataField('showLabels', value)} />
+          <TextField
+            label="On slice click -> set variable"
+            value={data.onSliceClickAction ?? ''}
+            onChange={(value) => handleDataField('onSliceClickAction', value)}
+          />
+        </>
+      )}
+
+      {type === 'HeatMap' && (
+        <>
+          <TextField label="X Field" value={data.xField ?? ''} onChange={(value) => handleDataField('xField', value)} />
+          <TextField label="Y Field" value={data.yField ?? ''} onChange={(value) => handleDataField('yField', value)} />
+          <TextField label="Value Field" value={data.valueField ?? ''} onChange={(value) => handleDataField('valueField', value)} />
+          <TextField label="Min Value" value={String(data.minValue ?? '')} onChange={(value) => handleDataField('minValue', Number(value))} type="number" />
+          <TextField label="Max Value" value={String(data.maxValue ?? '')} onChange={(value) => handleDataField('maxValue', Number(value))} type="number" />
+          <BooleanField label="Show cell labels" value={data.showCellLabels === true} onChange={(value) => handleDataField('showCellLabels', value)} />
+          <TextField
+            label="On cell click -> set variable"
+            value={data.onCellClickAction ?? ''}
+            onChange={(value) => handleDataField('onCellClickAction', value)}
           />
         </>
       )}
