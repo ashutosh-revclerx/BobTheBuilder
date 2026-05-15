@@ -434,7 +434,7 @@ async def delete_dashboard(dashboard_id: str):
         if code == "23503":
             raise HTTPException(
                 status_code=409,
-                detail="Dashboard is still referenced — unassign any customers first",
+                detail="Dashboard is still referenced by other records and cannot be deleted",
             )
         log.error("delete:", err)
         raise HTTPException(status_code=500, detail="Internal server error")
