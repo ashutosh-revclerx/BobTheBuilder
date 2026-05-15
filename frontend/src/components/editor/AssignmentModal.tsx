@@ -173,7 +173,7 @@ export default function AssignmentModal({ dashboardId: propDashboardId, onClose,
   };
 
   const getShareUrl = (customer: Customer) => {
-    const baseUrl = `${window.location.origin}/c/${customer.slug}`;
+    const baseUrl = `${window.location.origin}${import.meta.env.BASE_URL}c/${customer.slug}`;
     if (!customer.access_token) return baseUrl;
     return `${baseUrl}?token=${encodeURIComponent(customer.access_token)}`;
   };
