@@ -252,6 +252,7 @@ case "PieChart":
       padding: 20,
       innerRadius: 50,
       seriesColors: ["#2563eb", "#60a5fa", "#93c5fd"],
+      colors: ["#2563eb", "#60a5fa", "#93c5fd"],
     },
     data: {
       ...createBaseData(),
@@ -265,7 +266,6 @@ case "PieChart":
       variant: "donut",
       donut: true,
       showLegend: true,
-      colors: ["#2563eb", "#60a5fa", "#93c5fd"],
       hoverExpand: true,
     },
     layout: { ...COMPONENT_LAYOUTS[type] },

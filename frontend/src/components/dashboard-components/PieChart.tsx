@@ -46,10 +46,10 @@ const PieChart = React.memo(function PieChart({ config }: { config: ComponentCon
   const chartData = Array.isArray(rawData) ? rawData : [];
   const nameKey = data.categoryKey || data.nameField || data.xField || 'label';
   const valueKey = data.valueField || data.yField || 'value';
-  const palette = data.colors?.length
-    ? data.colors
-    : style.colors?.length
-      ? style.colors
+  const palette = style.colors?.length
+    ? style.colors
+    : data.colors?.length
+      ? data.colors
       : style.seriesColors?.length
         ? style.seriesColors
         : COLOR_SCHEMES[data.colorScheme || 'Blue'];

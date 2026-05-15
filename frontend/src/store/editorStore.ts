@@ -379,6 +379,7 @@ const createDefaultConfig = (
           padding: 20,
           innerRadius: 50,
           showDataLabels: false,
+          colors: ['#2563eb', '#3b82f6', '#60a5fa'],
         },
         data: {
           ...createBaseData(),
@@ -395,7 +396,6 @@ const createDefaultConfig = (
           showLegend: true,
           showLabels: false,
           hoverExpand: true,
-          colors: ['#2563eb', '#3b82f6', '#60a5fa'],
           colorScheme: 'Blue',
           onSliceClickAction: '',
         },

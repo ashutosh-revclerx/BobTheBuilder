@@ -351,13 +351,15 @@ export default function ThemeTab() {
   const toggle = (section: 'component' | 'dashboard' | 'presets') =>
     setExpandedSection((s) => (s === section ? '' : section));
 
+  const pieRows = Array.isArray(data?.mockValue) ? data.mockValue : [];
   const seriesCount = Math.min(
-    Math.max(data?.series?.length ?? 2, 1),
+    Math.max(ctype === 'PieChart' ? (style?.colors?.length ?? data?.colors?.length ?? pieRows.length ?? 3) : (data?.series?.length ?? 2), 1),
     MAX_SERIES_COLORS,
   );
-  const currentSeriesColors = (ctype === 'PieChart' ? style?.colors : style?.seriesColors) ?? Array.from({ length: seriesCount }, (_, i) =>
+  const currentSeriesColors = (ctype === 'PieChart' ? (style?.colors ?? data?.colors) : style?.seriesColors) ?? Array.from({ length: seriesCount }, (_, i) =>
     ['#2563eb', '#7c3aed', '#0891b2', '#059669', '#d97706'][i] ?? '#2563eb',
   );
+  const pieCategoryKey = data?.categoryKey || data?.nameField || data?.xField || 'label';
 
   return (
     <div className="theme-tab">
@@ -607,7 +609,7 @@ export default function ThemeTab() {
                         <LocalSeriesColorInput 
                           value={currentSeriesColors[i] ?? '#2563eb'}
                           componentId={lastSelectedComponentId}
-                          label={data.series?.[i]?.name ?? `Series ${i + 1}`}
+                          label={ctype === 'PieChart' ? String(pieRows[i]?.[pieCategoryKey] ?? `Slice ${i + 1}`) : (data.series?.[i]?.name ?? `Series ${i + 1}`)}
                           onChange={(c) => {
                             const next = [...currentSeriesColors];
                             next[i] = c;

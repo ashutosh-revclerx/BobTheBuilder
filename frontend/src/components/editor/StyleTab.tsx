@@ -24,6 +24,14 @@ const TABLE_VARIANT_DEFAULTS: Record<string, Partial<ComponentStyle>> = {
   },
 };
 
+const PIE_COLOR_THEMES: Record<string, string[]> = {
+  Ocean: ['#2563eb', '#0891b2', '#14b8a6', '#60a5fa', '#0f766e'],
+  Garden: ['#16a34a', '#84cc16', '#0d9488', '#f59e0b', '#22c55e'],
+  Sunset: ['#f97316', '#ef4444', '#f59e0b', '#ec4899', '#7c2d12'],
+  Slate: ['#334155', '#64748b', '#94a3b8', '#0f172a', '#475569'],
+  Vivid: ['#7c3aed', '#2563eb', '#dc2626', '#059669', '#d97706'],
+};
+
 function FormField({
   label,
   children,
@@ -151,11 +159,21 @@ export default function StyleTab() {
 
   const style = component.style;
 
-  const handleChange = (key: keyof ComponentStyle, value: string | number | boolean | Record<any, any>) => {
+  const handleChange = (key: keyof ComponentStyle, value: string | number | boolean | string[] | Record<any, any>) => {
     if (!lastSelectedComponentId) {
       return;
     }
     updateStyle(lastSelectedComponentId, { [key]: value });
+  };
+
+  const getPieSliceLabels = () => {
+    const rows = Array.isArray(component.data.mockValue) ? component.data.mockValue : [];
+    const categoryKey = component.data.categoryKey || component.data.nameField || component.data.xField || 'label';
+    const colorCount = Math.max(style.colors?.length ?? 0, component.data.colors?.length ?? 0, rows.length, 3);
+    return Array.from({ length: colorCount }, (_, index) => {
+      const row = rows[index] as Record<string, unknown> | undefined;
+      return String(row?.[categoryKey] ?? `Slice ${index + 1}`);
+    });
   };
 
   return (
@@ -429,6 +447,45 @@ export default function StyleTab() {
         <>
           <SliderField label="Inner Radius" value={style.innerRadius || 50} min={0} max={90} onChange={(value) => handleChange('innerRadius', value)} />
           <BooleanField label="Show Data Labels" value={style.showDataLabels === true} onChange={(value) => handleChange('showDataLabels', value)} />
+          <SelectField
+            label="Color Theme"
+            value="Custom"
+            options={['Custom', ...Object.keys(PIE_COLOR_THEMES)]}
+            onChange={(value) => {
+              if (value !== 'Custom') handleChange('colors', PIE_COLOR_THEMES[value]);
+            }}
+          />
+          <FormField label="Slice Colors">
+            <div className="mini-editor">
+              {getPieSliceLabels().map((sliceLabel, index) => {
+                const currentColors = style.colors ?? component.data.colors ?? ['#2563eb', '#3b82f6', '#60a5fa'];
+                return (
+                  <div key={`${sliceLabel}-${index}`} className="mini-editor-row">
+                    <span className="form-label" style={{ flex: 1 }}>{sliceLabel}</span>
+                    <input
+                      type="color"
+                      className="color-swatch-input"
+                      value={currentColors[index] ?? '#2563eb'}
+                      onChange={(e) => {
+                        const next = [...currentColors];
+                        next[index] = e.target.value;
+                        handleChange('colors', next);
+                      }}
+                    />
+                    <input
+                      className="form-input"
+                      value={currentColors[index] ?? '#2563eb'}
+                      onChange={(e) => {
+                        const next = [...currentColors];
+                        next[index] = e.target.value;
+                        handleChange('colors', next);
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </FormField>
         </>
       )}
 
